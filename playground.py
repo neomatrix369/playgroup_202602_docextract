@@ -300,17 +300,29 @@ def main():
         if "__" in after_prefix:
             provider, model_name = after_prefix.split("__", 1)
         else:
-            provider, model_name = "unknown", after_prefix
+            provider, model_name = "openrouter", after_prefix
         extracted_rows = parse_tsv(model_file)
         scores = score_model(expected_rows, extracted_rows)
         models_data[model_name] = scores
         model_providers[model_name] = provider
         mm_tag = "MM" if model_meta.get(model_name, {}).get("multimodal") else "text"
-        log.info("  [%s] %s  %s  %.1f%%  (%d/%d)",
+        log.info("  [{}] {}  {}  {:.1f}%  ({}/{})",
                  provider, f"{model_name:35s}", f"{mm_tag:<6}",
                  scores['accuracy'] * 100, scores['total_correct'], scores['total_expected'])
+
+    # F1/Precision/Recall from score.py (semantic scoring)
+    from score import score_all_models as _score_all
+    f1_results = _score_all(str(EXPECTED_FILE), verbose=False)
+    f1_data = {}
+    for r in f1_results:
+        f1_data[r["model_name"]] = {
+            "f1": r["f1"], "precision": r["precision"], "recall": r["recall"],
+            "fields_found": r["fields_found"], "fields_total": r["fields_total"],
+        }
+
     payload = {
         "models": models_data,
+        "f1_scores": f1_data,
         "fields": FIELDS,
         "field_labels": FIELD_LABELS,
         "field_groups": FIELD_GROUPS,
@@ -323,7 +335,7 @@ def main():
 
     html = HTML_TEMPLATE.replace("/*__DATA__*/null", json.dumps(payload))
     OUTPUT_FILE.write_text(html)
-    log.info("Wrote %s  —  open in your browser", OUTPUT_FILE)
+    log.info("Wrote {}  —  open in your browser", OUTPUT_FILE)
 
 
 # ── HTML Template ─────────────────────────────────────────────────────────────
@@ -429,7 +441,8 @@ select,button.ctrl{padding:6px 12px;border:1px solid var(--border);border-radius
       <div class="ctrl-row">
         <label>Sort by:
           <select id="rank-sort" onchange="renderRankTable()">
-            <option value="accuracy">Overall Accuracy</option>
+            <option value="f1">F1 Score</option>
+            <option value="accuracy">Exact-Match Accuracy</option>
             <option value="correct">Correct Extractions</option>
             <option value="wrong">Wrong (fewest)</option>
             <option value="missing">Missing (fewest)</option>
@@ -453,9 +466,19 @@ select,button.ctrl{padding:6px 12px;border:1px solid var(--border);border-radius
       <div id="rank-table-wrap" style="overflow-x:auto"></div>
     </div>
     <div class="card" style="min-width:0">
-      <h2>Accuracy Overview</h2>
+      <h2>F1 Score Overview</h2>
       <div class="chart-wrap"><canvas id="chart-accuracy"></canvas></div>
     </div>
+  </div>
+  <div class="card">
+    <h2>Provider Summary</h2>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Aggregated stats per provider (active models only, F1 &gt; 0). Fields and cost are averages per model.</p>
+    <div id="provider-summary" style="overflow-x:auto"></div>
+    <div id="provider-notes" style="margin-top:10px"></div>
+  </div>
+  <div class="card">
+    <h2>Scoring Methodology</h2>
+    <div id="scoring-notes"></div>
   </div>
 </div>
 
@@ -677,27 +700,38 @@ function switchTab(id){
 
 let chartAccuracy = null
 
+function f1Score(m){ return RAW.f1_scores?.[m]?.f1 || 0 }
+function bestF1(){
+  return activeModels().reduce((best,m)=>Math.max(best, f1Score(m)), 0)
+}
+
 function renderRankings(){
   // Stats bar
   const mods = allModels()
   const active = activeModels()
-  const totalFields = Object.values(RAW.models[active[0]]?.per_field||{}).reduce((s,f)=>s+f.correct+f.missing+f.wrong,0)
+  const providers = allProviders()
+  const topF1 = bestF1()
+  const topModel = active.reduce((best,m)=>f1Score(m)>f1Score(best)?m:best, active[0])
   document.getElementById('stats-bar').innerHTML = `
     <div class="stat-card"><div class="val">${mods.length}</div><div class="lbl">Models tested</div></div>
     <div class="stat-card"><div class="val">${active.length}</div><div class="lbl">Functional models</div></div>
+    <div class="stat-card"><div class="val">${providers.length}</div><div class="lbl">Providers</div></div>
     <div class="stat-card"><div class="val">${RAW.doc_names.length}</div><div class="lbl">Documents</div></div>
-    <div class="stat-card"><div class="val">${RAW.fields.length}</div><div class="lbl">Fields per document</div></div>
-    <div class="stat-card"><div class="val">${mods.length - active.length}</div><div class="lbl">Rate-limited / failed</div></div>
+    <div class="stat-card"><div class="val">${RAW.fields.length}</div><div class="lbl">Fields per doc</div></div>
+    <div class="stat-card"><div class="val">${topF1.toFixed(3)}</div><div class="lbl">Best F1 (${topModel})</div></div>
+    <div class="stat-card"><div class="val">${mods.length - active.length}</div><div class="lbl">Failed (F1=0)</div></div>
   `
   // Populate provider dropdown
   const provSel = document.getElementById('rank-provider')
-  allProviders().forEach(p=>{
+  providers.forEach(p=>{
     const opt = document.createElement('option')
     opt.value = p; opt.text = p.charAt(0).toUpperCase()+p.slice(1)
     provSel.appendChild(opt)
   })
   renderRankTable()
   renderAccuracyChart()
+  renderProviderSummary()
+  renderScoringNotes()
 }
 
 function rankRows(){
@@ -711,12 +745,16 @@ function rankRows(){
   if(provFilter!=='all') models = models.filter(m=>(RAW.model_providers?.[m]||'unknown')===provFilter)
   return models.map(m=>{
     const d = RAW.models[m]
+    const f1s = RAW.f1_scores?.[m] || {}
     let correct=0,wrong=0,missing=0
     for(const f of Object.values(d.per_field)){
       correct+=f.correct; wrong+=f.wrong; missing+=f.missing
     }
-    return {m, acc:d.accuracy, correct, wrong, missing, total:d.total_expected}
+    return {m, acc:d.accuracy, f1:f1s.f1||0, precision:f1s.precision||0, recall:f1s.recall||0,
+            fields_found:f1s.fields_found||0, fields_total:f1s.fields_total||0,
+            correct, wrong, missing, total:d.total_expected}
   }).sort((a,b)=>{
+    if(sort==='f1') return b.f1 - a.f1
     if(sort==='accuracy') return b.acc - a.acc
     if(sort==='correct') return b.correct - a.correct
     if(sort==='wrong') return a.wrong - b.wrong
@@ -739,27 +777,28 @@ function fmtCost(usd, est){
 }
 function renderRankTable(){
   const rows = rankRows()
-  const best = rows[0]?.acc || 1
+  const bestF1Val = rows[0]?.f1 || 1
   let html = `<table><thead><tr>
-    <th>#</th><th>Model</th><th>Provider</th><th>Accuracy</th><th>Score bar</th>
-    <th>Correct</th><th>Wrong</th><th>Missing</th><th>Time</th><th>Cost</th><th>Perf.</th><th>Tier</th>
+    <th>#</th><th>Model</th><th>Provider</th><th>F1</th><th>Prec</th><th>Recall</th><th>Score bar</th>
+    <th>Fields</th><th>Time</th><th>Cost</th><th>Perf.</th><th>Tier</th>
   </tr></thead><tbody>`
   rows.forEach((r,i)=>{
-    const t = tier(r.acc)
+    const t = tier(r.f1)
     const st = RAW.extraction_stats?.[r.m]
+    const fieldsStr = r.fields_total > 0 ? `${r.fields_found.toFixed(1)}/${r.fields_total.toFixed(0)}` : '—'
     html += `<tr>
       <td style="color:var(--muted)">${i+1}</td>
       <td><strong>${r.m}</strong></td>
       <td>${providerBadge(r.m)}</td>
-      <td><strong style="color:${hsl(r.acc)}">${pct(r.acc)}</strong></td>
+      <td><strong style="color:${hsl(r.f1)}">${r.f1.toFixed(3)}</strong></td>
+      <td style="color:var(--muted)">${r.precision.toFixed(3)}</td>
+      <td style="color:var(--muted)">${r.recall.toFixed(3)}</td>
       <td>
         <div class="rank-bar-wrap">
-          <div class="rank-bar" style="width:${(r.acc/Math.max(best,0.01)*100).toFixed(1)}%;background:${hsl(r.acc)}"></div>
+          <div class="rank-bar" style="width:${(r.f1/Math.max(bestF1Val,0.01)*100).toFixed(1)}%;background:${hsl(r.f1)}"></div>
         </div>
       </td>
-      <td style="color:var(--correct)">${r.correct}</td>
-      <td style="color:var(--wrong)">${r.wrong}</td>
-      <td style="color:var(--missing)">${r.missing}</td>
+      <td style="color:var(--muted);font-size:12px">${fieldsStr}</td>
       <td>${fmtTime(st?.total_elapsed_secs, st?.estimated)}</td>
       <td>${fmtCost(st?.total_cost_usd, st?.estimated)}</td>
       <td><span class="badge ${t.cls}">${t.label}</span></td>
@@ -779,10 +818,10 @@ function renderAccuracyChart(){
     data:{
       labels: rows.map(r=>r.m),
       datasets:[{
-        label:'Accuracy',
-        data: rows.map(r=>+(r.acc*100).toFixed(1)),
-        backgroundColor: rows.map(r=>bgAlpha(r.acc)),
-        borderColor: rows.map(r=>hsl(r.acc)),
+        label:'F1 Score',
+        data: rows.map(r=>+(r.f1*100).toFixed(1)),
+        backgroundColor: rows.map(r=>bgAlpha(r.f1)),
+        borderColor: rows.map(r=>hsl(r.f1)),
         borderWidth:1,
         borderRadius:4,
       }]
@@ -791,13 +830,74 @@ function renderAccuracyChart(){
       indexAxis:'y',
       responsive:true,
       maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.parsed.x.toFixed(1)}%`}}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`F1: ${(ctx.parsed.x/100).toFixed(3)}`}}},
       scales:{
         x:{min:0,max:100,ticks:{callback:v=>v+'%'},grid:{color:'#e2e8f0'}},
         y:{ticks:{font:{size:11}}}
       }
     }
   })
+}
+
+function renderProviderSummary(){
+  const providers = allProviders()
+  let html = `<table><thead><tr>
+    <th>Provider</th><th>All</th><th>Active</th><th>Failed</th>
+    <th>Avg F1</th><th>Best F1</th><th>Best Model</th>
+    <th>Avg Fields</th><th>Avg Time</th><th>Avg Cost</th>
+  </tr></thead><tbody>`
+  providers.sort().forEach(p=>{
+    const models = allModels().filter(m=>(RAW.model_providers?.[m]||'unknown')===p)
+    const active = models.filter(m=>f1Score(m)>0)
+    const failed = models.length - active.length
+    const avgF1 = active.length ? active.reduce((s,m)=>s+f1Score(m),0)/active.length : 0
+    const best = models.reduce((b,m)=>f1Score(m)>f1Score(b)?m:b, models[0])
+    const avgFF = active.length ? active.reduce((s,m)=>s+(RAW.f1_scores?.[m]?.fields_found||0),0)/active.length : 0
+    const avgFT = active.length ? active.reduce((s,m)=>s+(RAW.f1_scores?.[m]?.fields_total||0),0)/active.length : 0
+    const fieldsStr = avgFT > 0 ? `${avgFF.toFixed(1)}/${avgFT.toFixed(0)} (${(100*avgFF/avgFT).toFixed(0)}%)` : '—'
+    const times = active.map(m=>RAW.extraction_stats?.[m]?.total_elapsed_secs||0).filter(t=>t>0)
+    const avgTime = times.length ? times.reduce((s,t)=>s+t,0)/times.length : 0
+    const allEst = times.length>0 && active.every(m=>RAW.extraction_stats?.[m]?.estimated)
+    const costs = active.map(m=>RAW.extraction_stats?.[m]?.total_cost_usd||0).filter(c=>c>0)
+    const avgCost = costs.length ? costs.reduce((s,c)=>s+c,0)/costs.length : 0
+    const allCostEst = costs.length>0 && active.filter(m=>(RAW.extraction_stats?.[m]?.total_cost_usd||0)>0).every(m=>RAW.extraction_stats?.[m]?.estimated)
+    html += `<tr>
+      <td>${providerBadge(models[0])}</td>
+      <td>${models.length}</td>
+      <td style="color:var(--correct);font-weight:600">${active.length}</td>
+      <td style="color:${failed?'var(--red)':'var(--muted)'}">${failed}</td>
+      <td><strong style="color:${hsl(avgF1)}">${avgF1.toFixed(3)}</strong></td>
+      <td style="color:${hsl(f1Score(best))};font-weight:600">${f1Score(best).toFixed(3)}</td>
+      <td><strong>${best}</strong></td>
+      <td style="font-size:12px">${fieldsStr}</td>
+      <td>${fmtTime(avgTime, allEst)}</td>
+      <td>${fmtCost(avgCost, allCostEst)}</td>
+    </tr>`
+  })
+  html += '</tbody></table>'
+  document.getElementById('provider-summary').innerHTML = html
+
+  // Notes
+  let notes = '<div style="font-size:12px;color:var(--muted)">'
+  notes += '<p>~ = estimated from config pricing × avg tokens. '
+  notes += 'Failed = models with F1=0 (extraction failed or no parseable output). '
+  notes += 'Fields = avg fields found/total per model (out of '+RAW.fields.length+' per doc × '+RAW.doc_names.length+' docs).</p>'
+  notes += '</div>'
+  document.getElementById('provider-notes').innerHTML = notes
+}
+
+function renderScoringNotes(){
+  let html = ''
+  html += '<div class="insight insight-tip"><strong>Semantic scoring (F1)</strong> — score.py uses field-type-aware comparison: '
+  html += 'exact match for IDs and dates (charity_number, report_date), '
+  html += 'numeric tolerance (0.5%) for financial fields (income, spending), '
+  html += 'and fuzzy string similarity (SequenceMatcher) for text fields (names, addresses). '
+  html += 'F1 = harmonic mean of precision and recall.</div>'
+  html += '<div class="insight"><strong>Exact-match accuracy</strong> — the playground\'s per-field heatmaps and error breakdowns use strict exact matching. '
+  html += 'This is more conservative than F1 scoring — a model may score well on F1 but lower on exact match if values are close but not identical.</div>'
+  html += '<div class="insight"><strong>Two scoring views</strong> — the leaderboard ranks by F1 (semantic), while heatmaps and error patterns show exact-match detail. '
+  html += 'Both are useful: F1 reflects real-world utility, exact match reveals normalisation issues to fix in prompts or post-processing.</div>'
+  document.getElementById('scoring-notes').innerHTML = html
 }
 
 // ── ② Field Heatmap ───────────────────────────────────────────────────────
@@ -1186,7 +1286,7 @@ function renderInsights(){
   html += `<div class="insight insight-tip"><strong>Easiest field:</strong> "${RAW.field_labels[easiest.f]}" is most reliably extracted at ${pct(easiest.avg)} average accuracy.</div>`
   html += `<div class="insight"><strong>Financial data leader:</strong> ${financialConsistency[0].m} is best for income/spending extraction at ${pct(financialConsistency[0].financialAcc)} combined accuracy.</div>`
   if(failedModels.length){
-    html += `<div class="insight insight-warn"><strong>Rate-limited models (${failedModels.length}):</strong> ${failedModels.join(', ')} — all returned API errors (429). Results are invalid; retry with a paid key or lower throughput.</div>`
+    html += `<div class="insight insight-warn"><strong>Failed models (${failedModels.length}):</strong> ${failedModels.join(', ')} — F1=0, extraction failed or returned no parseable output. May be rate-limited, misconfigured, or unable to handle the document format.</div>`
   }
 
   // Check if any model is better on smaller tasks
@@ -1217,7 +1317,7 @@ function renderImprovements(){
   html += `<div class="insight"><strong>Consider few-shot examples</strong> — Models that got 100% on some docs but 0% on others are likely sensitive to document format variations. Adding 1-2 in-context examples from different document layouts will reduce variance.</div>`
   html += `<div class="insight"><strong>Post-processing</strong> — Apply deterministic cleaning after extraction: uppercase postcodes, strip trailing/leading whitespace, normalise decimal places. This can close the gap between "wrong" and "correct" for formatting-only errors.</div>`
   const failedNames = allModels().filter(m=>!isActive(m)).join(', ')
-  if(failedNames) html += `<div class="insight insight-warn"><strong>Re-test rate-limited models</strong> — These models returned all errors: ${failedNames}. Run them again with proper rate limiting or paid API keys before drawing conclusions.</div>`
+  if(failedNames) html += `<div class="insight insight-warn"><strong>Re-test failed models</strong> — These models scored F1=0: ${failedNames}. They may have been rate-limited, returned errors, or produced unparseable output. Re-run with proper API keys or rate limiting before drawing conclusions.</div>`
 
   document.getElementById('improvements').innerHTML = html
 }
@@ -1237,6 +1337,10 @@ function renderEvolution(){
     {phase:'Doubleword Batch API', commits:'05ed52c, 2777ca6', detail:'Added Doubleword as a second provider with batch API extraction pipeline. Created config_models_doubleword.py with 8 models (Qwen3, GPT-OSS). Updated pricing from official Doubleword docs.', icon:'🔗'},
     {phase:'Unified Multi-Provider Extractor', commits:'777f280, cffb225, e707ad2', detail:'Combined separate OpenRouter/Doubleword extractors into a single unified extractor.py with auto-detected backend. Renamed legacy files with provider suffixes (config_models_openrouter.py, llm_openrouter_calls.log).', icon:'⚙️'},
     {phase:'Provider-Aware Pipeline', commits:'7297e92, 5cb5fef', detail:'Added provider name to all prints, logs, filenames, and CSV columns. Defaults to running all providers. Added --all-openrouter flag for OpenRouter-only runs. Updated docs for the multi-provider workflow.', icon:'🏷️'},
+    {phase:'Doubleword Extraction Results', commits:'c7d5a37', detail:'Ran extraction for 7 Doubleword models (dw-qwen3.5-9b, dw-qwen3.5-35b, dw-qwen3-14b, dw-gpt-oss-20b, dw-qwen3-vl-30b, dw-qwen3-vl-235b, dw-qwen3.5-397b). Added checkpoint/resume and parallel batch submission for Doubleword pipeline.', icon:'📊'},
+    {phase:'F1 / Semantic Scoring', commits:'7c97b16, c61e75b', detail:'Replaced simple exact-match accuracy with field-type-aware F1 scoring: exact match for IDs/dates, numeric tolerance (0.5%) for financials, fuzzy string similarity (SequenceMatcher) for text fields like names and addresses. Leaderboard now shows F1, Precision, Recall.', icon:'🎯'},
+    {phase:'Provider Summary & Leaderboard', commits:'cfa9c66', detail:'Added per-provider aggregated stats to the scoring leaderboard: All/Active/Failed counts, avg F1, best model, avg fields, time, and cost. Estimated values marked with ~. Provider summary helps compare OpenRouter vs Doubleword at a glance.', icon:'📋'},
+    {phase:'Loguru Migration', commits:'13adfd2', detail:'Switched from stdlib logging to loguru across all scripts. Unified log format with module name binding, file sinks for LLM call logs, and level colors matching autobatcher defaults (blue DEBUG, bold INFO, yellow WARNING, red ERROR).', icon:'🪵'},
   ]
 
   let html = '<div style="position:relative;padding-left:28px;border-left:3px solid var(--accent)">'
@@ -1257,20 +1361,22 @@ function renderEvolution(){
   const failed = allModels().length - active.length
   const totalExtractions = active.reduce((s,m)=>s+RAW.models[m].total_expected,0)
   const totalCorrect = active.reduce((s,m)=>s+RAW.models[m].total_correct,0)
-  const bestModel = active.reduce((best,m)=>RAW.models[m].accuracy > RAW.models[best].accuracy ? m : best, active[0])
+  const bestModelF1 = active.reduce((best,m)=>f1Score(m)>f1Score(best)?m:best, active[0])
+  const avgF1 = active.reduce((s,m)=>s+f1Score(m),0)/active.length
   const avgAcc = active.reduce((s,m)=>s+RAW.models[m].accuracy,0)/active.length
 
   let statsHtml = `
     <table>
       <tr><td style="font-weight:600">Documents in corpus</td><td>${RAW.doc_names.length} charity PDFs (UK, 100+ pages each)</td></tr>
       <tr><td style="font-weight:600">Fields extracted per doc</td><td>${RAW.fields.length} (identity, financial, address)</td></tr>
-      <tr><td style="font-weight:600">Models configured</td><td>${allModels().length} total, ${active.length} functional, ${failed} failed/rate-limited</td></tr>
-      <tr><td style="font-weight:600">Total field comparisons</td><td>${totalExtractions} expected values scored</td></tr>
-      <tr><td style="font-weight:600">Overall correct extractions</td><td>${totalCorrect} across all functional models</td></tr>
-      <tr><td style="font-weight:600">Best model</td><td><strong>${bestModel}</strong> at ${pct(RAW.models[bestModel].accuracy)}</td></tr>
-      <tr><td style="font-weight:600">Average accuracy</td><td>${pct(avgAcc)} across ${active.length} functional models</td></tr>
-      <tr><td style="font-weight:600">Model tiers</td><td>Free → Ultra-cheap → Great Value → Premium</td></tr>
+      <tr><td style="font-weight:600">Models configured</td><td>${allModels().length} total, ${active.length} functional, ${failed} failed (F1=0)</td></tr>
       <tr><td style="font-weight:600">API providers</td><td>${allProviders().map(p=>p.charAt(0).toUpperCase()+p.slice(1)).join(', ')} (${allProviders().length} providers)</td></tr>
+      <tr><td style="font-weight:600">Total field comparisons</td><td>${totalExtractions} expected values scored</td></tr>
+      <tr><td style="font-weight:600">Best model (F1)</td><td><strong>${bestModelF1}</strong> at F1=${f1Score(bestModelF1).toFixed(3)}</td></tr>
+      <tr><td style="font-weight:600">Average F1</td><td>${avgF1.toFixed(3)} across ${active.length} functional models</td></tr>
+      <tr><td style="font-weight:600">Average exact-match accuracy</td><td>${pct(avgAcc)} across ${active.length} functional models</td></tr>
+      <tr><td style="font-weight:600">Scoring</td><td>F1 (semantic: exact for IDs, numeric tolerance for financials, fuzzy for text)</td></tr>
+      <tr><td style="font-weight:600">Model tiers</td><td>Free → Ultra-cheap → Great Value → Premium</td></tr>
     </table>`
   document.getElementById('evolution-stats').innerHTML = statsHtml
 

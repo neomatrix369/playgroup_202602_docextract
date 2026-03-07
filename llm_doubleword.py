@@ -5,7 +5,6 @@ submit, poll, resume, and download results independently.
 """
 
 import json
-import logging
 import os
 import time
 
@@ -13,12 +12,10 @@ from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
 import utils
-from utils import get_logger
+from utils import get_logger, add_file_logger
 
 logger = get_logger(__name__)
-_fh = logging.FileHandler("llm_doubleword_calls.log")
-_fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
-logger.addHandler(_fh)
+add_file_logger("llm_doubleword_calls.log", name_filter=__name__)
 
 load_dotenv()
 
@@ -95,14 +92,14 @@ async def submit_batch(
         file=(f"batch-{model_short_name}.jsonl", content.encode("utf-8")),
         purpose="batch",
     )
-    logger.info("Uploaded batch file %s for %s", file_response.id, model_short_name)
+    logger.info("Uploaded batch file {} for {}", file_response.id, model_short_name)
 
     batch_response = await client.batches.create(
         input_file_id=file_response.id,
         endpoint="/v1/chat/completions",
         completion_window=completion_window,
     )
-    logger.info("Submitted batch %s for %s (%d rows)",
+    logger.info("Submitted batch {} for {} ({} rows)",
                 batch_response.id, model_short_name, len(rows))
 
     cp = load_checkpoint()

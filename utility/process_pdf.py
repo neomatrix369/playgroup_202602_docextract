@@ -48,17 +48,17 @@ def main():
     # Validate source file exists
     source_path = Path(args.source_pdf)
     if not source_path.exists():
-        log.error("Source file not found: %s", args.source_pdf)
+        log.error("Source file not found: {}", args.source_pdf)
         sys.exit(1)
 
     if not source_path.suffix.lower() == ".pdf":
-        log.warning("File does not have .pdf extension: %s", args.source_pdf)
+        log.warning("File does not have .pdf extension: {}", args.source_pdf)
 
     # Create output filename
     output_path = source_path.with_suffix(".json")
 
-    log.info("Processing: %s", source_path)
-    log.info("Output will be saved to: %s", output_path)
+    log.info("Processing: {}", source_path)
+    log.info("Output will be saved to: {}", output_path)
 
     # Initialize the Document Intelligence client
     client = DocumentIntelligenceClient(
@@ -92,9 +92,9 @@ def main():
     with open(output_path, "w", encoding="utf-8") as json_file:
         json.dump(result_dict, json_file, indent=2, ensure_ascii=False)
 
-    log.info("Analysis complete. Results saved to: %s", output_path)
+    log.info("Analysis complete. Results saved to: {}", output_path)
     log.info("Content format: markdown")
-    log.info("Pages analyzed: %d", len(result_dict.get('pages', [])))
+    log.info("Pages analyzed: {}", len(result_dict.get('pages', [])))
 
 
 if __name__ == "__main__":

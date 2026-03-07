@@ -1,37 +1,37 @@
-import logging
 import os
 import re
 import sys
 from datetime import datetime, timezone
 
-# ── Shared colored logging ────────────────────────────────────────
-_COLORS = {
-    "DEBUG": "\033[36m",       # cyan
-    "INFO": "\033[32m",        # green
-    "WARNING": "\033[33m",     # yellow
-    "ERROR": "\033[31m",       # red
-    "CRITICAL": "\033[1;31m",  # bold red
-    "RESET": "\033[0m",
-}
+from loguru import logger
+
+# ── Shared loguru logging ─────────────────────────────────────────
+# Uses default loguru level colors (matching autobatcher):
+#   DEBUG=blue, INFO=bold, WARNING=yellow, ERROR=red, CRITICAL=bold red
+
+# Remove default handler; add our own with module name from extra["name"]
+logger.remove()
+logger.add(
+    sys.stderr,
+    format="<level>{level: <7}</level> | <cyan>{extra[name]: >12}</cyan> | {message}",
+    level="DEBUG",
+    colorize=True,
+)
 
 
-class ColorFormatter(logging.Formatter):
-    def format(self, record):
-        color = _COLORS.get(record.levelname, _COLORS["RESET"])
-        reset = _COLORS["RESET"]
-        record.levelname = f"{color}{record.levelname:<7}{reset}"
-        return super().format(record)
+def get_logger(name):
+    """Create a loguru logger bound with a module name."""
+    return logger.bind(name=name)
 
 
-def get_logger(name, level=logging.DEBUG):
-    """Create a logger with colored console output."""
-    log = logging.getLogger(name)
-    log.setLevel(level)
-    if not log.handlers:
-        ch = logging.StreamHandler(sys.stderr)
-        ch.setFormatter(ColorFormatter("%(levelname)s %(message)s"))
-        log.addHandler(ch)
-    return log
+def add_file_logger(filename, name_filter=None):
+    """Add a file sink, optionally filtered to a specific logger name."""
+    logger.add(
+        filename,
+        format="{time:YYYY-MM-DD HH:mm:ss} {level: <7} {message}",
+        filter=lambda record: name_filter is None or record["extra"].get("name") == name_filter,
+        level="DEBUG",
+    )
 
 
 def sanitize_error_message(msg):

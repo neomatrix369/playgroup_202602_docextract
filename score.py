@@ -89,7 +89,7 @@ def score(expected_items, predicted_items, verbose=True):
             fn += (1.0 - sim)
             if verbose and sim < 1.0:
                 sim_str = f" (sim={sim:.2f})" if 0 < sim < 1 else ""
-                log.info("  Row %d: %s expected='%s' predicted='%s'%s",
+                log.info("  Row {}: {} expected='{}' predicted='{}'{}",
                          row_num, key, expected_val, predicted_val, sim_str)
 
         # Check predicted fields not in expected (precision side)
@@ -97,7 +97,7 @@ def score(expected_items, predicted_items, verbose=True):
             if key not in expected_row:
                 fp += 1
                 if verbose:
-                    log.info("  Row %d: %s spurious='%s' (not in expected)",
+                    log.info("  Row {}: {} spurious='{}' (not in expected)",
                              row_num, key, predicted_row[key])
 
     fields_total = tp + fn   # total expected fields (always integer, but float for consistency)
@@ -196,7 +196,7 @@ def score_all_models(expected_filename, verbose=False):
             model_name = after_prefix
         predicted_items = get_all_items(predicted_filename)
         if verbose:
-            log.info("--- [%s] %s [%s] ---", provider, model_name, _mod_tag(model_name))
+            log.info("--- [{}] {} [{}] ---", provider, model_name, _mod_tag(model_name))
         scores = score(expected_items, predicted_items, verbose=verbose)
         model_stats = stats.get(model_name, {})
         results.append({
@@ -243,5 +243,33 @@ if __name__ == "__main__":
             print(f"{r['provider']:<12} {r['model_name']:<25} {_mod_tag(r['model_name']):<6} {r['docs']:>4}"
                   f"  {r['f1']:>5.3f}  {r['precision']:>5.3f}  {r['recall']:>6.3f}"
                   f"  {fields_str:>14}  {time_str:>9}  {cost_str:>9}")
+        # Provider summary
+        by_provider = {}
+        for r in results:
+            p = r["provider"]
+            by_provider.setdefault(p, []).append(r)
+
+        print(f"\n  Provider Summary (active models only, F1 > 0)")
+        print(f"  {'Provider':<12} {'All':>4} {'Active':>6} {'Fail':>4}  {'Avg F1':>6}  {'Best F1':>7}  {'Best Model':<25}  {'Avg Fields':>14}  {'Time(s)':>9}  {'Cost($)':>9}")
+        print(f"  {'-'*112}")
+        for p, models in sorted(by_provider.items()):
+            active = [m for m in models if m["f1"] > 0]
+            failed = len(models) - len(active)
+            avg_f1 = sum(m["f1"] for m in active) / len(active) if active else 0
+            best = max(models, key=lambda m: m["f1"])
+            avg_ff = sum(m["fields_found"] for m in active) / len(active) if active else 0
+            avg_ft = sum(m["fields_total"] for m in active) / len(active) if active else 0
+            fields_str = f"{avg_ff:.1f}/{avg_ft:.0f} ({100*avg_ff/avg_ft:.0f}%)" if avg_ft else "-"
+            times = [m["elapsed_secs"] for m in active if m["elapsed_secs"] > 0]
+            avg_time = sum(times) / len(times) if times else 0
+            time_str = f"~{avg_time:.1f}" if avg_time and all(m.get("estimated") for m in active if m["elapsed_secs"] > 0) else f"{avg_time:.1f}" if avg_time else "-"
+            costs = [m["cost_usd"] for m in active if m["cost_usd"] > 0]
+            avg_cost = sum(costs) / len(costs) if costs else 0
+            est_cost_count = sum(1 for m in active if m["cost_usd"] > 0 and m.get("estimated"))
+            cost_prefix = "~" if est_cost_count == len(costs) and costs else ""
+            avg_cost_str = f"{cost_prefix}{avg_cost:.4f}" if avg_cost else "-"
+            print(f"  {p:<12} {len(models):>4} {len(active):>6} {failed:>4}  {avg_f1:>6.3f}  {best['f1']:>7.3f}  {best['model_name']:<25}  {fields_str:>14}  {time_str:>9}  {avg_cost_str:>9}")
+
         print(f"\n  ~ = estimated from config pricing x avg tokens")
+        print(f"  Fail = models with F1=0 (extraction failed or no parseable output)")
         print(f"  Scoring: exact match for IDs/dates, numeric tolerance for financials, fuzzy similarity for text")
