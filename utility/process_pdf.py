@@ -7,6 +7,11 @@ import os
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils import get_logger
+
+log = get_logger("process_pdf")
+
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.ai.documentintelligence.models import AnalyzeDocumentRequest, DocumentContentFormat
 from azure.core.credentials import AzureKeyCredential
@@ -37,23 +42,23 @@ def main():
     endpoint = os.getenv("AZURE_DI_ENDPOINT")
 
     if not api_key or not endpoint:
-        print("Error: AZURE_DI_KEY and AZURE_DI_ENDPOINT must be set in .env file")
+        log.error("AZURE_DI_KEY and AZURE_DI_ENDPOINT must be set in .env file")
         sys.exit(1)
 
     # Validate source file exists
     source_path = Path(args.source_pdf)
     if not source_path.exists():
-        print(f"Error: Source file not found: {args.source_pdf}")
+        log.error("Source file not found: %s", args.source_pdf)
         sys.exit(1)
 
     if not source_path.suffix.lower() == ".pdf":
-        print(f"Warning: File does not have .pdf extension: {args.source_pdf}")
+        log.warning("File does not have .pdf extension: %s", args.source_pdf)
 
     # Create output filename
     output_path = source_path.with_suffix(".json")
 
-    print(f"Processing: {source_path}")
-    print(f"Output will be saved to: {output_path}")
+    log.info("Processing: %s", source_path)
+    log.info("Output will be saved to: %s", output_path)
 
     # Initialize the Document Intelligence client
     client = DocumentIntelligenceClient(
@@ -67,7 +72,7 @@ def main():
         pdf_bytes = pdf_file.read()
 
     # Analyze the document with markdown output format
-    print("Uploading and analyzing document...")
+    log.info("Uploading and analyzing document...")
     poller = client.begin_analyze_document(
         model_id="prebuilt-layout",
         pages=None,
@@ -87,9 +92,9 @@ def main():
     with open(output_path, "w", encoding="utf-8") as json_file:
         json.dump(result_dict, json_file, indent=2, ensure_ascii=False)
 
-    print(f"Analysis complete. Results saved to: {output_path}")
-    print(f"Content format: markdown")
-    print(f"Pages analyzed: {len(result_dict.get('pages', []))}")
+    log.info("Analysis complete. Results saved to: %s", output_path)
+    log.info("Content format: markdown")
+    log.info("Pages analyzed: %d", len(result_dict.get('pages', [])))
 
 
 if __name__ == "__main__":

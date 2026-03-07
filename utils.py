@@ -1,6 +1,37 @@
+import logging
 import os
 import re
+import sys
 from datetime import datetime, timezone
+
+# ── Shared colored logging ────────────────────────────────────────
+_COLORS = {
+    "DEBUG": "\033[36m",       # cyan
+    "INFO": "\033[32m",        # green
+    "WARNING": "\033[33m",     # yellow
+    "ERROR": "\033[31m",       # red
+    "CRITICAL": "\033[1;31m",  # bold red
+    "RESET": "\033[0m",
+}
+
+
+class ColorFormatter(logging.Formatter):
+    def format(self, record):
+        color = _COLORS.get(record.levelname, _COLORS["RESET"])
+        reset = _COLORS["RESET"]
+        record.levelname = f"{color}{record.levelname:<7}{reset}"
+        return super().format(record)
+
+
+def get_logger(name, level=logging.DEBUG):
+    """Create a logger with colored console output."""
+    log = logging.getLogger(name)
+    log.setLevel(level)
+    if not log.handlers:
+        ch = logging.StreamHandler(sys.stderr)
+        ch.setFormatter(ColorFormatter("%(levelname)s %(message)s"))
+        log.addHandler(ch)
+    return log
 
 
 def sanitize_error_message(msg):

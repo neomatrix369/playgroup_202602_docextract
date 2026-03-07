@@ -1,4 +1,4 @@
-VALUE_MODELS = {
+OPENROUTER_MODELS = {
 
     # ═══════════════════════════════════════════════════════════
     #  FREE TIER  (rate-limited: ~20 req/min, ~200 req/day)

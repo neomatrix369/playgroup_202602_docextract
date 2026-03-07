@@ -9,6 +9,9 @@ Output: playground.html  (open in any browser, fully self-contained)
 import csv
 import json
 from pathlib import Path
+from utils import get_logger
+
+log = get_logger("playground")
 
 DATA_DIR = Path("data")
 EXPECTED_FILE = DATA_DIR / "playgroup_dev_expected.tsv"
@@ -44,13 +47,15 @@ FIELD_GROUPS = {
 
 
 def load_model_meta() -> dict:
-    """Read tier, pricing and modality info from config_models.py's VALUE_MODELS."""
+    """Read tier, pricing and modality info from all model configs."""
     try:
-        from config_models import VALUE_MODELS
+        from config_models_openrouter import OPENROUTER_MODELS
+        from config_models_doubleword import DOUBLEWORD_MODELS
     except ImportError:
         return {}
+    all_models = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS}
     meta = {}
-    for short_name, cfg in VALUE_MODELS.items():
+    for short_name, cfg in all_models.items():
         if not isinstance(cfg, dict):
             continue
         raw_tier = cfg.get("tier", "unknown")
@@ -139,10 +144,12 @@ def load_extraction_stats() -> dict:
         avg_prompt = 180_000   # typical total prompt tokens across 11 rows
         avg_completion = 1_500
         try:
-            from config_models import VALUE_MODELS
+            from config_models_openrouter import OPENROUTER_MODELS
+            from config_models_doubleword import DOUBLEWORD_MODELS
+            all_models = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS}
         except ImportError:
-            VALUE_MODELS = {}
-        for model_name, cfg in VALUE_MODELS.items():
+            all_models = {}
+        for model_name, cfg in all_models.items():
             if model_name not in stats:
                 price_in = cfg.get("price_in", 0)
                 price_out = cfg.get("price_out", 0)
@@ -286,19 +293,29 @@ def main():
     model_meta = load_model_meta()
     extraction_stats = load_extraction_stats()
     models_data = {}
+    model_providers = {}
     for model_file in sorted(DATA_DIR.glob("playgroup_dev_extracted__*.tsv")):
-        model_name = model_file.stem.replace("playgroup_dev_extracted__", "")
+        after_prefix = model_file.stem.replace("playgroup_dev_extracted__", "")
+        # New format: {provider}__{model} or legacy: {model}
+        if "__" in after_prefix:
+            provider, model_name = after_prefix.split("__", 1)
+        else:
+            provider, model_name = "unknown", after_prefix
         extracted_rows = parse_tsv(model_file)
         scores = score_model(expected_rows, extracted_rows)
         models_data[model_name] = scores
+        model_providers[model_name] = provider
         mm_tag = "MM" if model_meta.get(model_name, {}).get("multimodal") else "text"
-        print(f"  {model_name:35s}  {mm_tag:<6}  {scores['accuracy']:5.1%}  ({scores['total_correct']}/{scores['total_expected']})")
+        log.info("  [%s] %s  %s  %.1f%%  (%d/%d)",
+                 provider, f"{model_name:35s}", f"{mm_tag:<6}",
+                 scores['accuracy'] * 100, scores['total_correct'], scores['total_expected'])
     payload = {
         "models": models_data,
         "fields": FIELDS,
         "field_labels": FIELD_LABELS,
         "field_groups": FIELD_GROUPS,
         "model_meta": model_meta,
+        "model_providers": model_providers,
         "extraction_stats": extraction_stats,
         "doc_names": doc_names,
         "expected": expected_rows,
@@ -306,7 +323,7 @@ def main():
 
     html = HTML_TEMPLATE.replace("/*__DATA__*/null", json.dumps(payload))
     OUTPUT_FILE.write_text(html)
-    print(f"\nWrote {OUTPUT_FILE}  —  open in your browser")
+    log.info("Wrote %s  —  open in your browser", OUTPUT_FILE)
 
 
 # ── HTML Template ─────────────────────────────────────────────────────────────
@@ -425,6 +442,11 @@ select,button.ctrl{padding:6px 12px;border:1px solid var(--border);border-radius
             <option value="free">Free tier only</option>
             <option value="ultra-cheap">≤ Ultra-cheap</option>
             <option value="great-value">≤ Great Value</option>
+          </select>
+        </label>
+        <label>Provider:
+          <select id="rank-provider" onchange="renderRankTable()">
+            <option value="all">All Providers</option>
           </select>
         </label>
       </div>
@@ -558,7 +580,7 @@ select,button.ctrl{padding:6px 12px;border:1px solid var(--border);border-radius
 <div id="tab-evolution" class="tab-panel">
   <div class="card">
     <h2>Project Evolution Timeline</h2>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:16px">How this extraction benchmark evolved across 10 commits — from raw data preparation to a multi-model scored leaderboard.</p>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:16px">How this extraction benchmark evolved — from raw data preparation to a multi-provider, multi-model scored leaderboard.</p>
     <div id="evolution-timeline"></div>
   </div>
   <div class="two-col">
@@ -615,6 +637,19 @@ function costTierBadge(m){
   const t = RAW.model_meta?.[m]?.tier || 'unknown'
   return `<span class="badge ${tierBadgeCls(t)}">${tierLabel(t)}</span>`
 }
+function providerLabel(m){
+  const p = RAW.model_providers?.[m] || 'unknown'
+  return p.charAt(0).toUpperCase() + p.slice(1)
+}
+function providerBadge(m){
+  const p = RAW.model_providers?.[m] || 'unknown'
+  const cls = {'openrouter':'badge-blue','doubleword':'badge-yellow'}[p]||'badge-gray'
+  const label = p.charAt(0).toUpperCase() + p.slice(1)
+  return `<span class="badge ${cls}">${label}</span>`
+}
+function allProviders(){
+  return [...new Set(Object.values(RAW.model_providers||{}))]
+}
 
 // ── Tab switching ─────────────────────────────────────────────────────────
 
@@ -654,6 +689,13 @@ function renderRankings(){
     <div class="stat-card"><div class="val">${RAW.fields.length}</div><div class="lbl">Fields per document</div></div>
     <div class="stat-card"><div class="val">${mods.length - active.length}</div><div class="lbl">Rate-limited / failed</div></div>
   `
+  // Populate provider dropdown
+  const provSel = document.getElementById('rank-provider')
+  allProviders().forEach(p=>{
+    const opt = document.createElement('option')
+    opt.value = p; opt.text = p.charAt(0).toUpperCase()+p.slice(1)
+    provSel.appendChild(opt)
+  })
   renderRankTable()
   renderAccuracyChart()
 }
@@ -661,10 +703,12 @@ function renderRankings(){
 function rankRows(){
   const sort = document.getElementById('rank-sort').value
   const filter = document.getElementById('rank-filter').value
+  const provFilter = document.getElementById('rank-provider')?.value || 'all'
   const tierBudgets = {'free':['free'],'ultra-cheap':['free','ultra-cheap'],'great-value':['free','ultra-cheap','great-value']}
   let models = allModels()
   if(filter==='active') models = activeModels()
   else if(tierBudgets[filter]) models = models.filter(m=>tierBudgets[filter].includes(RAW.model_meta?.[m]?.tier))
+  if(provFilter!=='all') models = models.filter(m=>(RAW.model_providers?.[m]||'unknown')===provFilter)
   return models.map(m=>{
     const d = RAW.models[m]
     let correct=0,wrong=0,missing=0
@@ -697,7 +741,7 @@ function renderRankTable(){
   const rows = rankRows()
   const best = rows[0]?.acc || 1
   let html = `<table><thead><tr>
-    <th>#</th><th>Model</th><th>Accuracy</th><th>Score bar</th>
+    <th>#</th><th>Model</th><th>Provider</th><th>Accuracy</th><th>Score bar</th>
     <th>Correct</th><th>Wrong</th><th>Missing</th><th>Time</th><th>Cost</th><th>Perf.</th><th>Tier</th>
   </tr></thead><tbody>`
   rows.forEach((r,i)=>{
@@ -706,6 +750,7 @@ function renderRankTable(){
     html += `<tr>
       <td style="color:var(--muted)">${i+1}</td>
       <td><strong>${r.m}</strong></td>
+      <td>${providerBadge(r.m)}</td>
       <td><strong style="color:${hsl(r.acc)}">${pct(r.acc)}</strong></td>
       <td>
         <div class="rank-bar-wrap">
@@ -768,7 +813,7 @@ function renderFieldHeatmap(){
   html += '</tr></thead><tbody>'
 
   for(const m of models){
-    html += `<tr><td style="font-size:12px;font-weight:600;white-space:nowrap">${m}</td>`
+    html += `<tr><td style="font-size:12px;font-weight:600;white-space:nowrap">${m} <span style="font-weight:400;color:var(--muted);font-size:10px">${providerLabel(m)}</span></td>`
     const pf = RAW.models[m].per_field
     for(const f of fields){
       const fd = pf[f] || {correct:0,missing:0,wrong:0}
@@ -1073,12 +1118,13 @@ function renderRecommendations(){
   let budgetNote = budget==='any' ? '' : ` <span style="color:var(--muted)">(budget: ${tierLabel(budget)} and below)</span>`
   let html = `<p style="font-size:12px;color:var(--muted);margin-bottom:14px">Ranking models by accuracy on: <strong>${relevantFields.map(f=>RAW.field_labels[f]).join(', ')}</strong>${budgetNote}</p>`
   if(!models.length){html+='<p style="color:var(--muted)">No functional models match this budget filter.</p>'; document.getElementById('rec-output').innerHTML=html; return}
-  html += '<table><thead><tr><th>#</th><th>Model</th><th>Accuracy on selected fields</th><th>Correct</th><th>Perf.</th><th>Cost</th></tr></thead><tbody>'
+  html += '<table><thead><tr><th>#</th><th>Model</th><th>Provider</th><th>Accuracy on selected fields</th><th>Correct</th><th>Perf.</th><th>Cost</th></tr></thead><tbody>'
   scores.forEach((r,i)=>{
     const t = tier(r.acc)
     html += `<tr>
       <td style="color:var(--muted)">${i+1}</td>
       <td><strong>${r.m}</strong></td>
+      <td>${providerBadge(r.m)}</td>
       <td>
         <span style="color:${hsl(r.acc)};font-weight:700">${pct(r.acc)}</span>
         <div class="rank-bar-wrap" style="margin-top:3px;width:120px">
@@ -1182,12 +1228,15 @@ function renderEvolution(){
   const timeline = [
     {phase:'Data Preparation', commits:'8482875, bda4127, 3c4a94a', detail:'Automated Kleister-Charity data extraction. Collected 11 PDF documents (5→10→11). Built utility scripts for data prep.', icon:'📦'},
     {phase:'Format Standardisation', commits:'56eebd2', detail:'Converted expected/predicted TSV files to proper tab-delimited format. Enabled delimiter validation in score.py.', icon:'🔧'},
-    {phase:'Multi-Model Leaderboard', commits:'5523528', detail:'Added config_models.py with 40+ model configs (tiers, pricing, multimodal flags). Built extractor.py, score.py leaderboard, and this interactive playground. Generated extraction results for 33+ models via OpenRouter.', icon:'🏆'},
+    {phase:'Multi-Model Leaderboard', commits:'5523528', detail:'Added config_models_openrouter.py with 40+ model configs (tiers, pricing, multimodal flags). Built extractor.py, score.py leaderboard, and this interactive playground. Generated extraction results for 33+ models via OpenRouter.', icon:'🏆'},
     {phase:'Documentation', commits:'013826d', detail:'Rewrote README and QUICKSTART to cover full pipeline: extractor.py → score.py → playground.py. Documented model tiers, CLI patterns, and output files.', icon:'📖'},
     {phase:'Model Cleanup & Refactor', commits:'66dd9d5', detail:'Removed 8 unavailable models (deepseek-r1-free, gpt-oss-120b-free, gemini-flash-free, etc.). Deleted stale TSVs. Added extraction call log tracking. Refactored LLM provider selection.', icon:'🧹'},
     {phase:'Security Hardening', commits:'1fad564', detail:'Added sanitize_error_message() to scrub user_id/API keys from all logs and TSV outputs before writing to disk.', icon:'🔒'},
     {phase:'Extended Results', commits:'5d92ce5', detail:'Ran extractions for 8 additional models (claude-3.5-haiku, command-r-plus, gemma-3-27b-free, etc.). Added extraction_stats.csv with per-model timing and cost data.', icon:'📊'},
-    {phase:'Cost & Speed Tracking', commits:'5b13d98', detail:'Added time and cost columns to the scoring leaderboard. Reads actual elapsed time and API cost from extraction stats. Estimates costs for models without stats using config pricing × avg tokens.', icon:'💰'},
+    {phase:'Cost & Speed Tracking', commits:'5b13d98, f640b10', detail:'Added time and cost columns to the scoring leaderboard and playground. Reads actual elapsed time and API cost from extraction stats. Estimates costs for models without stats using config pricing. Added Project Evolution tab.', icon:'💰'},
+    {phase:'Doubleword Batch API', commits:'05ed52c, 2777ca6', detail:'Added Doubleword as a second provider with batch API extraction pipeline. Created config_models_doubleword.py with 8 models (Qwen3, GPT-OSS). Updated pricing from official Doubleword docs.', icon:'🔗'},
+    {phase:'Unified Multi-Provider Extractor', commits:'777f280, cffb225, e707ad2', detail:'Combined separate OpenRouter/Doubleword extractors into a single unified extractor.py with auto-detected backend. Renamed legacy files with provider suffixes (config_models_openrouter.py, llm_openrouter_calls.log).', icon:'⚙️'},
+    {phase:'Provider-Aware Pipeline', commits:'7297e92, 5cb5fef', detail:'Added provider name to all prints, logs, filenames, and CSV columns. Defaults to running all providers. Added --all-openrouter flag for OpenRouter-only runs. Updated docs for the multi-provider workflow.', icon:'🏷️'},
   ]
 
   let html = '<div style="position:relative;padding-left:28px;border-left:3px solid var(--accent)">'
@@ -1221,7 +1270,7 @@ function renderEvolution(){
       <tr><td style="font-weight:600">Best model</td><td><strong>${bestModel}</strong> at ${pct(RAW.models[bestModel].accuracy)}</td></tr>
       <tr><td style="font-weight:600">Average accuracy</td><td>${pct(avgAcc)} across ${active.length} functional models</td></tr>
       <tr><td style="font-weight:600">Model tiers</td><td>Free → Ultra-cheap → Great Value → Premium</td></tr>
-      <tr><td style="font-weight:600">API provider</td><td>OpenRouter (unified access to 40+ models)</td></tr>
+      <tr><td style="font-weight:600">API providers</td><td>${allProviders().map(p=>p.charAt(0).toUpperCase()+p.slice(1)).join(', ')} (${allProviders().length} providers)</td></tr>
     </table>`
   document.getElementById('evolution-stats').innerHTML = statsHtml
 
@@ -1234,12 +1283,13 @@ function renderEvolution(){
   }
   statModels.sort((a,b)=>stats[a].total_elapsed_secs - stats[b].total_elapsed_secs)
   let tbl = `<table><thead><tr>
-    <th>Model</th><th>Total Time</th><th>Avg/Doc</th><th>Total Cost</th><th>Avg/Doc</th><th>Prompt Tokens</th><th>Completion Tokens</th>
+    <th>Model</th><th>Provider</th><th>Total Time</th><th>Avg/Doc</th><th>Total Cost</th><th>Avg/Doc</th><th>Prompt Tokens</th><th>Completion Tokens</th>
   </tr></thead><tbody>`
   statModels.forEach(m=>{
     const s = stats[m]
     tbl += `<tr>
       <td><strong>${m}</strong></td>
+      <td>${providerBadge(m)}</td>
       <td>${fmtTime(s.total_elapsed_secs, s.estimated)}</td>
       <td>${fmtTime(s.avg_secs_per_row, s.estimated)}</td>
       <td>${fmtCost(s.total_cost_usd, s.estimated)}</td>

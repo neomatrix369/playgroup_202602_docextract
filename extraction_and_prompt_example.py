@@ -1,5 +1,8 @@
 import csv
 import llm_openrouter
+from utils import get_logger
+
+log = get_logger("example")
 
 IN_FILENAME = 'data/playgroup_dev_in.tsv'
 
@@ -47,4 +50,4 @@ if __name__ == "__main__":
 
             # call llm
             response = llm_openrouter.call_llm(model, prompt_template, text_djvu2hocr)
-            print(response)
+            log.info(response)

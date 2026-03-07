@@ -1,12 +1,58 @@
 import csv
 import glob
 import sys
+from difflib import SequenceMatcher
 
-from config_models import VALUE_MODELS
+from config_models_doubleword import DOUBLEWORD_MODELS
+from config_models_openrouter import OPENROUTER_MODELS
+from utils import get_logger
+
+log = get_logger("score")
+
+ALL_MODELS = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS}
+
+# Fields where exact match is required (no fuzzy scoring)
+EXACT_FIELDS = {"charity_number", "report_date"}
+# Fields compared as numbers (tolerance-based)
+NUMERIC_FIELDS = {"income_annually_in_british_pounds", "spending_annually_in_british_pounds"}
+# All other fields use semantic (fuzzy string) comparison
+NUMERIC_TOLERANCE = 0.005  # 0.5% relative tolerance
+
+
+def _normalize(value):
+    """Normalize a string for semantic comparison: lowercase, collapse underscores/spaces."""
+    return value.lower().replace("_", " ").strip()
+
+
+def _field_similarity(key, expected_val, predicted_val):
+    """Return a similarity score between 0.0 and 1.0 for a field pair.
+
+    - Exact fields: 1.0 if equal, 0.0 otherwise
+    - Numeric fields: 1.0 if within tolerance, 0.0 otherwise
+    - Text fields: SequenceMatcher ratio on normalized strings
+    """
+    if predicted_val is None:
+        return 0.0
+
+    if key in EXACT_FIELDS:
+        return 1.0 if predicted_val == expected_val else 0.0
+
+    if key in NUMERIC_FIELDS:
+        try:
+            exp_num = float(expected_val.replace(",", "").replace("_", ""))
+            pred_num = float(predicted_val.replace(",", "").replace("_", ""))
+            if exp_num == 0:
+                return 1.0 if pred_num == 0 else 0.0
+            return 1.0 if abs(exp_num - pred_num) / abs(exp_num) <= NUMERIC_TOLERANCE else 0.0
+        except (ValueError, TypeError):
+            return 0.0
+
+    # Text fields: semantic similarity
+    return SequenceMatcher(None, _normalize(expected_val), _normalize(predicted_val)).ratio()
 
 
 def _mod_tag(model_name):
-    cfg = VALUE_MODELS.get(model_name)
+    cfg = ALL_MODELS.get(model_name)
     return "MM" if cfg and cfg.get("multimodal") else "text"
 
 
@@ -15,26 +61,57 @@ def get_all_items(filename):
     with open(filename, 'r') as tsvfile:
         reader = csv.reader(tsvfile, delimiter='\t', quoting=csv.QUOTE_NONE)
         for item in reader:
-            # e.g.
-            # ['address__post_town=SHREWSBURY', 'address__postcode=SY3_7PQ', 'address__street_line=58_TRINITY_STREET', 'charity_name=The_Sanata_Charitable_Trust', 'charity_number=1132766', 'income_annually_in_british_pounds=255653.00', 'report_date=2015-12-31', 'spending_annually_in_british_pounds=258287.00']
             k_v_pairs = dict([itm.split('=', 1) for itm in item if '=' in itm])
             items.append(k_v_pairs)
     return items
 
 
 def score(expected_items, predicted_items, verbose=True):
-    total = 0
-    correct = 0
+    """Score predicted vs expected using semantic similarity with precision, recall, F1.
+
+    Uses field-type-aware comparison: exact match for IDs/dates, numeric tolerance for
+    financial fields, and fuzzy string similarity for text fields (names, addresses).
+
+    Returns dict with: tp, fp, fn, precision, recall, f1, fields_found, fields_total, docs.
+    """
+    tp = 0.0   # sum of similarity scores for matched fields
+    fp = 0     # predicted but not in expected (spurious)
+    fn = 0.0   # sum of (1 - similarity) for expected fields
+
     for row_num, expected_row in enumerate(expected_items):
         predicted_row = predicted_items[row_num] if row_num < len(predicted_items) else {}
+
+        # Check expected fields (recall side)
         for key, expected_val in expected_row.items():
-            total += 1
             predicted_val = predicted_row.get(key)
-            if predicted_val == expected_val:
-                correct += 1
-            elif verbose:
-                print(f"  Row {row_num}: {key} expected='{expected_val}' predicted='{predicted_val}'")
-    return correct, total
+            sim = _field_similarity(key, expected_val, predicted_val)
+            tp += sim
+            fn += (1.0 - sim)
+            if verbose and sim < 1.0:
+                sim_str = f" (sim={sim:.2f})" if 0 < sim < 1 else ""
+                log.info("  Row %d: %s expected='%s' predicted='%s'%s",
+                         row_num, key, expected_val, predicted_val, sim_str)
+
+        # Check predicted fields not in expected (precision side)
+        for key in predicted_row:
+            if key not in expected_row:
+                fp += 1
+                if verbose:
+                    log.info("  Row %d: %s spurious='%s' (not in expected)",
+                             row_num, key, predicted_row[key])
+
+    fields_total = tp + fn   # total expected fields (always integer, but float for consistency)
+    fields_found = tp        # correctly matched fields (sum of similarities)
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+
+    return {
+        "tp": tp, "fp": fp, "fn": fn,
+        "precision": precision, "recall": recall, "f1": f1,
+        "fields_found": fields_found, "fields_total": fields_total,
+        "docs": len(expected_items),
+    }
 
 
 def _load_stats(stats_filename="data/extraction_stats.csv",
@@ -90,7 +167,7 @@ def _load_stats(stats_filename="data/extraction_stats.csv",
         avg_elapsed = sum(t for t, _ in known_tokens) / len(known_tokens)
         avg_prompt = 180_000  # typical total prompt tokens across 11 rows
         avg_completion = 1_500
-        for model_name, cfg in VALUE_MODELS.items():
+        for model_name, cfg in ALL_MODELS.items():
             if model_name not in stats:
                 price_in = cfg.get("price_in", 0)
                 price_out = cfg.get("price_out", 0)
@@ -109,16 +186,27 @@ def score_all_models(expected_filename, verbose=False):
     stats = _load_stats()
     results = []
     for predicted_filename in sorted(glob.glob("data/*_dev_extracted__*.tsv")):
-        model_name = predicted_filename.split("__", 1)[1].removesuffix(".tsv")
+        # Filename: playgroup_dev_extracted__{provider}__{model}.tsv (new)
+        #       or: playgroup_dev_extracted__{model}.tsv (legacy, no provider)
+        after_prefix = predicted_filename.split("__", 1)[1].removesuffix(".tsv")
+        if "__" in after_prefix:
+            provider, model_name = after_prefix.split("__", 1)
+        else:
+            provider = "openrouter"
+            model_name = after_prefix
         predicted_items = get_all_items(predicted_filename)
         if verbose:
-            print(f"\n--- {model_name} [{_mod_tag(model_name)}] ---")
-        correct, total = score(expected_items, predicted_items, verbose=verbose)
+            log.info("--- [%s] %s [%s] ---", provider, model_name, _mod_tag(model_name))
+        scores = score(expected_items, predicted_items, verbose=verbose)
         model_stats = stats.get(model_name, {})
-        results.append((model_name, correct, total,
-                         model_stats.get("elapsed_secs", 0),
-                         model_stats.get("cost_usd", 0),
-                         model_stats.get("estimated", False)))
+        results.append({
+            "provider": provider,
+            "model_name": model_name,
+            **scores,
+            "elapsed_secs": model_stats.get("elapsed_secs", 0),
+            "cost_usd": model_stats.get("cost_usd", 0),
+            "estimated": model_stats.get("estimated", False),
+        })
     return results
 
 
@@ -130,18 +218,30 @@ if __name__ == "__main__":
         predicted_filename = sys.argv[1]
         expected_items = get_all_items(expected_filename)
         predicted_items = get_all_items(predicted_filename)
-        correct, total = score(expected_items, predicted_items, verbose=True)
-        print(f"\nScore: {correct}/{total}")
+        s = score(expected_items, predicted_items, verbose=True)
+        ft = s['fields_total']
+        ff = s['fields_found']
+        pct = 100 * ff / ft if ft else 0
+        print(f"\nF1: {s['f1']:.3f}  Precision: {s['precision']:.3f}  Recall: {s['recall']:.3f}"
+              f"  Fields: {ff:.1f}/{ft:.0f} ({pct:.0f}%)  Docs: {s['docs']}")
     else:
-        # Score all models
+        # Score all models — leaderboard ranked by F1
         results = score_all_models(expected_filename, verbose=False)
-        print(f"\n{'Model':<25} {'Mod':<6} {'Score':>10}  {'%':>7}  {'Time(s)':>9}  {'Cost($)':>9}")
-        print("-" * 75)
-        results.sort(key=lambda r: r[1] / r[2] if r[2] else 0, reverse=True)
-        for model_name, correct, total, elapsed, cost, estimated in results:
-            pct = 100 * correct / total if total else 0
-            prefix = "~" if estimated else ""
-            time_str = f"{prefix}{elapsed:.1f}" if elapsed else "-"
-            cost_str = f"{prefix}{cost:.4f}" if cost else "-"
-            print(f"{model_name:<25} {_mod_tag(model_name):<6} {correct:>4}/{total:<4}  {pct:>6.1f}%  {time_str:>9}  {cost_str:>9}")
+        header = (f"{'Provider':<12} {'Model':<25} {'Mod':<6} {'Docs':>4}"
+                  f"  {'F1':>5}  {'Prec':>5}  {'Recall':>6}"
+                  f"  {'Fields':>14}  {'Time(s)':>9}  {'Cost($)':>9}")
+        print(f"\n{header}")
+        print("-" * len(header))
+        results.sort(key=lambda r: r["f1"], reverse=True)
+        for r in results:
+            prefix = "~" if r["estimated"] else ""
+            time_str = f"{prefix}{r['elapsed_secs']:.1f}" if r["elapsed_secs"] else "-"
+            cost_str = f"{prefix}{r['cost_usd']:.4f}" if r["cost_usd"] else "-"
+            ft = r["fields_total"]
+            ff = r["fields_found"]
+            fields_str = f"{ff:.1f}/{ft:.0f} ({100*ff/ft:.0f}%)" if ft else "-"
+            print(f"{r['provider']:<12} {r['model_name']:<25} {_mod_tag(r['model_name']):<6} {r['docs']:>4}"
+                  f"  {r['f1']:>5.3f}  {r['precision']:>5.3f}  {r['recall']:>6.3f}"
+                  f"  {fields_str:>14}  {time_str:>9}  {cost_str:>9}")
         print(f"\n  ~ = estimated from config pricing x avg tokens")
+        print(f"  Scoring: exact match for IDs/dates, numeric tolerance for financials, fuzzy similarity for text")
