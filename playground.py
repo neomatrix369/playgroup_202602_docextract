@@ -82,6 +82,11 @@ def load_extraction_stats() -> dict:
     3. config pricing x avg tokens (estimate, marked with estimated=true)
     """
     stats = {}
+    field_names = [
+        "charity_number", "charity_name", "report_date",
+        "income_annually_in_british_pounds", "spending_annually_in_british_pounds",
+        "address__postcode", "address__post_town", "address__street_line",
+    ]
 
     # 1. Primary: stats CSV
     stats_file = DATA_DIR / "extraction_stats.csv"
@@ -93,18 +98,26 @@ def load_extraction_stats() -> dict:
                     continue
                 elapsed = float(row.get("total_elapsed_secs", 0))
                 cost = float(row.get("total_cost_usd", 0))
-                if elapsed or cost:
-                    stats[name] = {
-                        "total_elapsed_secs": elapsed,
-                        "total_cost_usd": cost,
-                        "total_prompt_tokens": int(row.get("total_prompt_tokens", 0)),
-                        "total_completion_tokens": int(row.get("total_completion_tokens", 0)),
-                        "rows_with_values": int(row.get("rows_with_values", 0)),
-                        "rows_empty": int(row.get("rows_empty", 0)),
-                        "avg_secs_per_row": float(row.get("avg_secs_per_row", 0)),
-                        "avg_cost_per_row": float(row.get("avg_cost_per_row", 0)),
-                        "estimated": False,
-                    }
+                total = int(row.get("total", 0))
+                rows_with = int(row.get("rows_with_values", 0))
+                rows_empty = int(row.get("rows_empty", 0))
+                field_counts = {f: int(row.get(f, 0)) for f in field_names}
+                stats[name] = {
+                    "total_elapsed_secs": elapsed,
+                    "total_cost_usd": cost,
+                    "total_prompt_tokens": int(row.get("total_prompt_tokens", 0)),
+                    "total_completion_tokens": int(row.get("total_completion_tokens", 0)),
+                    "rows_with_values": rows_with,
+                    "rows_empty": rows_empty,
+                    "total_rows": total or (rows_with + rows_empty),
+                    "avg_secs_per_row": float(row.get("avg_secs_per_row", 0)),
+                    "avg_cost_per_row": float(row.get("avg_cost_per_row", 0)),
+                    "field_counts": field_counts,
+                    "estimated": False,
+                }
+                # Only keep elapsed/cost if non-zero (for estimation fallback)
+                if not elapsed and not cost:
+                    stats[name]["estimated"] = True
 
     # 2. Fallback: aggregate from call log
     call_log_file = DATA_DIR / "extraction_call_log.csv"
@@ -132,8 +145,10 @@ def load_extraction_stats() -> dict:
                         "total_completion_tokens": a["completion"],
                         "rows_with_values": a["rows"],
                         "rows_empty": 0,
+                        "total_rows": a["rows"],
                         "avg_secs_per_row": a["elapsed"] / n,
                         "avg_cost_per_row": a["cost"] / n,
+                        "field_counts": {},
                         "estimated": False,
                     }
 
@@ -163,8 +178,10 @@ def load_extraction_stats() -> dict:
                         "total_completion_tokens": avg_completion,
                         "rows_with_values": 0,
                         "rows_empty": 0,
+                        "total_rows": 0,
                         "avg_secs_per_row": avg_elapsed / n,
                         "avg_cost_per_row": est_cost / n,
+                        "field_counts": {},
                         "estimated": True,
                     }
 
@@ -429,6 +446,7 @@ select,button.ctrl{padding:6px 12px;border:1px solid var(--border);border-radius
   <button class="tab-btn" onclick="switchTab('errors')">Error Breakdown</button>
   <button class="tab-btn" onclick="switchTab('deepdive')">Deep Dive</button>
   <button class="tab-btn" onclick="switchTab('recommendations')">Recommendations</button>
+  <button class="tab-btn" onclick="switchTab('provider-analysis')">Provider Analysis</button>
   <button class="tab-btn" onclick="switchTab('evolution')">Project Evolution</button>
 </div>
 
@@ -599,6 +617,54 @@ select,button.ctrl{padding:6px 12px;border:1px solid var(--border);border-radius
   </div>
 </div>
 
+<!-- ═════════════════════════ PROVIDER ANALYSIS ═════════════════════════ -->
+<div id="tab-provider-analysis" class="tab-panel">
+  <div class="stats-bar" id="provider-stats-bar"></div>
+  <div class="two-col">
+    <div class="card">
+      <h2>Provider Comparison</h2>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Side-by-side comparison across all providers (active models only).</p>
+      <div class="chart-wrap"><canvas id="chart-provider-f1"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Tier Distribution by Provider</h2>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px">How models are distributed across pricing tiers per provider.</p>
+      <div class="chart-wrap"><canvas id="chart-provider-tiers"></canvas></div>
+    </div>
+  </div>
+  <div class="two-col">
+    <div class="card">
+      <h2>Cost Efficiency (F1 per $)</h2>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Higher is better — F1 score achieved per dollar spent (active models with cost data).</p>
+      <div id="cost-efficiency-table" style="overflow-x:auto"></div>
+    </div>
+    <div class="card">
+      <h2>Modality Breakdown</h2>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Text-only vs multimodal model distribution and performance per provider.</p>
+      <div id="modality-breakdown" style="overflow-x:auto"></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Model Catalog</h2>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px">All configured models with capabilities, pricing, and performance. Filter by provider.</p>
+    <div class="ctrl-row">
+      <label>Provider:
+        <select id="catalog-provider" onchange="renderModelCatalog()">
+          <option value="all">All Providers</option>
+        </select>
+      </label>
+      <label>Status:
+        <select id="catalog-status" onchange="renderModelCatalog()">
+          <option value="all">All</option>
+          <option value="active">Active Only</option>
+          <option value="failed">Failed Only</option>
+        </select>
+      </label>
+    </div>
+    <div id="model-catalog" style="overflow-x:auto"></div>
+  </div>
+</div>
+
 <!-- ══════════════════════════ PROJECT EVOLUTION ════════════════════════════ -->
 <div id="tab-evolution" class="tab-panel">
   <div class="card">
@@ -692,6 +758,7 @@ function switchTab(id){
     if(id==='errors') renderErrorChart(), renderErrorPatterns()
     if(id==='deepdive') initDeepDive()
     if(id==='recommendations') renderRecommendations(), renderInsights(), renderImprovements()
+    if(id==='provider-analysis') renderProviderAnalysis()
     if(id==='evolution') renderEvolution()
   }
 }
@@ -1322,7 +1389,179 @@ function renderImprovements(){
   document.getElementById('improvements').innerHTML = html
 }
 
-// ── ⑦ Evolution ──────────────────────────────────────────────────────────────
+// ── ⑦ Provider Analysis ──────────────────────────────────────────────────────
+
+let chartProviderF1 = null, chartProviderTiers = null
+
+function renderProviderAnalysis(){
+  const providers = allProviders().sort()
+  const mods = allModels()
+
+  // Stats bar
+  const totalConfigured = Object.keys(RAW.model_meta||{}).length
+  const totalRun = mods.length
+  const totalActive = activeModels().length
+  const dwCount = mods.filter(m=>(RAW.model_providers?.[m]||'')==='doubleword').length
+  const orCount = mods.filter(m=>(RAW.model_providers?.[m]||'')==='openrouter').length
+  document.getElementById('provider-stats-bar').innerHTML = `
+    <div class="stat-card"><div class="val">${providers.length}</div><div class="lbl">Providers</div></div>
+    <div class="stat-card"><div class="val">${totalConfigured}</div><div class="lbl">Models configured</div></div>
+    <div class="stat-card"><div class="val">${totalRun}</div><div class="lbl">Models run</div></div>
+    <div class="stat-card"><div class="val">${totalActive}</div><div class="lbl">Active (F1 > 0)</div></div>
+    <div class="stat-card"><div class="val">${orCount}</div><div class="lbl">OpenRouter</div></div>
+    <div class="stat-card"><div class="val">${dwCount}</div><div class="lbl">Doubleword</div></div>
+  `
+
+  // Provider F1 comparison chart
+  const provData = providers.map(p=>{
+    const pModels = activeModels().filter(m=>(RAW.model_providers?.[m]||'')=== p)
+    const f1s = pModels.map(m=>f1Score(m))
+    const avg = f1s.length ? f1s.reduce((s,v)=>s+v,0)/f1s.length : 0
+    const best = f1s.length ? Math.max(...f1s) : 0
+    return {p, avg, best, count: pModels.length}
+  })
+
+  const ctx1 = document.getElementById('chart-provider-f1').getContext('2d')
+  if(chartProviderF1) chartProviderF1.destroy()
+  chartProviderF1 = new Chart(ctx1,{
+    type:'bar',
+    data:{
+      labels: provData.map(d=>d.p.charAt(0).toUpperCase()+d.p.slice(1)),
+      datasets:[
+        {label:'Avg F1', data:provData.map(d=>+(d.avg*100).toFixed(1)), backgroundColor:'rgba(99,102,241,0.6)', borderRadius:4},
+        {label:'Best F1', data:provData.map(d=>+(d.best*100).toFixed(1)), backgroundColor:'rgba(16,185,129,0.6)', borderRadius:4}
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${(c.parsed.y/100).toFixed(3)}`}}},
+      scales:{y:{min:0,max:100,ticks:{callback:v=>v+'%'},grid:{color:'#e2e8f0'}}}
+    }
+  })
+
+  // Tier distribution chart
+  const tierColors = {'free':'#94a3b8','ultra-cheap':'#3b82f6','great-value':'#10b981','premium':'#f59e0b'}
+  const tierLabels = ['free','ultra-cheap','great-value','premium']
+  const datasets = tierLabels.map(t=>({
+    label: tierLabel(t),
+    data: providers.map(p=>{
+      return mods.filter(m=>(RAW.model_providers?.[m]||'')=== p && (RAW.model_meta?.[m]?.tier||'')=== t).length
+    }),
+    backgroundColor: tierColors[t],
+    borderRadius:4
+  }))
+  const ctx2 = document.getElementById('chart-provider-tiers').getContext('2d')
+  if(chartProviderTiers) chartProviderTiers.destroy()
+  chartProviderTiers = new Chart(ctx2,{
+    type:'bar',
+    data:{labels: providers.map(p=>p.charAt(0).toUpperCase()+p.slice(1)), datasets},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'top'}},
+      scales:{x:{stacked:true},y:{stacked:true,ticks:{stepSize:1},grid:{color:'#e2e8f0'}}}
+    }
+  })
+
+  // Cost efficiency table
+  const effModels = activeModels().filter(m=>{
+    const st = RAW.extraction_stats?.[m]
+    return st && st.total_cost_usd > 0
+  }).map(m=>{
+    const st = RAW.extraction_stats[m]
+    const f1 = f1Score(m)
+    const efficiency = st.total_cost_usd > 0 ? f1 / st.total_cost_usd : 0
+    return {m, f1, cost: st.total_cost_usd, efficiency, estimated: st.estimated}
+  }).sort((a,b)=>b.efficiency - a.efficiency)
+
+  let effHtml = `<table><thead><tr><th>#</th><th>Model</th><th>Provider</th><th>F1</th><th>Cost</th><th>F1/$</th><th>Tier</th></tr></thead><tbody>`
+  effModels.forEach((r,i)=>{
+    effHtml += `<tr>
+      <td style="color:var(--muted)">${i+1}</td>
+      <td><strong>${r.m}</strong></td>
+      <td>${providerBadge(r.m)}</td>
+      <td style="color:${hsl(r.f1)};font-weight:600">${r.f1.toFixed(3)}</td>
+      <td>${fmtCost(r.cost, r.estimated)}</td>
+      <td style="font-weight:700;color:var(--accent)">${r.efficiency.toFixed(1)}</td>
+      <td>${costTierBadge(r.m)}</td>
+    </tr>`
+  })
+  effHtml += '</tbody></table>'
+  if(!effModels.length) effHtml = '<p style="color:var(--muted)">No cost data available.</p>'
+  document.getElementById('cost-efficiency-table').innerHTML = effHtml
+
+  // Modality breakdown
+  let modHtml = `<table><thead><tr><th>Provider</th><th>Text-only</th><th>Multimodal</th><th>Text Avg F1</th><th>MM Avg F1</th><th>Modalities</th></tr></thead><tbody>`
+  providers.forEach(p=>{
+    const pMods = mods.filter(m=>(RAW.model_providers?.[m]||'')=== p)
+    const textOnly = pMods.filter(m=>!RAW.model_meta?.[m]?.multimodal)
+    const mm = pMods.filter(m=>RAW.model_meta?.[m]?.multimodal)
+    const textActive = textOnly.filter(m=>f1Score(m)>0)
+    const mmActive = mm.filter(m=>f1Score(m)>0)
+    const textAvg = textActive.length ? textActive.reduce((s,m)=>s+f1Score(m),0)/textActive.length : 0
+    const mmAvg = mmActive.length ? mmActive.reduce((s,m)=>s+f1Score(m),0)/mmActive.length : 0
+    const allModalities = new Set()
+    pMods.forEach(m=>(RAW.model_meta?.[m]?.modalities||[]).forEach(mod=>allModalities.add(mod)))
+    modHtml += `<tr>
+      <td>${providerBadge(pMods[0])}</td>
+      <td>${textOnly.length} (${textActive.length} active)</td>
+      <td>${mm.length} (${mmActive.length} active)</td>
+      <td style="color:${hsl(textAvg)};font-weight:600">${textAvg?textAvg.toFixed(3):'—'}</td>
+      <td style="color:${hsl(mmAvg)};font-weight:600">${mmAvg?mmAvg.toFixed(3):'—'}</td>
+      <td style="font-size:11px">${[...allModalities].sort().join(', ')}</td>
+    </tr>`
+  })
+  modHtml += '</tbody></table>'
+  document.getElementById('modality-breakdown').innerHTML = modHtml
+
+  // Populate catalog provider dropdown
+  const catSel = document.getElementById('catalog-provider')
+  providers.forEach(p=>{
+    const opt = document.createElement('option')
+    opt.value = p; opt.text = p.charAt(0).toUpperCase()+p.slice(1)
+    catSel.appendChild(opt)
+  })
+  renderModelCatalog()
+}
+
+function renderModelCatalog(){
+  const provFilter = document.getElementById('catalog-provider').value
+  const statusFilter = document.getElementById('catalog-status').value
+  let models = allModels()
+  if(provFilter!=='all') models = models.filter(m=>(RAW.model_providers?.[m]||'')=== provFilter)
+  if(statusFilter==='active') models = models.filter(m=>f1Score(m)>0)
+  else if(statusFilter==='failed') models = models.filter(m=>f1Score(m)===0)
+
+  // Sort by F1 desc
+  models.sort((a,b)=>f1Score(b)-f1Score(a))
+
+  let html = `<table><thead><tr>
+    <th>Model</th><th>Provider</th><th>F1</th><th>Tier</th><th>Modalities</th>
+    <th>Context</th><th>Price (in/out)</th><th>Notes</th>
+  </tr></thead><tbody>`
+  models.forEach(m=>{
+    const meta = RAW.model_meta?.[m]||{}
+    const f1 = f1Score(m)
+    const mods = (meta.modalities||[]).join(', ')
+    const ctx = meta.ctx ? (meta.ctx>=1000000 ? (meta.ctx/1000000).toFixed(0)+'M' : (meta.ctx/1000).toFixed(0)+'K') : '—'
+    const priceIn = meta.price_in!=null ? '$'+meta.price_in.toFixed(2) : '—'
+    const priceOut = meta.price_out!=null ? '$'+meta.price_out.toFixed(2) : '—'
+    html += `<tr>
+      <td><strong>${m}</strong></td>
+      <td>${providerBadge(m)}</td>
+      <td style="color:${hsl(f1)};font-weight:600">${f1?f1.toFixed(3):'<span style="color:var(--red)">0</span>'}</td>
+      <td>${costTierBadge(m)}</td>
+      <td style="font-size:11px">${mods||'—'}</td>
+      <td style="font-size:12px">${ctx}</td>
+      <td style="font-size:11px">${priceIn} / ${priceOut}</td>
+      <td style="font-size:11px;color:var(--muted);max-width:220px">${meta.notes||''}</td>
+    </tr>`
+  })
+  html += '</tbody></table>'
+  if(!models.length) html = '<p style="color:var(--muted)">No models match the filter.</p>'
+  document.getElementById('model-catalog').innerHTML = html
+}
+
+// ── ⑧ Evolution ──────────────────────────────────────────────────────────────
 
 function renderEvolution(){
   const timeline = [
