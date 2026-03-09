@@ -1,22 +1,25 @@
+# Quickstart
+
 Do the following before attending playgroup please.
 
-# Setup
-
-The project requires Python 3.13 (pinned in `.python-version`). Choose either route below.
+> Once setup is done, head to the [README](README.md) for the full workflow, results, and key findings.
 
 ---
 
-## Option A — venv + pip
+## 1. Python
+
+The project requires Python 3.13 (pinned in `.python-version`). Choose either route below.
+
+### Option A — venv + pip
 
 ```bash
 $ python -c "import sys; print(sys.version)"  # confirm >= 3.13
-# $ conda activate python313                  # Ian's route if needed
 $ python -m venv .venv
 $ . .venv/bin/activate
 $ pip install -r requirements.txt
 ```
 
-## Option B — uv (faster)
+### Option B — uv (faster)
 
 ```bash
 $ uv venv                          # auto-picks Python 3.13 from .python-version
@@ -28,9 +31,9 @@ If `uv` isn't installed: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 
 ---
 
-# .env
+## 2. API Keys
 
-You'll need a `.env` file with your API keys:
+Create a `.env` file in the project root:
 
 ```
 OPENROUTER_API_KEY=sk-or-v1-...
@@ -41,7 +44,7 @@ The OpenRouter key is required. The Doubleword key is only needed if you want to
 
 ---
 
-# Smoke Test
+## 3. Smoke Test
 
 Run this to confirm everything is working:
 
@@ -63,9 +66,9 @@ If you see the JSON block, you're ready.
 
 ---
 
-# Next Steps
+## Next Steps
 
-See `README.md` for the full end-to-end workflow. The key commands follow a consistent pattern:
+Head to [README.md](README.md) for the full end-to-end workflow. The key commands follow a consistent pattern:
 
 - **Pass a model name** → run that model only (e.g. `python extractor.py gemini-2.0-flash`)
 - **Pass multiple model names** → run each in turn (backend auto-detected per model)

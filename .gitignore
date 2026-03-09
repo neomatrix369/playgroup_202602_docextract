@@ -9,3 +9,5 @@ data/.doubleword_checkpoints.json
 
 .claude/
 .playwright-mcp/
+
+DW_FB.md
