@@ -1,6 +1,6 @@
 # UK Charity Document Extraction — Multi-Model Benchmark
 
-Extract structured fields from UK charity financial PDFs using LLMs via [OpenRouter](https://openrouter.ai/) or the [Doubleword Batch API](https://docs.doubleword.ai/batches/getting-started-with-batched-api), then score and rank the results across 40+ models.
+Extract structured fields from UK charity financial PDFs using LLMs via [OpenRouter](https://openrouter.ai/) or the [Doubleword Batch API](https://docs.doubleword.ai/batches/getting-started-with-batched-api), then score and rank the results across 47 models.
 
 **Jump to:** [Key Findings](#key-findings) | [Setup](#setup) | [Workflow](#end-to-end-workflow) | [Results](#results) | [Repo Reference](#whats-in-this-repo) | [Dataset](#dataset)
 
@@ -9,22 +9,22 @@ Extract structured fields from UK charity financial PDFs using LLMs via [OpenRou
 > - **Playgroup attendees** — start with [QUICKSTART.md](QUICKSTART.md), then follow the [Workflow](#end-to-end-workflow) section below.
 > - **Curious explorers** — read the [Key Findings](#key-findings) and open the [interactive playground](which-models-extracted-playground.html) to browse results without running any code.
 > - **Contributors / extenders** — see [Repo Reference](#whats-in-this-repo) for the full file map and how pieces connect.
-> - **Doubleword team** — see [Key Findings](#key-findings) for benchmark results, the [Doubleword Batch API](#doubleword-batch-api-configmodelsdoublewordpy) tier table, and note the [data gap](#data-gap-doubleword-batch-api) on time/cost reporting.
+> - **Doubleword team** — see [Key Findings](#key-findings) for benchmark results, the [Doubleword Batch API](#doubleword-batch-api-configmodelsdoublewordpy) tier table, and note the [timing and cost](#doubleword-batch-api--timing-and-cost) details.
 
 ---
 
 ## Key Findings
 
-> Last updated: 2026-03-07 — 47 models tested (40+ OpenRouter, 7 Doubleword).
+> Last updated: 2026-03-19 — 47 models tested (40 OpenRouter, 7 Doubleword). Doubleword batch stats (timing, tokens, cost) have been backfilled from API data.
 
 **Provider summary** (active = models with F1 > 0):
 
-| Provider | Models | Active | Failed | Avg F1 | Best F1 | Best Model | Avg Fields |
-|----------|--------|--------|--------|--------|---------|------------|------------|
-| Doubleword | 7 | 6 | 1 | 0.888 | 0.927 | dw-qwen3.5-9b | 69.9/85 (82%) |
-| OpenRouter | 40 | 27 | 13 | 0.753 | 0.946 | gemini-3-pro | 56.0/85 (66%) |
+| Provider | Models | Active | Failed | Avg F1 | Best F1 | Best Model | Avg Fields | Avg Time(s) | Avg Cost($) |
+|----------|--------|--------|--------|--------|---------|------------|------------|-------------|-------------|
+| Doubleword | 7 | 6 | 1 | 0.888 | 0.927 | dw-qwen3.5-9b | 69.9/85 (82%) | 3,369.5 | 0.0204 |
+| OpenRouter | 40 | 27 | 13 | 0.753 | 0.946 | gemini-3-pro | 56.0/85 (66%) | 2,029.7 | 0.0922 |
 
-Doubleword has a higher average F1 (0.888 vs 0.753) and a much lower failure rate (14% vs 33%), though OpenRouter's best model (`gemini-3-pro`) holds the overall top score. OpenRouter's average is dragged down by free-tier models that universally failed on this task.
+Doubleword has a higher average F1 (0.888 vs 0.753) and a much lower failure rate (14% vs 32%), though OpenRouter's best model (`gemini-3-pro`) holds the overall top score. OpenRouter's average is dragged down by free-tier models that universally failed on this task. Doubleword's average cost per active model ($0.02) is ~4.5× cheaper than OpenRouter's ($0.09).
 
 **Top 5 models by F1 score:**
 
@@ -46,9 +46,9 @@ Doubleword has a higher average F1 (0.888 vs 0.753) and a much lower failure rat
 
 For the full interactive breakdown (field heatmaps, per-document analysis, error patterns, provider comparisons), open the **[Model Extraction Playground](which-models-extracted-playground.html)** locally in a browser. It has 8 tabs: Rankings, Field Heatmap, Document Analysis, Error Breakdown, Deep Dive, Recommendations, Provider Analysis, and Project Evolution.
 
-### Data Gap: Doubleword Batch API
+### Doubleword Batch API — Timing and Cost
 
-The Doubleword Batch API does not return per-request elapsed time or cost in batch results. All Doubleword entries in `data/extraction_stats.csv` show `total_elapsed_secs=0.0` and `total_cost_usd=0.0`. This means time and cost comparisons in the leaderboard are only available for OpenRouter models.
+Doubleword batch stats (elapsed time, tokens, cost) were backfilled by querying batch metadata via `batches.list()`. The pipeline now uses API-reported `created_at`/`completed_at` timestamps for accurate elapsed time and stores `batch_id` for traceability. Per-request cost is computed from token counts and config pricing. The only model without stats is `dw-qwen3.5-397b`, which returned empty results.
 
 ---
 
@@ -76,9 +76,9 @@ The leaderboard printed by `score.py` is ranked by F1 and includes precision, re
 ```
 Provider     Model                     Mod    Docs     F1   Prec  Recall          Fields    Time(s)    Cost($)
 --------------------------------------------------------------------------------------------------------------
-openrouter   gemini-3-pro              MM       11  0.946  0.975   0.918     78/85 (92%)     ~629.1    ~0.3780
-openrouter   qwen3-235b                text     11  0.937  0.975   0.902     77/85 (90%)     ~629.1    ~0.0258
-doubleword   dw-qwen3.5-9b             text     11  0.927  0.974   0.885     75/85 (88%)        n/a        n/a
+openrouter   gemini-3-pro              MM       11  0.946  0.975   0.918   78.1/85 (92%)    ~2273.3    ~0.3780
+openrouter   qwen3-235b                text     11  0.937  0.975   0.902   76.7/85 (90%)    ~2273.3    ~0.0258
+doubleword   dw-qwen3.5-9b             text     11  0.927  0.974   0.885   75.2/85 (88%)      353.0     0.0354
 ...
 ```
 
@@ -169,8 +169,8 @@ python score.py data/playgroup_dev_extracted__openrouter__gemini-2.0-flash.tsv
 | `extractor.py` | Unified extraction runner. Auto-detects backend from model prefix (`dw-*` → Doubleword batch, others → OpenRouter). Doubleword models are submitted in parallel and polled with checkpoint/resume. Prints a per-provider run plan at start and a combined summary at end (completed/skipped/failed counts). Supports `--completion-window`, `--all-doubleword`, and `--all-openrouter` flags. |
 | `score.py` | Scorer with F1/Precision/Recall. No args → ranked leaderboard; pass a filename → verbose field-by-field diff. |
 | `utils.py` | Shared helpers (`extract_from_triple_backticks`, `sanitize_error_message`). |
-| `config_models_openrouter.py` | OpenRouter model registry — 40+ models organised by tier. |
-| `config_models_doubleword.py` | Doubleword model registry — 7 models with batch pricing from [docs](https://docs.doubleword.ai/batches/model-pricing). |
+| `config_models_openrouter.py` | OpenRouter model registry — 33 models organised by tier. |
+| `config_models_doubleword.py` | Doubleword model registry — 7 extraction models + 1 embedding model, with batch pricing from [docs](https://docs.doubleword.ai/batches/model-pricing). |
 | `playground.py` | Generates the interactive HTML playground from extraction results. |
 
 ### Model Tiers
@@ -206,7 +206,7 @@ Each model entry includes: model ID, `multimodal` flag, supported modalities, co
 | `playgroup_dev_expected.tsv` | Ground truth field values |
 | `pdf_names.txt` | PDF filenames in row order |
 | `playgroup_dev_extracted__<provider>__<model>.tsv` | Per-model extraction output (one file per run) |
-| `extraction_stats.csv` | Cumulative run stats: provider, model, row counts, per-field hit rates, time, cost |
+| `extraction_stats.csv` | Cumulative run stats: provider, model, row counts, per-field hit rates, time, cost, batch_id (Doubleword) |
 | `extraction_call_log.csv` | Per-row call log: provider, model, row, status, elapsed time, tokens, cost |
 | `.doubleword_checkpoints.json` | Doubleword batch checkpoint: maps model → batch_id for resume on cancel/re-run |
 | `*.pdf` | 11 UK charity financial PDFs (≤ 200 pages each) |
