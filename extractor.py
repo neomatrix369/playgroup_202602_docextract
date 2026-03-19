@@ -127,12 +127,13 @@ def _append_call_log(row_data):
 
 
 def _append_stats(provider, model_short_name, model_cfg, total, rows_with_values, rows_empty, field_counts,
-                   total_elapsed_secs=0.0, total_prompt_tokens=0, total_completion_tokens=0, total_cost_usd=0.0):
+                   total_elapsed_secs=0.0, total_prompt_tokens=0, total_completion_tokens=0, total_cost_usd=0.0,
+                   batch_id=""):
     fieldnames = (["datetime", "provider", "model_short_name", "model_full_name", "tier", "multimodal",
                    "price_in", "price_out", "ctx",
                    "total", "rows_with_values", "rows_empty",
                    "total_elapsed_secs", "total_prompt_tokens", "total_completion_tokens", "total_cost_usd",
-                   "avg_secs_per_row", "avg_cost_per_row"] + ALL_FIELDS)
+                   "avg_secs_per_row", "avg_cost_per_row"] + ALL_FIELDS + ["batch_id"])
     row = {
         "datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "provider": provider,
@@ -153,6 +154,7 @@ def _append_stats(provider, model_short_name, model_cfg, total, rows_with_values
         "avg_secs_per_row": round(total_elapsed_secs / total, 2) if total else 0,
         "avg_cost_per_row": round(total_cost_usd / total, 6) if total else 0,
         **{f: field_counts.get(f, 0) for f in ALL_FIELDS},
+        "batch_id": batch_id,
     }
     write_header = not os.path.exists(STATS_FILENAME)
     with open(STATS_FILENAME, "a", newline="") as f:
@@ -295,7 +297,7 @@ def _load_input_rows():
     return rows
 
 
-def _write_doubleword_results(model_short_name, results, rows, elapsed_secs):
+def _write_doubleword_results(model_short_name, results, rows, elapsed_secs, batch_id=""):
     """Write batch results to TSV, per-row call logs, and model stats.
 
     Uses atomic write (temp file + rename) so a partial file is never left behind on cancel.
@@ -370,7 +372,8 @@ def _write_doubleword_results(model_short_name, results, rows, elapsed_secs):
                    elapsed_secs, total_prompt_tokens, total_completion_tokens, total_cost_usd)
     _append_stats("Doubleword", model_short_name, model_cfg,
                   rows_with_values + rows_empty, rows_with_values, rows_empty, field_counts,
-                  elapsed_secs, total_prompt_tokens, total_completion_tokens, total_cost_usd)
+                  elapsed_secs, total_prompt_tokens, total_completion_tokens, total_cost_usd,
+                  batch_id=batch_id)
 
 
 async def _run_all_doubleword(models_to_run, completion_window="1h"):
@@ -488,9 +491,14 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
             poll_summary.append(f"{model_short_name}:{counts['completed']}/{counts['total']}")
 
             if status == "completed":
-                elapsed = time.time() - submitted_at[model_short_name]
+                api_created = counts.get("created_at")
+                api_completed = counts.get("completed_at")
+                if api_created and api_completed:
+                    elapsed = api_completed - api_created
+                else:
+                    elapsed = time.time() - submitted_at[model_short_name]
                 results = await llm_doubleword.download_results(client, output_file_id)
-                _write_doubleword_results(model_short_name, results, rows, elapsed)
+                _write_doubleword_results(model_short_name, results, rows, elapsed, batch_id=batch_id)
                 llm_doubleword.remove_checkpoint_entry(model_short_name)
                 done.append(model_short_name)
                 completed_models += 1

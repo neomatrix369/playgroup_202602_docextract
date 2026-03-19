@@ -115,13 +115,19 @@ async def submit_batch(
 
 
 async def poll_batch(client: AsyncOpenAI, batch_id: str):
-    """Check batch status. Returns (status, output_file_id, counts_dict)."""
+    """Check batch status. Returns (status, output_file_id, counts_dict).
+
+    The counts dict includes API-reported created_at/completed_at timestamps
+    for accurate elapsed time calculation.
+    """
     batch = await client.batches.retrieve(batch_id)
     counts = batch.request_counts
     return batch.status, batch.output_file_id, {
         "total": counts.total if counts else 0,
         "completed": counts.completed if counts else 0,
         "failed": counts.failed if counts else 0,
+        "created_at": getattr(batch, "created_at", None),
+        "completed_at": getattr(batch, "completed_at", None),
     }
 
 
