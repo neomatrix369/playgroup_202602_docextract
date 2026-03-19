@@ -1,16 +1,16 @@
-datetime,provider,model_short_name,model_full_name,tier,multimodal,price_in,price_out,ctx,total,rows_with_values,rows_empty,total_elapsed_secs,total_prompt_tokens,total_completion_tokens,total_cost_usd,avg_secs_per_row,avg_cost_per_row,charity_number,charity_name,report_date,income_annually_in_british_pounds,spending_annually_in_british_pounds,address__postcode,address__post_town,address__street_line
-2026-03-06 18:36:38,OpenRouter,llama-3.3-70b-free,meta-llama/llama-3.3-70b-instruct:free,free,False,0,0,131000,11,0,11,0.0,0,0,0.0,0.0,0.0,0,0,0,0,0,0,0,0
-2026-03-06 19:09:36,OpenRouter,mistral-small-free,mistralai/mistral-small-3.1-24b-instruct:free,free,False,0,0,33000,11,0,11,0.0,0,0,0.0,0.0,0.0,0,0,0,0,0,0,0,0
-2026-03-06 19:43:28,OpenRouter,gemma-3-27b-free,google/gemma-3-27b-it:free,free,True,0,0,131000,11,0,11,0.0,0,0,0.0,0.0,0.0,0,0,0,0,0,0,0,0
-2026-03-06 19:44:11,OpenRouter,gemma-3n-free,google/gemma-3n-e2b-it:free,free,True,0,0,8000,11,0,11,0.0,0,0,0.0,0.0,0.0,0,0,0,0,0,0,0,0
-2026-03-06 19:49:35,OpenRouter,llama-3.2-11b-vision,meta-llama/llama-3.2-11b-vision-instruct,ultra_cheap,True,0.05,0.05,131000,11,10,1,324.38,159152,1272,0.008021,29.49,0.000729,9,10,10,9,9,9,9,10
-2026-03-06 20:20:42,OpenRouter,qwen3-vl-30b-thinking,qwen/qwen3-vl-30b-a3b-thinking,great_value,True,0.13,0.52,131000,11,11,0,1867.3,176660,108050,0.079152,169.75,0.007196,11,11,11,10,10,10,11,11
-2026-03-06 20:24:00,OpenRouter,claude-3.5-haiku,anthropic/claude-3.5-haiku,great_value,True,0.8,4.0,200000,11,11,0,197.87,191065,1674,0.159548,17.99,0.014504,11,11,11,9,9,10,11,11
-2026-03-06 20:26:07,OpenRouter,command-r-plus,cohere/command-r-plus-08-2024,premium,False,2.5,10.0,128000,11,11,0,126.83,189535,1488,0.488717,11.53,0.044429,11,11,10,7,7,11,11,10
-2026-03-07 01:20:11,Doubleword,dw-qwen3.5-9b,Qwen/Qwen3.5-9B,ultra_cheap,False,0.04,0.35,262000,11,11,0,0.0,0,0,0.0,0.0,0.0,11,11,11,8,8,10,11,11
-2026-03-07 01:25:02,Doubleword,dw-qwen3-14b,Qwen/Qwen3-14B-FP8,ultra_cheap,False,0.03,0.3,262000,11,10,1,0.0,0,0,0.0,0.0,0.0,10,10,10,9,9,9,10,10
-2026-03-07 01:28:26,Doubleword,dw-gpt-oss-20b,openai/gpt-oss-20b,ultra_cheap,False,0.03,0.2,262000,11,11,0,0.0,0,0,0.0,0.0,0.0,11,11,11,8,8,10,10,10
-2026-03-07 01:33:42,Doubleword,dw-qwen3.5-35b,Qwen/Qwen3.5-35B-A3B-FP8,great_value,False,0.07,0.3,262000,11,11,0,0.0,0,0,0.0,0.0,0.0,11,11,11,9,9,10,10,10
-2026-03-07 01:33:45,Doubleword,dw-qwen3.5-397b,Qwen/Qwen3.5-397B-A17B,premium,False,0.3,1.8,262000,11,0,11,0.0,0,0,0.0,0.0,0.0,0,0,0,0,0,0,0,0
-2026-03-07 01:37:09,Doubleword,dw-qwen3-vl-30b,Qwen/Qwen3-VL-30B-A3B-Instruct-FP8,great_value,True,0.07,0.3,262000,11,11,0,0.0,0,0,0.0,0.0,0.0,11,11,11,11,11,11,11,11
-2026-03-07 01:45:16,Doubleword,dw-qwen3-vl-235b,Qwen/Qwen3-VL-235B-A22B-Instruct-FP8,premium,True,0.15,0.55,262000,11,11,0,0.0,0,0,0.0,0.0,0.0,11,11,11,10,10,11,11,11
+datetime,provider,model_short_name,model_full_name,tier,multimodal,price_in,price_out,ctx,total,rows_with_values,rows_empty,total_elapsed_secs,total_prompt_tokens,total_completion_tokens,total_cost_usd,avg_secs_per_row,avg_cost_per_row,charity_number,charity_name,report_date,income_annually_in_british_pounds,spending_annually_in_british_pounds,address__postcode,address__post_town,address__street_line,batch_id
+2026-03-06 18:36:38,OpenRouter,llama-3.3-70b-free,meta-llama/llama-3.3-70b-instruct:free,free,False,0,0,131000,11,0,11,0.0,0,0,0.0,0.0,0.0,0,0,0,0,0,0,0,0,
+2026-03-06 19:09:36,OpenRouter,mistral-small-free,mistralai/mistral-small-3.1-24b-instruct:free,free,False,0,0,33000,11,0,11,0.0,0,0,0.0,0.0,0.0,0,0,0,0,0,0,0,0,
+2026-03-06 19:43:28,OpenRouter,gemma-3-27b-free,google/gemma-3-27b-it:free,free,True,0,0,131000,11,0,11,0.0,0,0,0.0,0.0,0.0,0,0,0,0,0,0,0,0,
+2026-03-06 19:44:11,OpenRouter,gemma-3n-free,google/gemma-3n-e2b-it:free,free,True,0,0,8000,11,0,11,0.0,0,0,0.0,0.0,0.0,0,0,0,0,0,0,0,0,
+2026-03-06 19:49:35,OpenRouter,llama-3.2-11b-vision,meta-llama/llama-3.2-11b-vision-instruct,ultra_cheap,True,0.05,0.05,131000,11,10,1,324.38,159152,1272,0.008021,29.49,0.000729,9,10,10,9,9,9,9,10,
+2026-03-06 20:20:42,OpenRouter,qwen3-vl-30b-thinking,qwen/qwen3-vl-30b-a3b-thinking,great_value,True,0.13,0.52,131000,11,11,0,1867.3,176660,108050,0.079152,169.75,0.007196,11,11,11,10,10,10,11,11,
+2026-03-06 20:24:00,OpenRouter,claude-3.5-haiku,anthropic/claude-3.5-haiku,great_value,True,0.8,4.0,200000,11,11,0,197.87,191065,1674,0.159548,17.99,0.014504,11,11,11,9,9,10,11,11,
+2026-03-06 20:26:07,OpenRouter,command-r-plus,cohere/command-r-plus-08-2024,premium,False,2.5,10.0,128000,11,11,0,126.83,189535,1488,0.488717,11.53,0.044429,11,11,10,7,7,11,11,10,
+2026-03-07 01:20:11,Doubleword,dw-qwen3.5-9b,Qwen/Qwen3.5-9B,ultra_cheap,False,0.04,0.35,262000,11,11,0,353,176660,80918,0.035388,32.09,0.003217,11,11,11,8,8,10,11,11,d7631b0c-bdfa-44cb-b4f0-9a0a1cd21c0b
+2026-03-07 01:25:02,Doubleword,dw-qwen3-14b,Qwen/Qwen3-14B-FP8,ultra_cheap,False,0.03,0.3,262000,11,10,1,18692,107663,7190,0.005387,1699.27,0.00049,10,10,10,9,9,9,10,10,b88d10d5-12a1-4548-9d40-0aeb46b5a384
+2026-03-07 01:28:26,Doubleword,dw-gpt-oss-20b,openai/gpt-oss-20b,ultra_cheap,False,0.03,0.2,262000,11,11,0,195,157898,12790,0.007295,17.73,0.000663,11,11,11,8,8,10,10,10,9705ae5e-65e1-45ab-ba23-c724ba89ef1b
+2026-03-07 01:33:42,Doubleword,dw-qwen3.5-35b,Qwen/Qwen3.5-35B-A3B-FP8,great_value,False,0.07,0.3,262000,11,11,0,310,176660,73392,0.034384,28.18,0.003126,11,11,11,9,9,10,10,10,517c7198-e0c6-4861-8a1e-8594b65f81e5
+2026-03-07 01:33:45,Doubleword,dw-qwen3.5-397b,Qwen/Qwen3.5-397B-A17B,premium,False,0.3,1.8,262000,11,0,11,0.0,0,0,0.0,0.0,0.0,0,0,0,0,0,0,0,0,
+2026-03-07 01:37:09,Doubleword,dw-qwen3-vl-30b,Qwen/Qwen3-VL-30B-A3B-Instruct-FP8,great_value,True,0.07,0.3,262000,11,11,0,184,176847,1574,0.012851,16.73,0.001168,11,11,11,11,11,11,11,11,4466546a-1b95-4a48-b7c7-3e456d5bee6e
+2026-03-07 01:45:16,Doubleword,dw-qwen3-vl-235b,Qwen/Qwen3-VL-235B-A22B-Instruct-FP8,premium,True,0.15,0.55,262000,11,11,0,483,176847,1535,0.027371,43.91,0.002488,11,11,11,10,10,11,11,11,1d93d13c-d95b-4594-852e-722cbdfe9f7a
