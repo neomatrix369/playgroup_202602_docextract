@@ -470,56 +470,73 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
 
     # ── Phase 4: Poll all batches until every one completes ──────
     #   Order: resumed (oldest) first, then newly submitted.
+    #   Ctrl-C triggers a clean shutdown: checkpoints are preserved so
+    #   the next run can resume where we left off.
     total_models = len(pending)
     completed_models = 0
     failed_models = 0
-    log.info("[Doubleword] Polling {} batch(es)...", total_models)
+    log.info("[Doubleword] Polling {} batch(es)... (Ctrl-C to stop gracefully)", total_models)
 
-    while pending:
-        await asyncio.sleep(DOUBLEWORD_POLL_INTERVAL)
-        done = []
-        poll_summary = []
+    interrupted = False
+    try:
+        while pending:
+            await asyncio.sleep(DOUBLEWORD_POLL_INTERVAL)
+            done = []
+            poll_summary = []
 
-        for model_short_name, batch_id in pending.items():
-            try:
-                status, output_file_id, counts = await llm_doubleword.poll_batch(client, batch_id)
-            except Exception as e:
-                log.error("[{}] Poll error: {}", model_short_name, e)
-                poll_summary.append(f"{model_short_name}:error")
-                continue
+            for model_short_name, batch_id in pending.items():
+                try:
+                    status, output_file_id, counts = await llm_doubleword.poll_batch(client, batch_id)
+                except Exception as e:
+                    log.error("[{}] Poll error: {}", model_short_name, e)
+                    poll_summary.append(f"{model_short_name}:error")
+                    continue
 
-            poll_summary.append(f"{model_short_name}:{counts['completed']}/{counts['total']}")
+                poll_summary.append(f"{model_short_name}:{counts['completed']}/{counts['total']}")
 
-            if status == "completed":
-                api_created = counts.get("created_at")
-                api_completed = counts.get("completed_at")
-                if api_created and api_completed:
-                    elapsed = api_completed - api_created
-                else:
-                    elapsed = time.time() - submitted_at[model_short_name]
-                results = await llm_doubleword.download_results(client, output_file_id)
-                _write_doubleword_results(model_short_name, results, rows, elapsed, batch_id=batch_id)
-                llm_doubleword.remove_checkpoint_entry(model_short_name)
-                done.append(model_short_name)
-                completed_models += 1
-                statuses[model_short_name] = "completed"
-            elif status in ("failed", "expired", "cancelled"):
-                log.error("[{}] Batch {} — will need manual resubmission", model_short_name, status)
-                llm_doubleword.remove_checkpoint_entry(model_short_name)
-                done.append(model_short_name)
-                failed_models += 1
-                statuses[model_short_name] = status
+                if status == "completed":
+                    api_created = counts.get("created_at")
+                    api_completed = counts.get("completed_at")
+                    if api_created and api_completed:
+                        elapsed = api_completed - api_created
+                    else:
+                        elapsed = time.time() - submitted_at[model_short_name]
+                    results = await llm_doubleword.download_results(client, output_file_id)
+                    _write_doubleword_results(model_short_name, results, rows, elapsed, batch_id=batch_id)
+                    llm_doubleword.remove_checkpoint_entry(model_short_name)
+                    done.append(model_short_name)
+                    completed_models += 1
+                    statuses[model_short_name] = "completed"
+                elif status in ("failed", "expired", "cancelled"):
+                    log.error("[{}] Batch {} — will need manual resubmission", model_short_name, status)
+                    llm_doubleword.remove_checkpoint_entry(model_short_name)
+                    done.append(model_short_name)
+                    failed_models += 1
+                    statuses[model_short_name] = status
 
-        for m in done:
-            del pending[m]
+            for m in done:
+                del pending[m]
 
-        # Big-picture progress (debug-level to reduce noise during polling)
-        remaining = len(pending)
-        log.debug("[Polling] {}/{} done, {} pending, {} failed  |  {}",
-                  completed_models, total_models, remaining, failed_models, "  ".join(poll_summary))
+            # Big-picture progress (debug-level to reduce noise during polling)
+            remaining = len(pending)
+            log.debug("[Polling] {}/{} done, {} pending, {} failed  |  {}",
+                      completed_models, total_models, remaining, failed_models, "  ".join(poll_summary))
+
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        interrupted = True
+        log.warning("")
+        log.warning("=" * 60)
+        log.warning("Interrupted — shutting down gracefully")
+        log.warning("  Completed so far: {}/{}", completed_models, total_models)
+        log.warning("  Still pending   : {} (checkpoints saved, will resume next run)",
+                     ", ".join(pending.keys()))
+        log.warning("=" * 60)
+        for model_short_name in pending:
+            statuses[model_short_name] = "interrupted"
 
     await client.close()
-    log.info("[Doubleword] All batches complete ({} succeeded, {} failed)", completed_models, failed_models)
+    if not interrupted:
+        log.info("[Doubleword] All batches complete ({} succeeded, {} failed)", completed_models, failed_models)
     return statuses
 
 
@@ -565,7 +582,7 @@ def _print_run_summary(all_statuses):
     log.info("=" * 60)
     log.info("Run Summary")
     log.info("=" * 60)
-    for status in ("completed", "skipped", "failed", "cancelled", "expired", "unknown"):
+    for status in ("completed", "skipped", "interrupted", "failed", "cancelled", "expired", "unknown"):
         models = by_status.get(status, [])
         if not models:
             continue
@@ -601,6 +618,17 @@ def _resolve_model(model_short_name):
 
 
 async def main():
+    # Sync Doubleword model pricing before anything else
+    import sync_doubleword_models
+    sync_doubleword_models.sync()
+    # Reload the config after sync so we pick up any changes
+    import importlib
+    import config_models_doubleword as _cfg_dw
+    importlib.reload(_cfg_dw)
+    global DOUBLEWORD_MODELS, ALL_MODELS
+    DOUBLEWORD_MODELS = _cfg_dw.DOUBLEWORD_MODELS
+    ALL_MODELS = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS}
+
     parser = argparse.ArgumentParser(
         description="Extract charity data using OpenRouter or Doubleword Batch API. "
                     "Backend is auto-detected: dw-* models use Doubleword, others use OpenRouter."
@@ -671,4 +699,7 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        log.warning("\nShutdown complete.")
