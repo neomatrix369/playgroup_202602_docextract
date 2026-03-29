@@ -604,13 +604,27 @@ def _print_run_summary(all_statuses):
 # ═══════════════════════════════════════════════════════════════════
 
 def _resolve_model(model_short_name):
-    """Return (model_cfg, backend) or exit with error."""
+    """Return backend string ('doubleword' or 'openrouter') or exit with error.
+
+    Deprecated Doubleword models are skipped with a warning rather than run.
+    """
     if model_short_name in DOUBLEWORD_MODELS:
+        cfg = DOUBLEWORD_MODELS[model_short_name]
+        if cfg.get("deprecated"):
+            since = cfg.get("deprecated_since", "unknown")
+            log.warning(
+                "[Extractor] ⚠  Skipping '{}' — it is deprecated (since {}) and no longer "
+                "available on Doubleword. Remove the 'deprecated' flag in "
+                "config_models_doubleword.py to re-enable it.",
+                model_short_name, since,
+            )
+            return "deprecated"
         return "doubleword"
     if model_short_name in OPENROUTER_MODELS:
         return "openrouter"
+    active_dw = [k for k, v in DOUBLEWORD_MODELS.items() if not v.get("deprecated")]
     available_or = ", ".join(f"{k}{_mod_tag(OPENROUTER_MODELS[k]['multimodal'])}" for k in OPENROUTER_MODELS)
-    available_dw = ", ".join(f"{k}{_mod_tag(DOUBLEWORD_MODELS[k]['multimodal'])}" for k in DOUBLEWORD_MODELS)
+    available_dw = ", ".join(f"{k}{_mod_tag(DOUBLEWORD_MODELS[k]['multimodal'])}" for k in active_dw)
     log.error("Unknown model '{}'.", model_short_name)
     log.error("  OpenRouter models: {}", available_or)
     log.error("  Doubleword models: {}", available_dw)
@@ -644,20 +658,35 @@ async def main():
                        help="Run only OpenRouter models")
     args = parser.parse_args()
 
+    # Announce deprecated models prominently
+    deprecated_dw = {k: v for k, v in DOUBLEWORD_MODELS.items() if v.get("deprecated")}
+    if deprecated_dw:
+        log.warning("=" * 60)
+        log.warning("⚠  {} DEPRECATED Doubleword model(s) — will be SKIPPED:",
+                    len(deprecated_dw))
+        for short_name, cfg in deprecated_dw.items():
+            since = cfg.get("deprecated_since", "unknown")
+            log.warning("    • {} ({}) — deprecated since {}",
+                        short_name, cfg["model"], since)
+        log.warning("=" * 60)
+
     if args.models:
         models_to_run = args.models
     elif args.all_doubleword:
-        models_to_run = list(DOUBLEWORD_MODELS)
+        models_to_run = [k for k, v in DOUBLEWORD_MODELS.items() if not v.get("deprecated")]
     elif args.all_openrouter:
         models_to_run = list(OPENROUTER_MODELS)
     else:
-        models_to_run = list(ALL_MODELS)
+        active_dw = [k for k, v in DOUBLEWORD_MODELS.items() if not v.get("deprecated")]
+        models_to_run = list(OPENROUTER_MODELS) + active_dw
 
-    # Partition models by backend
+    # Partition models by backend, skip deprecated
     dw_models = []
     or_models = []
     for model_short_name in models_to_run:
         backend = _resolve_model(model_short_name)
+        if backend == "deprecated":
+            continue   # warning already logged by _resolve_model
         if backend == "doubleword":
             dw_models.append(model_short_name)
         else:

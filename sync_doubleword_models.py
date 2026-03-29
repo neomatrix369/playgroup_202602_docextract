@@ -3,10 +3,21 @@
 Uses the agent-friendly markdown endpoint at docs.doubleword.ai (llms.txt enabled)
 to fetch a clean pricing table instead of scraping HTML. Skips saving when nothing
 has changed. Designed to run at the start of each extractor run.
+
+IMPORTANT — augment-only policy
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Models are NEVER removed from config_models_doubleword.py by this script.
+If a model disappears from the remote pricing page it is marked:
+    "deprecated": True,
+    "deprecated_since": "YYYY-MM-DD",
+and moved to the DEPRECATED MODELS section at the bottom of the file.
+This preserves pricing/metadata for historical runs and makes the loss
+visible in every subsequent sync log as a prominent WARNING.
 """
 
 import os
 import re
+from datetime import date
 
 import httpx
 
@@ -148,39 +159,131 @@ def _parse_markdown_table(markdown):
     return models
 
 
+def _load_existing_models():
+    """Safely load the current DOUBLEWORD_MODELS dict from CONFIG_PATH.
+
+    Returns an empty dict if the file doesn't exist or can't be parsed.
+    """
+    if not os.path.exists(CONFIG_PATH):
+        return {}
+    try:
+        namespace = {}
+        with open(CONFIG_PATH, "r") as f:
+            exec(f.read(), namespace)  # noqa: S102
+        return namespace.get("DOUBLEWORD_MODELS", {})
+    except Exception as e:
+        log.warning("[Sync] Could not load existing config ({}), starting fresh", e)
+        return {}
+
+
+def _merge_with_existing(fetched_models, existing_models):
+    """Merge freshly-fetched models into the existing model dict.
+
+    Rules:
+    - New model in API response  → added with no deprecated flag.
+    - Existing model in response → pricing/metadata updated, deprecated flag cleared.
+    - Existing model NOT in resp → kept as-is, deprecated=True, deprecated_since set
+      only when not already set (preserves original deprecation date).
+
+    Returns the merged list ordered: active first (text then VL), deprecated last.
+    """
+    today = date.today().isoformat()
+    fetched_by_short = {m["short_name"]: m for m in fetched_models}
+
+    merged = {}  # short_name -> model dict
+
+    # Start from existing so manual hand-edits to notes/ctx are preserved.
+    # Inject "short_name" because the config stores it as the dict key, not
+    # as a field inside the value dict.
+    for short_name, cfg in existing_models.items():
+        entry = dict(cfg)
+        entry.setdefault("short_name", short_name)
+        merged[short_name] = entry
+
+    # Apply/add fetched models (update existing, add new)
+    for short_name, m in fetched_by_short.items():
+        entry = dict(m)  # copy from fetched
+        entry.pop("deprecated", None)          # clear any stale deprecated flag
+        entry.pop("deprecated_since", None)
+        merged[short_name] = entry
+
+    # Flag anything in existing that's missing from the API response
+    for short_name in list(merged.keys()):
+        if short_name not in fetched_by_short:
+            entry = merged[short_name]
+            if not entry.get("deprecated"):
+                entry["deprecated"] = True
+                entry["deprecated_since"] = today
+                log.warning(
+                    "[Sync] ⚠  Model '{}' is NO LONGER in the Doubleword pricing page — "
+                    "marking as deprecated (since {}). It will NOT be removed from config.",
+                    short_name, today,
+                )
+
+    # ── Sort: active text, active VL, deprecated ───────────────────
+    def _sort_key(item):
+        _, m = item
+        dep = 1 if m.get("deprecated") else 0
+        vl  = 1 if m.get("multimodal") else 0
+        return (dep, vl)
+
+    return [m for _, m in sorted(merged.items(), key=_sort_key)]
+
+
 def _generate_config(models):
-    """Generate the Python config file content matching the existing format."""
-    text_models = [m for m in models if not m["multimodal"]]
-    vl_models = [m for m in models if m["multimodal"]]
+    """Generate the Python config file content matching the existing format.
 
-    def _fmt_entry(m):
-        mods = "[" + ", ".join(f'"{x}"' for x in m["modalities"]) + "]"
-        pin = f'{m["price_in"]:.2f}'
-        pout = f'{m["price_out"]:.2f}'
-        return (
-            f'    "{m["short_name"]}": {{\n'
-            f'        "model":      "{m["model"]}",\n'
-            f'        "multimodal": {m["multimodal"]},\n'
-            f'        "modalities": {mods},\n'
-            f'        "tier":       "{m["tier"]}",\n'
-            f'        "price_in":   {pin}, "price_out": {pout},\n'
-            f'        "ctx":        {m["ctx"]:_},\n'
-            f'        "notes":      "{m["notes"]}",\n'
-            f'    }},'
+    Active models appear in TEXT-ONLY / VISION-LANGUAGE sections.
+    Models flagged deprecated=True are collected in a DEPRECATED MODELS
+    section at the bottom and are clearly annotated.
+    """
+    active  = [m for m in models if not m.get("deprecated")]
+    retired = [m for m in models if m.get("deprecated")]
+
+    text_models = [m for m in active if not m.get("multimodal")]
+    vl_models   = [m for m in active if m.get("multimodal")]
+
+    def _fmt_entry(m, *, include_deprecated=False):
+        # Normalise key names — support both "short_name" (from parser)
+        # and keys that may come straight from existing config dict.
+        short_name = m.get("short_name") or next(
+            (k for k, v in (m.items() if hasattr(m, "items") else [])), None
         )
+        mods  = "[" + ", ".join(f'"{x}"' for x in m["modalities"]) + "]"
+        pin   = f'{m["price_in"]:.2f}'
+        pout  = f'{m["price_out"]:.2f}'
+        lines = [
+            f'    "{short_name}": {{',
+            f'        "model":      "{m["model"]}",',
+            f'        "multimodal": {m["multimodal"]},',
+            f'        "modalities": {mods},',
+            f'        "tier":       "{m["tier"]}",',
+            f'        "price_in":   {pin}, "price_out": {pout},',
+            f'        "ctx":        {m["ctx"]:_},',
+            f'        "notes":      "{m["notes"]}",',
+        ]
+        if include_deprecated and m.get("deprecated"):
+            since = m.get("deprecated_since", "unknown")
+            lines += [
+                f'        "deprecated":       True,',
+                f'        "deprecated_since": "{since}",',
+            ]
+        lines.append("    },")
+        return "\n".join(lines)
 
-    lines = [
+    output_lines = [
         "# Doubleword Batch API models — model names use HuggingFace conventions",
         "# Verify model availability at https://app.doubleword.ai/ before running",
         "# Pricing from https://docs.doubleword.ai/batches/model-pricing",
         '# Prices shown are "High" (1h) batch tier — "Standard" (24h) is ~30-50% cheaper',
         "# AUTO-GENERATED by sync_doubleword_models.py — do not edit manually",
+        "# Models are NEVER removed — deprecated ones are flagged, not deleted.",
         "",
         "DOUBLEWORD_MODELS = {",
     ]
 
     if text_models:
-        lines += [
+        output_lines += [
             "",
             "    # ═══════════════════════════════════════════════════════════",
             "    #  TEXT-ONLY MODELS",
@@ -188,10 +291,10 @@ def _generate_config(models):
             "",
         ]
         for m in text_models:
-            lines.append(_fmt_entry(m))
+            output_lines.append(_fmt_entry(m))
 
     if vl_models:
-        lines += [
+        output_lines += [
             "",
             "    # ═══════════════════════════════════════════════════════════",
             "    #  VISION-LANGUAGE MODELS",
@@ -199,18 +302,34 @@ def _generate_config(models):
             "",
         ]
         for m in vl_models:
-            lines.append(_fmt_entry(m))
+            output_lines.append(_fmt_entry(m))
 
-    lines.append("}")
-    lines.append("")
-    return "\n".join(lines)
+    if retired:
+        output_lines += [
+            "",
+            "    # ═══════════════════════════════════════════════════════════",
+            "    #  DEPRECATED MODELS  (no longer on Doubleword pricing page)",
+            "    #  These entries are kept for historical reference only.",
+            "    #  They are automatically skipped during extraction runs.",
+            "    # ═══════════════════════════════════════════════════════════",
+            "",
+        ]
+        for m in retired:
+            output_lines.append(_fmt_entry(m, include_deprecated=True))
+
+    output_lines.append("}")
+    output_lines.append("")
+    return "\n".join(output_lines)
 
 
 def sync(write=True):
-    """Fetch pricing page, parse models, and optionally write config file.
+    """Fetch pricing page, merge with existing config, and optionally write.
 
-    Returns the parsed models list. Skips writing if the generated config
-    is identical to the existing file (no changes detected).
+    Augment-only: models absent from the remote pricing page are marked
+    deprecated=True (with a deprecated_since date) rather than removed.
+
+    Returns the full merged models list (active + deprecated).
+    Skips writing if the generated config is identical to the existing file.
     """
     log.info("[Sync] Fetching Doubleword model pricing...")
     try:
@@ -222,32 +341,55 @@ def sync(write=True):
     log.info("[Sync] Fetched pricing data ({} bytes)", len(resp.text))
 
     log.info("[Sync] Parsing model pricing and details...")
-    models = _parse_markdown_table(resp.text)
-    if not models:
+    fetched = _parse_markdown_table(resp.text)
+    if not fetched:
         log.warning("[Sync] No models parsed from pricing page, keeping existing config")
         return None
 
-    log.info("[Sync] Collected {} models from Doubleword:", len(models))
-    for m in models:
+    log.info("[Sync] API returned {} model(s):", len(fetched))
+    for m in fetched:
         tag = "[VL]" if m["multimodal"] else "[text]"
-        log.info("  {} {:25s}  ${:.2f} in / ${:.2f} out  {}",
+        log.info("  {} {:28s}  ${:.2f} in / ${:.2f} out  {}",
                  tag, m["short_name"], m["price_in"], m["price_out"], m["model"])
+
+    # ── Merge with existing config (augment-only) ─────────────────
+    existing_models = _load_existing_models()
+    models = _merge_with_existing(fetched, existing_models)
+
+    active     = [m for m in models if not m.get("deprecated")]
+    deprecated = [m for m in models if m.get("deprecated")]
+
+    log.info("[Sync] Merged registry: {} active, {} deprecated",
+             len(active), len(deprecated))
+
+    # ── Loud warnings for deprecated models ──────────────────────
+    if deprecated:
+        log.warning("[Sync] " + "═" * 55)
+        log.warning("[Sync] ⚠  {} DEPRECATED MODEL(S) — no longer on pricing page:",
+                    len(deprecated))
+        for m in deprecated:
+            since = m.get("deprecated_since", "unknown")
+            log.warning("[Sync]   • {} ({}) — deprecated since {}",
+                        m["short_name"], m["model"], since)
+        log.warning("[Sync] These models are SKIPPED during extraction runs.")
+        log.warning("[Sync] Remove the 'deprecated' flag manually to re-enable.")
+        log.warning("[Sync] " + "═" * 55)
 
     if write:
         config_text = _generate_config(models)
 
-        # Check if anything actually changed
-        existing = ""
+        existing_text = ""
         if os.path.exists(CONFIG_PATH):
             with open(CONFIG_PATH, "r") as f:
-                existing = f.read()
+                existing_text = f.read()
 
-        if config_text == existing:
+        if config_text == existing_text:
             log.info("[Sync] No changes detected, skipping save")
         else:
             with open(CONFIG_PATH, "w") as f:
                 f.write(config_text)
-            log.info("[Sync] Saved {} models to {}", len(models), CONFIG_PATH)
+            log.info("[Sync] Saved {} active + {} deprecated model(s) to {}",
+                     len(active), len(deprecated), CONFIG_PATH)
 
     return models
 
