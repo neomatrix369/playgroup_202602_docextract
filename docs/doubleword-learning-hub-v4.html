@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Doubleword Platform — Developer Learning Hub</title>
+<title>Doubleword Platform — Developer Learning Hub v4</title>
 <style>
 :root {
   --dw-ink: #0a0a0f;
@@ -309,7 +309,7 @@ kbd { background: rgba(255,255,255,0.1); padding: 0.15em 0.4em; border-radius: 4
         <div class="review-section-title">✅ What went well</div>
         Clean sidebar nav · Comparison table on intro page is excellent · Writing is crisp and jargon-free
         <div class="review-section-title" style="margin-top:0.2em;">⚠️ Could improve</div>
-        Lead homepage with cost savings, not generic tagline · Add a 5-line code snippet to the intro page · Show pricing deltas (not just "Reduced pricing") in the comparison table
+        Lead homepage with cost savings, not generic tagline · Add a 5-line code snippet to the intro page · Show pricing deltas (not just "Reduced pricing") in the comparison table · "What is a JSONL file?" promoted as a top-6 Popular Guide signals to experienced devs that docs may not be aimed at them · <strong>Cross-site gap:</strong> OCR models, dw CLI, customer stories, savings calculator, and cost benchmarks ($30K/$15.8K/$2.1K) live on doubleword.ai but are not linked from docs.doubleword.ai · Docs has no consolidated prerequisites page across products · Two blog locations (docs.doubleword.ai/conceptual and blog.doubleword.ai) fragment content
       </div>
     </div>
 <div class="sources">
@@ -719,7 +719,7 @@ resp = requests.get(
         <div class="review-section-title">✅ What went well</div>
         Thinking mode / reasoning toggle documented per model · Embedding model specs are detailed · Playground links per model
         <div class="review-section-title" style="margin-top:0.2em;">⚠️ Could improve</div>
-        OCR models on pricing page but not on docs pricing page yet · No model comparison chart (quality vs cost) · No guidance on which model to pick for common tasks
+        OCR models (DeepSeek-OCR-2, olmOCR-2-7B, LightOnOCR-2-1B) on marketing pricing page but not on docs pricing page yet · Nemotron overnight pricing shows $0.00/$0.00 on docs but $0.15/$0.38 on marketing site — pricing data out of sync · No model comparison chart (quality vs cost) · No guidance on which model to pick for common tasks
       </div>
     </div>
 <div class="sources">
@@ -1213,56 +1213,48 @@ modelGroups:
   </section>
 
   <section>
-    <h2>Doubleword Batch Skill for AI Agents</h2>
-    <p style="font-size:0.78em;color:var(--dw-muted);">A reusable skill that teaches AI coding agents how to work with the Doubleword Batch API.</p>
+    <h2>Doubleword Skills for AI Agents</h2>
+    <p style="font-size:0.72em;color:var(--dw-muted);">Multiple skills exist across the ecosystem — official and community-built.</p>
     <div class="two-col">
       <div>
-        <h3 style="color:var(--dw-green);">What it covers</h3>
-        <div class="step"><div class="step-num" style="background:var(--dw-green);">1</div><div class="step-content"><strong>Submitting batch jobs</strong> via the API</div></div>
-        <div class="step"><div class="step-num" style="background:var(--dw-green);">2</div><div class="step-content"><strong>Monitoring status</strong> + downloading results</div></div>
-        <div class="step"><div class="step-num" style="background:var(--dw-green);">3</div><div class="step-content"><strong>Using Autobatcher</strong> from Python</div></div>
-        <div class="step"><div class="step-num" style="background:var(--dw-green);">4</div><div class="step-content"><strong>Tool calling</strong> + structured outputs</div></div>
-        <div class="step"><div class="step-num" style="background:var(--dw-green);">5</div><div class="step-content"><strong>Models &amp; pricing</strong> reference</div></div>
-        <h3 style="margin-top:0.6em;color:var(--dw-green);">Supported Agents</h3>
-        <p class="small">Claude Code · Cursor · Windsurf · Codex · any agent supporting the skills format</p>
-      </div>
-      <div>
-        <h3 style="color:var(--dw-green);">Install</h3>
-        <pre><code class="language-bash"># Via Skills CLI
+        <h3 style="color:var(--dw-green);">Official Skill</h3>
+        <div class="model-card"><div class="model-name" style="color:var(--dw-green);">doublewordai/batch-skill</div><div class="model-desc">Batch API, Autobatcher, tool calling, structured outputs, models & pricing. Claude Code, Cursor, Windsurf, Codex.</div></div>
+        <pre style="margin:0.3em 0;"><code class="language-bash"># Install
 npx skills add \
   https://github.com/doublewordai/batch-skill
-
-# Or via Git
-git clone \
-  https://github.com/doublewordai/batch-skill \
-  ~/.claude/skills/batch-skill</code></pre>
-        <h3 style="margin-top:0.5em;color:var(--dw-green);">Usage</h3>
-        <p class="small">Once installed, ask your agent:</p>
-        <p class="small" style="color:#e2e8f0;"><em>"How do I submit a batch job to Doubleword?"</em><br><em>"Help me download partial results"</em><br><em>"What models are available and what do they cost?"</em></p>
-        <pre style="margin-top:0.3em;"><code class="language-bash"># Update
-npx skills update doubleword-batch
-# Or: cd ~/.claude/skills/batch-skill && git pull</code></pre>
-        <p class="smaller"><a href="https://docs.doubleword.ai/inference-api/skill" target="_blank">Skill docs →</a> · <a href="https://github.com/doublewordai/batch-skill" target="_blank">GitHub →</a> · <a href="https://github.com/skills-sh/skills" target="_blank">Skills CLI →</a></p>
+# Or: git clone ... ~/.claude/skills/batch-skill
+# Update
+npx skills update doubleword-batch</code></pre>
+        <p class="smaller"><a href="https://docs.doubleword.ai/inference-api/skill" target="_blank">Docs →</a> · <a href="https://github.com/doublewordai/batch-skill" target="_blank">GitHub →</a></p>
+      </div>
+      <div>
+        <h3 style="color:var(--dw-green);">Community Skills</h3>
+        <div class="model-card"><div class="model-name" style="color:var(--dw-green);">NnamdiOdozi/dw_batch_skill</div><div class="model-desc">Claude Code batch skill. Featured on "Seen in the Wild." <a href="https://github.com/NnamdiOdozi/dw_batch_skill" target="_blank">GitHub →</a></div></div>
+        <div class="model-card"><div class="model-name" style="color:var(--dw-green);">openclaw/.../doubleword</div><div class="model-desc">Two versions: v1 (API-only) + v2 (adds autobatcher + tool calling). <a href="https://github.com/openclaw/skills/tree/main/skills/pjb157/doubleword" target="_blank">GitHub →</a></div></div>
+        <div class="model-card"><div class="model-name" style="color:var(--dw-green);">Termo.ai</div><div class="model-desc">Hosted skill — deploy on a free agent, no install needed. <a href="https://termo.ai/skills/doubleword" target="_blank">Termo →</a></div></div>
       </div>
     </div>
     
     <div class="review">
-      <div class="review-title">Docs Review — AI Skill Page</div>
-      <div class="review-row"><span class="review-dim">Clarity</span><span class="review-score good">A</span><span class="review-note">Clear install commands for both Skills CLI and git. Supported agents listed.</span></div>
-      <div class="review-row"><span class="review-dim">Prerequisites</span><span class="review-score good">A</span><span class="review-note">npx or git. Agent (Claude Code, Cursor, etc.) assumed already installed.</span></div>
-      <div class="review-row"><span class="review-dim">Examples</span><span class="review-score ok">B</span><span class="review-note">Usage examples are prompts, not code. The skill itself provides the code when invoked.</span></div>
-      <div class="review-row"><span class="review-dim">Level</span><span class="review-score good">A</span><span class="review-note">All levels. If you can type a prompt, you can use the skill.</span></div>
+      <div class="review-title">Docs Review — Skills Ecosystem</div>
+      <div class="review-row"><span class="review-dim">Clarity</span><span class="review-score ok">B</span><span class="review-note">Official skill page is clear. But docs only mention the official skill — no reference to 3+ community alternatives.</span></div>
+      <div class="review-row"><span class="review-dim">Prerequisites</span><span class="review-score good">A</span><span class="review-note">npx or git. Agent assumed installed. Low barrier.</span></div>
+      <div class="review-row"><span class="review-dim">Examples</span><span class="review-score ok">B</span><span class="review-note">Usage examples are prompts, not code output. No screenshot of what the skill returns when invoked.</span></div>
+      <div class="review-row"><span class="review-dim">Level</span><span class="review-score good">A</span><span class="review-note">All levels. Prompt-based interface is accessible to everyone.</span></div>
       <div class="review-section">
         <div class="review-section-title">✅ What went well</div>
-        Low barrier to entry · Covers the full API surface through natural language · MIT licensed
+        Low barrier to entry · MIT licensed · Covers full API surface via natural language
         <div class="review-section-title" style="margin-top:0.2em;">⚠️ Could improve</div>
-        No example of what the skill actually outputs when invoked · No comparison with using the API directly
+        Skills are fragmented: 4+ implementations with no cross-referencing · Docs skill page doesn't link to community skills · OpenClaw skill examples use <code>anthropic/claude-3-5-sonnet</code> (not a DW-hosted model) which could confuse users · Homepage "Get Started with AI" CTA links to old URL pattern (<code>/batches/skill</code>) · No comparison between official vs community skills · No example of actual skill output when invoked
       </div>
     </div>
 <div class="sources">
       <span class="src-num">1</span> <a href="https://docs.doubleword.ai/inference-api/skill" target="_blank">API Skill — Docs</a> · 
-      <span class="src-num">2</span> <a href="https://github.com/doublewordai/batch-skill" target="_blank">batch-skill — GitHub</a> · 
-      <span class="src-num">3</span> <a href="https://github.com/skills-sh/skills" target="_blank">Skills CLI — GitHub</a>
+      <span class="src-num">2</span> <a href="https://github.com/doublewordai/batch-skill" target="_blank">Official batch-skill</a> · 
+      <span class="src-num">3</span> <a href="https://github.com/NnamdiOdozi/dw_batch_skill" target="_blank">Nnamdi's dw_batch_skill</a> · 
+      <span class="src-num">4</span> <a href="https://github.com/openclaw/skills/tree/main/skills/pjb157/doubleword" target="_blank">OpenClaw v2</a> · 
+      <span class="src-num">5</span> <a href="https://termo.ai/skills/doubleword" target="_blank">Termo.ai</a> · 
+      <span class="src-num">6</span> <a href="https://www.doubleword.ai/seen-in-the-wild" target="_blank">Seen in the Wild</a>
     </div>
   </section>
 
@@ -1456,7 +1448,7 @@ npx skills update doubleword-batch
         <a href="https://doublewordai.github.io/dw/" target="_blank" style="font-size:0.85em;">Docs</a>
       </div>
     </div>
-    <p class="smaller" style="margin-top:1.5em;">Built from 55+ docs pages + doubleword.ai &nbsp;·&nbsp; March 2026</p>
+    <p class="smaller" style="margin-top:1.5em;">v4 &nbsp;·&nbsp; Built from 55+ docs pages + doubleword.ai &nbsp;·&nbsp; 42 issues tracked &nbsp;·&nbsp; March 2026</p>
   </section>
 </section>
 
