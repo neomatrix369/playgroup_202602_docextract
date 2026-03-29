@@ -16,3 +16,5 @@ datetime,provider,model_short_name,model_full_name,tier,multimodal,price_in,pric
 2026-03-07 01:45:16,Doubleword,dw-qwen3-vl-235b,Qwen/Qwen3-VL-235B-A22B-Instruct-FP8,premium,True,0.15,0.55,262000,11,11,0,483,176847,1535,0.027371,43.91,0.002488,11,11,11,10,10,11,11,11,1d93d13c-d95b-4594-852e-722cbdfe9f7a
 2026-03-20 23:45:08,Doubleword,dw-qwen3.5-4b,Qwen/Qwen3.5-4B,ultra_cheap,False,0.05,0.08,262000,11,11,0,408,176660,79386,0.015184,37.09,0.00138,11,11,11,8,8,11,11,10,577db53a-b146-4e0d-86bb-a16376735737
 2026-03-20 23:45:09,Doubleword,dw-nemotron-120b,nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4,premium,False,0.23,0.56,262000,11,10,1,406,181119,39379,0.06371,36.91,0.005792,10,10,10,7,7,9,10,10,d909a0bc-0d55-48c1-b9ac-50a07ccb7a90
+2026-03-29 02:12:15,Doubleword,dw-deepseek-ocr-2,deepseek-ai/DeepSeek-OCR-2,ultra_cheap,False,0.08,0.08,262000,11,0,11,14113,43876,3453,0.003786,1283.0,0.000344,0,0,0,0,0,0,0,0,c2b12480-6079-4dab-a7bd-de1ad1f3fa5b
+2026-03-29 02:12:15,Doubleword,dw-olmocr-2-7b-1025-fp8,allenai/olmOCR-2-7B-1025-FP8,ultra_cheap,False,0.15,0.15,262000,11,8,3,32214,49696,1128,0.007624,2928.55,0.000693,8,8,8,8,8,8,8,8,8575b4b8-784a-47b3-8833-e467bc711091

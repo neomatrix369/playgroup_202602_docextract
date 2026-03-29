@@ -606,25 +606,24 @@ def _print_run_summary(all_statuses):
 def _resolve_model(model_short_name):
     """Return backend string ('doubleword' or 'openrouter') or exit with error.
 
-    Deprecated Doubleword models are skipped with a warning rather than run.
+    potentially_deprecated models are NOT skipped — they still run normally.
+    Only a manually set 'deprecated': True flag would retire a model (if that
+    logic is ever added in future).
     """
     if model_short_name in DOUBLEWORD_MODELS:
         cfg = DOUBLEWORD_MODELS[model_short_name]
-        if cfg.get("deprecated"):
-            since = cfg.get("deprecated_since", "unknown")
+        if cfg.get("potentially_deprecated"):
+            first_seen = cfg.get("first_noticed_missing", "unknown")
             log.warning(
-                "[Extractor] ⚠  Skipping '{}' — it is deprecated (since {}) and no longer "
-                "available on Doubleword. Remove the 'deprecated' flag in "
-                "config_models_doubleword.py to re-enable it.",
-                model_short_name, since,
+                "[Extractor] ⚠  '{}' is potentially_deprecated (first noticed missing: {}). "
+                "Running it anyway — confirm manually to fully retire.",
+                model_short_name, first_seen,
             )
-            return "deprecated"
         return "doubleword"
     if model_short_name in OPENROUTER_MODELS:
         return "openrouter"
-    active_dw = [k for k, v in DOUBLEWORD_MODELS.items() if not v.get("deprecated")]
     available_or = ", ".join(f"{k}{_mod_tag(OPENROUTER_MODELS[k]['multimodal'])}" for k in OPENROUTER_MODELS)
-    available_dw = ", ".join(f"{k}{_mod_tag(DOUBLEWORD_MODELS[k]['multimodal'])}" for k in active_dw)
+    available_dw = ", ".join(f"{k}{_mod_tag(DOUBLEWORD_MODELS[k]['multimodal'])}" for k in DOUBLEWORD_MODELS)
     log.error("Unknown model '{}'.", model_short_name)
     log.error("  OpenRouter models: {}", available_or)
     log.error("  Doubleword models: {}", available_dw)
@@ -658,35 +657,34 @@ async def main():
                        help="Run only OpenRouter models")
     args = parser.parse_args()
 
-    # Announce deprecated models prominently
-    deprecated_dw = {k: v for k, v in DOUBLEWORD_MODELS.items() if v.get("deprecated")}
-    if deprecated_dw:
+    # Announce potentially_deprecated models (informational — they still run)
+    pdep_dw = {k: v for k, v in DOUBLEWORD_MODELS.items() if v.get("potentially_deprecated")}
+    if pdep_dw:
         log.warning("=" * 60)
-        log.warning("⚠  {} DEPRECATED Doubleword model(s) — will be SKIPPED:",
-                    len(deprecated_dw))
-        for short_name, cfg in deprecated_dw.items():
-            since = cfg.get("deprecated_since", "unknown")
-            log.warning("    • {} ({}) — deprecated since {}",
-                        short_name, cfg["model"], since)
+        log.warning("⚠  {} POTENTIALLY DEPRECATED Doubleword model(s) — still running:",
+                    len(pdep_dw))
+        for short_name, cfg in pdep_dw.items():
+            first_seen = cfg.get("first_noticed_missing", "unknown")
+            log.warning("    • {} ({}) — first noticed missing: {}",
+                        short_name, cfg["model"], first_seen)
+        log.warning("  These models are included in runs — flag is informational only.")
+        log.warning("  Confirm and set 'deprecated': True manually to fully retire.")
         log.warning("=" * 60)
 
     if args.models:
         models_to_run = args.models
     elif args.all_doubleword:
-        models_to_run = [k for k, v in DOUBLEWORD_MODELS.items() if not v.get("deprecated")]
+        models_to_run = list(DOUBLEWORD_MODELS)   # includes potentially_deprecated
     elif args.all_openrouter:
         models_to_run = list(OPENROUTER_MODELS)
     else:
-        active_dw = [k for k, v in DOUBLEWORD_MODELS.items() if not v.get("deprecated")]
-        models_to_run = list(OPENROUTER_MODELS) + active_dw
+        models_to_run = list(ALL_MODELS)           # includes potentially_deprecated
 
-    # Partition models by backend, skip deprecated
+    # Partition models by backend
     dw_models = []
     or_models = []
     for model_short_name in models_to_run:
         backend = _resolve_model(model_short_name)
-        if backend == "deprecated":
-            continue   # warning already logged by _resolve_model
         if backend == "doubleword":
             dw_models.append(model_short_name)
         else:
