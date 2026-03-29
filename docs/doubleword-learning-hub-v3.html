@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Doubleword Platform — Developer Learning Hub</title>
+<style>
+:root {
+  --dw-ink: #0a0a0f;
+  --dw-paper: #f8f6f1;
+  --dw-accent: #e85d26;
+  --dw-accent2: #2563eb;
+  --dw-green: #16a34a;
+  --dw-amber: #d97706;
+  --dw-purple: #8b5cf6;
+  --dw-muted: #6b7280;
+  --dw-surface: #1a1a2e;
+  --dw-surface2: #16213e;
+  --dw-border: rgba(255,255,255,0.08);
+}
+body { color: #e2e8f0; }
+#deck { text-align: left; }
+h1, h2, h3 { text-transform: none; letter-spacing: -0.02em; color: #f1f5f9; }
+code, pre code { font-family: 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace; font-size: 0.62em; }
+pre { width: 100%; margin: 0.5em 0; box-shadow: none; border-radius: 8px; border: 1px solid var(--dw-border); }
+pre code { max-height: 380px; padding: 0.8em 1em; line-height: 1.45; overflow-y: auto; }
+/* slide padding handled by engine CSS */
+.title-slide { text-align: center !important; background: radial-gradient(ellipse at 30% 50%, #1e1b4b 0%, #0a0a0f 70%); }
+.title-slide h1 { font-size: 2.4em; margin-bottom: 0.1em; }
+.accent-bar { width: 120px; height: 4px; background: var(--dw-accent); margin: 0.4em auto; border-radius: 2px; }
+.section-header { text-align: center !important; }
+.section-num { font-family: 'JetBrains Mono', monospace; font-size: 0.55em; color: var(--dw-accent); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 0.3em; }
+
+/* Product picker cards */
+.product-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.8em; margin: 0.6em 0; }
+.product-card { background: var(--dw-surface); border: 1px solid var(--dw-border); border-radius: 12px; padding: 1em 1.2em; transition: all 0.2s; }
+.product-card:hover { border-color: var(--dw-accent); transform: translateY(-2px); }
+.product-card .pc-tag { font-family: 'JetBrains Mono', monospace; font-size: 0.6em; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.3em; }
+.product-card h3 { margin-top: 0.2em !important; font-size: 1.1em !important; }
+.product-card p { font-size: 0.72em; color: var(--dw-muted); margin: 0.3em 0 0 0; }
+.tag-inference { color: var(--dw-accent); }
+.tag-control { color: var(--dw-accent2); }
+.tag-stack { color: var(--dw-purple); }
+
+/* Tables */
+.cmp-table { width: 100%; border-collapse: collapse; font-size: 0.68em; margin: 0.6em 0; }
+.cmp-table th { background: rgba(232,93,38,0.15); color: var(--dw-accent); padding: 0.5em 0.7em; text-align: left; font-weight: 600; border-bottom: 2px solid var(--dw-accent); }
+.cmp-table td { padding: 0.45em 0.7em; border-bottom: 1px solid var(--dw-border); vertical-align: top; }
+.cmp-table tr:hover td { background: rgba(255,255,255,0.03); }
+.cmp-table-blue th { background: rgba(37,99,235,0.15); color: var(--dw-accent2); border-bottom-color: var(--dw-accent2); }
+.cmp-table-purple th { background: rgba(139,92,246,0.15); color: var(--dw-purple); border-bottom-color: var(--dw-purple); }
+
+/* Badges */
+.badge { display: inline-block; padding: 0.15em 0.5em; border-radius: 20px; font-size: 0.7em; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.badge-green { background: rgba(22,163,74,0.2); color: #4ade80; }
+.badge-amber { background: rgba(217,119,6,0.2); color: #fbbf24; }
+.badge-blue { background: rgba(37,99,235,0.2); color: #60a5fa; }
+.badge-red { background: rgba(239,68,68,0.2); color: #f87171; }
+.badge-purple { background: rgba(139,92,246,0.2); color: #a78bfa; }
+
+/* Layouts */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2em; align-items: start; }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.8em; align-items: start; }
+.code-output { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7em; margin: 0.5em 0; }
+.code-side { border-radius: 8px; overflow: hidden; border: 1px solid var(--dw-border); }
+.output-side { background: #0d1117; border: 1px solid rgba(22,163,74,0.3); padding: 0.7em 0.9em; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.6em; line-height: 1.5; color: #a5d6a7; }
+.output-label { font-size: 0.6em; font-family: 'JetBrains Mono', monospace; margin-bottom: 0.2em; text-transform: uppercase; letter-spacing: 0.1em; }
+
+/* Callouts */
+.callout { background: rgba(37,99,235,0.08); border-left: 3px solid var(--dw-accent2); padding: 0.6em 0.9em; border-radius: 0 6px 6px 0; margin: 0.5em 0; font-size: 0.75em; }
+.callout-accent { background: rgba(232,93,38,0.08); border-left-color: var(--dw-accent); }
+.callout-green { background: rgba(22,163,74,0.08); border-left-color: var(--dw-green); }
+.callout-purple { background: rgba(139,92,246,0.08); border-left-color: var(--dw-purple); }
+
+/* Model cards */
+.model-card { background: var(--dw-surface); border: 1px solid var(--dw-border); border-radius: 10px; padding: 0.6em 0.9em; margin: 0.3em 0; }
+.model-card .model-name { font-family: 'JetBrains Mono', monospace; font-size: 0.68em; color: var(--dw-accent); }
+.model-card .model-desc { font-size: 0.64em; color: var(--dw-muted); }
+.model-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4em; font-size: 0.75em; }
+
+/* Decision tree */
+.decision-flow { display: flex; flex-direction: column; align-items: center; gap: 0.2em; font-size: 0.75em; }
+.decision-node { background: var(--dw-surface); border: 1px solid var(--dw-border); border-radius: 10px; padding: 0.6em 1em; text-align: center; margin: 0.2em; }
+.decision-node.question { border-color: var(--dw-accent2); background: rgba(37,99,235,0.08); }
+.decision-node.answer { border-color: var(--dw-green); background: rgba(22,163,74,0.08); }
+.decision-row { display: flex; gap: 0.5em; align-items: stretch; justify-content: center; }
+.arrow-down { color: var(--dw-muted); font-size: 1.1em; }
+
+/* Calculator */
+.calc-container { background: var(--dw-surface); border: 1px solid var(--dw-border); border-radius: 12px; padding: 0.8em 1em; font-size: 0.72em; }
+.calc-row { display: flex; align-items: center; gap: 0.7em; margin: 0.4em 0; }
+.calc-row label { min-width: 130px; color: var(--dw-muted); font-size: 0.88em; }
+.calc-row input, .calc-row select { background: rgba(255,255,255,0.06); border: 1px solid var(--dw-border); color: #e2e8f0; padding: 0.35em 0.5em; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 0.92em; width: 150px; }
+.calc-row select { width: 170px; }
+.calc-result { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5em; margin-top: 0.6em; }
+.calc-result-card { background: rgba(255,255,255,0.03); border: 1px solid var(--dw-border); border-radius: 8px; padding: 0.5em 0.7em; text-align: center; }
+.calc-result-card .price { font-family: 'JetBrains Mono', monospace; font-size: 1.3em; font-weight: 600; }
+.calc-result-card .label { font-size: 0.78em; color: var(--dw-muted); margin-top: 0.15em; }
+.price-rt { color: #f87171; } .price-async { color: #fbbf24; } .price-batch { color: #4ade80; }
+.savings-tag { font-family: 'JetBrains Mono', monospace; color: var(--dw-green); font-size: 0.82em; font-weight: 600; }
+
+/* Steps */
+.step { display: flex; gap: 0.7em; margin: 0.4em 0; align-items: flex-start; }
+.step-num { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; background: var(--dw-accent); color: white; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 0.7em; }
+.step-num-blue { background: var(--dw-accent2); }
+.step-num-purple { background: var(--dw-purple); }
+.step-content { flex: 1; }
+.step-content strong { color: #f1f5f9; }
+
+/* Helpers */
+.small { font-size: 0.72em; color: var(--dw-muted); }
+.smaller { font-size: 0.6em; color: var(--dw-muted); }
+a { color: var(--dw-accent); text-decoration: underline; text-underline-offset: 3px; }
+a:hover { color: #f97316; }
+hr { border: none; border-top: 1px solid var(--dw-border); margin: 0.6em 0; }
+.progress-fill { background: var(--dw-accent); }
+
+/* Insight boxes (from blog series) */
+.insight-box { background: linear-gradient(135deg, rgba(139,92,246,0.06), rgba(37,99,235,0.06)); border: 1px solid rgba(139,92,246,0.2); border-radius: 8px; padding: 0.6em 0.9em; margin: 0.5em 0; font-size: 0.72em; }
+.insight-box .insight-label { font-family: 'JetBrains Mono', monospace; font-size: 0.8em; color: var(--dw-purple); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.2em; }
+
+/* Stat highlight */
+.stat-row { display: flex; gap: 1em; justify-content: center; margin: 0.6em 0; }
+.stat-card { text-align: center; }
+.stat-card .stat-num { font-family: 'DM Serif Display', serif; font-size: 2em; color: var(--dw-accent); }
+.stat-card .stat-label { font-size: 0.65em; color: var(--dw-muted); }
+
+/* Source citations */
+.sources { margin-top: auto; padding-top: 0.4em; border-top: 1px solid var(--dw-border); font-size: 0.52em; color: #4b5563; line-height: 1.8; }
+.sources a { color: #6b7280; text-decoration: none; border-bottom: 1px dotted #4b5563; transition: color 0.15s; }
+.sources a:hover { color: var(--dw-accent); border-bottom-color: var(--dw-accent); }
+.sources .src-num { display: inline-block; min-width: 1.4em; color: #9ca3af; font-family: 'SF Mono', Menlo, monospace; }
+
+/* Review panel */
+.review { display: none; margin-top: 0.5em; background: rgba(217,119,6,0.06); border: 1px solid rgba(217,119,6,0.25); border-radius: 8px; padding: 0.5em 0.7em; font-size: 0.55em; line-height: 1.6; color: #d4d4d8; }
+.review.visible { display: block; }
+.review-title { font-family: 'SF Mono', Menlo, monospace; font-size: 1.05em; color: var(--dw-amber); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.3em; }
+.review-row { display: flex; gap: 0.5em; margin: 0.15em 0; align-items: baseline; }
+.review-dim { min-width: 90px; color: #9ca3af; font-family: 'SF Mono', Menlo, monospace; font-size: 0.95em; }
+.review-score { font-family: 'SF Mono', Menlo, monospace; font-weight: 700; min-width: 28px; }
+.review-score.good { color: #4ade80; }
+.review-score.ok { color: #fbbf24; }
+.review-score.gap { color: #f87171; }
+.review-note { color: #a1a1aa; }
+.review-section { margin-top: 0.3em; padding-top: 0.3em; border-top: 1px solid rgba(217,119,6,0.15); }
+.review-section-title { color: var(--dw-amber); font-weight: 600; font-size: 0.95em; margin-bottom: 0.15em; }
+.review-toggle { position: fixed; top: 8px; right: 8px; z-index: 1002; background: rgba(217,119,6,0.15); border: 1px solid rgba(217,119,6,0.3); color: #fbbf24; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-family: 'SF Mono', Menlo, monospace; }
+
+/* System font stack - no CDN needed */
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; font-size: 20px; }
+h1, h2, h3 { font-family: Georgia, 'Times New Roman', serif; }
+h1 { font-size: 2.2em; line-height: 1.1; }
+h2 { font-size: 1.45em; line-height: 1.2; margin-bottom: 0.3em; }
+h3 { font-size: 1.05em; color: var(--dw-accent); }code, pre code, .badge, .step-num, .section-num, .pc-tag, .calc-row input,
+.calc-row select, .output-label, .model-name, .insight-label, .savings-tag,
+.calc-result-card .price { font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', Menlo, Consolas, monospace; }
+
+/* === SELF-CONTAINED SLIDE ENGINE === */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0f; overflow: hidden; font-size: 22px; color: #e2e8f0; }
+#deck { width: 100vw; height: calc(100vh - 39px); position: relative; }
+/* Top-level section groups */
+#deck > section { display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
+#deck > section.active { display: block; }
+/* Nested child slides */
+#deck > section > section { display: none; width: 100%; height: 100%; overflow-y: auto; padding: 28px 48px 16px 48px; }
+#deck > section > section.active { display: flex; flex-direction: column; }
+/* Non-nested slides (title slide etc) */
+#deck > section:not(:has(> section)) { display: none; overflow-y: auto; padding: 28px 48px 16px 48px; }
+#deck > section.active:not(:has(> section)) { display: flex; flex-direction: column; }
+/* Section headers - vertically center them */
+#deck > section > section.active .section-header,
+#deck > section.active:not(:has(> section)) .section-header {
+  min-height: calc(100vh - 39px - 56px);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+/* Title slide centering */
+#deck > section.active:not(:has(> section)).title-slide {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+/* Navigation bar */
+.nav-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 36px; background: rgba(10,10,15,0.95); border-top: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; z-index: 1000; }
+.nav-bar button { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: #94a3b8; padding: 3px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-family: inherit; }
+.nav-bar button:hover { background: rgba(255,255,255,0.15); color: #e2e8f0; }
+.nav-counter { color: #6b7280; font-size: 13px; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+.progress-bar { position: fixed; bottom: 36px; left: 0; height: 3px; background: #e85d26; transition: width 0.3s; z-index: 1001; }
+/* Code styling without highlight.js */
+pre { background: #1e1e2e; overflow-x: auto; }
+pre code { display: block; color: #cdd6f4; white-space: pre; }
+kbd { background: rgba(255,255,255,0.1); padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.85em; }
+</style>
+</head>
+<body>
+<div id="deck">
+
+<!-- ======================== TITLE ======================== -->
+<section class="title-slide">
+  <h1>Doubleword<br>Platform</h1>
+  <div class="accent-bar"></div>
+  <p style="font-size:0.8em;color:var(--dw-muted);margin-top:0.2em;">Developer Learning Hub &nbsp;·&nbsp; The Complete Picture</p>
+  <div class="stat-row" style="margin-top:1em;">
+    <div class="stat-card"><div class="stat-num" style="color:var(--dw-accent);">3</div><div class="stat-label">Products</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--dw-accent2);">55+</div><div class="stat-label">Doc Pages</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--dw-purple);">10</div><div class="stat-label">Models</div></div>
+  </div>
+  <p class="smaller" style="margin-top:1em;"><kbd style="background:rgba(255,255,255,0.1);padding:0.15em 0.4em;border-radius:4px;font-size:0.85em;">→</kbd> sections &nbsp;·&nbsp; <kbd style="background:rgba(255,255,255,0.1);padding:0.15em 0.4em;border-radius:4px;font-size:0.85em;">↓</kbd> go deeper &nbsp;·&nbsp; <kbd style="background:rgba(255,255,255,0.1);padding:0.15em 0.4em;border-radius:4px;font-size:0.85em;">ESC</kbd> overview map</p>
+</section>
+
+<!-- ======================== SECTION 1: PLATFORM OVERVIEW ======================== -->
+<section>
+  <section class="section-header">
+    <div class="section-num">Section 01</div>
+    <h2>The Doubleword Platform</h2>
+    <p class="small">Three products, one mission: AI infrastructure for every workload</p>
+  </section>
+
+  <section>
+    <h2>Three Products, One Platform</h2>
+    <div class="product-grid">
+      <div class="product-card">
+        <div class="pc-tag tag-inference">Product 1</div>
+        <h3 style="color:var(--dw-accent);">Inference API</h3>
+        <p>Managed LLM inference with realtime, async, and batch modes. OpenAI-compatible. Up to 80% cost savings.</p>
+        <p style="font-size:0.6em;color:var(--dw-accent);margin-top:0.4em;">~30 doc pages · 10 models · 9 workbook examples</p>
+      </div>
+      <div class="product-card">
+        <div class="pc-tag tag-control">Product 2</div>
+        <h3 style="color:var(--dw-accent2);">Control Layer</h3>
+        <p>Open-source AI gateway. Written in Rust. 450x faster than LiteLLM. RBAC, analytics, billing built in.</p>
+        <p style="font-size:0.6em;color:var(--dw-accent2);margin-top:0.4em;">~11 doc pages · Open source · Docker Compose quickstart</p>
+      </div>
+      <div class="product-card">
+        <div class="pc-tag tag-stack">Product 3</div>
+        <h3 style="color:var(--dw-purple);">Inference Stack</h3>
+        <p>Self-hosted LLM deployment on your GPU infrastructure. Kubernetes-native. Helm charts. Multi-engine.</p>
+        <p style="font-size:0.6em;color:var(--dw-purple);margin-top:0.4em;">~5+ doc pages · Bit Harbor · Pre-Porter · vLLM/TRT-LLM</p>
+      </div>
+    </div>
+    <!-- Platform architecture SVG -->
+    <svg viewBox="0 0 800 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:800px;margin:0.5em auto 0;display:block;">
+      <defs>
+        <marker id="arrOr" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="7" markerHeight="5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#e85d26"/></marker>
+        <marker id="arrBl" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="7" markerHeight="5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6"/></marker>
+        <style>
+          .arch-box { rx: 8; ry: 8; stroke-width: 1.5; }
+          .arch-txt { fill: #e2e8f0; font-family: -apple-system, system-ui, sans-serif; font-size: 13px; font-weight: 600; }
+          .arch-sub { fill: #94a3b8; font-family: -apple-system, system-ui, sans-serif; font-size: 10px; }
+          .arch-line { stroke-width: 1.5; fill: none; stroke-dasharray: 6 3; }
+          @keyframes drawLine { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+          @keyframes popIn { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
+          .arch-a1 { animation: popIn 0.3s ease-out 0.1s both; }
+          .arch-a2 { animation: popIn 0.3s ease-out 0.3s both; }
+          .arch-a3 { animation: popIn 0.3s ease-out 0.5s both; }
+          .arch-a4 { animation: popIn 0.3s ease-out 0.7s both; }
+          .arch-l1 { stroke-dashoffset: 100; animation: drawLine 0.6s ease-out 0.5s forwards; }
+          .arch-l2 { stroke-dashoffset: 100; animation: drawLine 0.6s ease-out 0.7s forwards; }
+          .arch-l3 { stroke-dashoffset: 100; animation: drawLine 0.6s ease-out 0.9s forwards; }
+        </style>
+      </defs>
+      <!-- Your Code -->
+      <g class="arch-a1">
+        <rect class="arch-box" x="10" y="55" width="130" height="50" fill="rgba(255,255,255,0.05)" stroke="#6b7280"/>
+        <text class="arch-txt" x="75" y="78" text-anchor="middle">Your Code</text>
+        <text class="arch-sub" x="75" y="94" text-anchor="middle">OpenAI SDK</text>
+      </g>
+      <!-- Control Layer -->
+      <g class="arch-a2">
+        <rect class="arch-box" x="220" y="30" width="160" height="100" fill="rgba(37,99,235,0.1)" stroke="#3b82f6"/>
+        <text class="arch-txt" x="300" y="56" text-anchor="middle" fill="#60a5fa">Control Layer</text>
+        <text class="arch-sub" x="300" y="72" text-anchor="middle">Auth · RBAC · Analytics</text>
+        <text class="arch-sub" x="300" y="86" text-anchor="middle">Billing · Health Checks</text>
+        <text class="arch-sub" x="300" y="102" text-anchor="middle" fill="#60a5fa">Open Source · Rust</text>
+        <text class="arch-sub" x="300" y="120" text-anchor="middle" font-style="italic">optional gateway</text>
+      </g>
+      <!-- Inference API -->
+      <g class="arch-a3">
+        <rect class="arch-box" x="470" y="10" width="170" height="60" fill="rgba(232,93,38,0.1)" stroke="#e85d26"/>
+        <text class="arch-txt" x="555" y="36" text-anchor="middle" fill="#f97316">Inference API</text>
+        <text class="arch-sub" x="555" y="52" text-anchor="middle">Managed · 10 models · Batch</text>
+      </g>
+      <!-- Inference Stack -->
+      <g class="arch-a4">
+        <rect class="arch-box" x="470" y="90" width="170" height="60" fill="rgba(139,92,246,0.1)" stroke="#8b5cf6"/>
+        <text class="arch-txt" x="555" y="116" text-anchor="middle" fill="#a78bfa">Inference Stack</text>
+        <text class="arch-sub" x="555" y="132" text-anchor="middle">Self-hosted · Your GPUs</text>
+      </g>
+      <!-- Models -->
+      <g class="arch-a4">
+        <rect class="arch-box" x="700" y="45" width="90" height="70" fill="rgba(22,163,74,0.08)" stroke="#4ade80"/>
+        <text class="arch-txt" x="745" y="72" text-anchor="middle" fill="#4ade80" font-size="12">LLMs</text>
+        <text class="arch-sub" x="745" y="88" text-anchor="middle">Qwen · GPT</text>
+        <text class="arch-sub" x="745" y="100" text-anchor="middle">Nemotron</text>
+      </g>
+      <!-- Lines -->
+      <line class="arch-line arch-l1" x1="140" y1="80" x2="218" y2="80" stroke="#6b7280" marker-end="url(#arrBl)"/>
+      <line class="arch-line arch-l2" x1="380" y1="55" x2="468" y2="40" stroke="#e85d26" marker-end="url(#arrOr)"/>
+      <line class="arch-line arch-l2" x1="380" y1="105" x2="468" y2="115" stroke="#8b5cf6"/>
+      <line class="arch-line arch-l3" x1="640" y1="40" x2="698" y2="65" stroke="#e85d26"/>
+      <line class="arch-line arch-l3" x1="640" y1="120" x2="698" y2="95" stroke="#8b5cf6"/>
+    </svg>
+    
+    <div class="review">
+      <div class="review-title">Docs Review — Source Pages</div>
+      <div class="review-row"><span class="review-dim">Clarity</span><span class="review-score ok">B</span><span class="review-note">Homepage explains products exist but value prop is generic. "Build AI infrastructure for every workload" doesn't convey cost savings.</span></div>
+      <div class="review-row"><span class="review-dim">Prerequisites</span><span class="review-score gap">C</span><span class="review-note">No clear "start here" path. Two product cards but no guidance on which to pick first.</span></div>
+      <div class="review-row"><span class="review-dim">Examples</span><span class="review-score gap">D</span><span class="review-note">Zero code on the homepage or intro page. Developer must click through to subpages to see any code.</span></div>
+      <div class="review-row"><span class="review-dim">Level</span><span class="review-score ok">B</span><span class="review-note">Accessible to all levels, but experienced devs may find it too abstract without anchoring numbers.</span></div>
+      <div class="review-section">
+        <div class="review-section-title">✅ What went well</div>
+        Clean sidebar nav · Comparison table on intro page is excellent · Writing is crisp and jargon-free
+        <div class="review-section-title" style="margin-top:0.2em;">⚠️ Could improve</div>
+        Lead homepage with cost savings, not generic tagline · Add a 5-line code snippet to the intro page · Show pricing deltas (not just "Reduced pricing") in the comparison table
+      </div>
+    </div>
+<div class="sources">
+      <span class="src-num">1</span> <a href="https://docs.doubleword.ai/" target="_blank">docs.doubleword.ai — Homepage</a> · 
+      <span class="src-num">2</span> <a href="https://docs.doubleword.ai/inference-api/intro-to-doubleword-inference" target="_blank">Intro to Doubleword Inference</a> · 
+      <span class="src-num">3</span> <a href="https://docs.doubleword.ai/control-layer/control-layer-overview" target="_blank">Control Layer Overview</a> · 
+      <span class="src-num">4</span> <a href="https://docs.doubleword.ai/inference-stack/deployment/loading/" target="_blank">Inference Stack — Model Loading</a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Who Uses What?</h2>
+    <table class="cmp-table">
+      <thead><tr><th>You are...</th><th>Start with</th><th>Then add</th></tr></thead>
+      <tbody>
+        <tr><td>Developer wanting cheap LLM inference</td><td><span class="badge badge-red">Inference API</span></td><td>Autobatcher for async savings</td></tr>
+        <tr><td>Team needing RBAC / usage tracking</td><td><span class="badge badge-blue">Control Layer</span></td><td>Connect to any provider</td></tr>
+        <tr><td>Enterprise with GPU fleet</td><td><span class="badge badge-purple">Inference Stack</span></td><td>Control Layer as the gateway</td></tr>
+        <tr><td>Startup evaluating open-source LLMs</td><td><span class="badge badge-red">Inference API</span> playground</td><td>Batch mode for eval sweeps</td></tr>
+        <tr><td>Platform team building internal AI</td><td><span class="badge badge-blue">Control Layer</span> + <span class="badge badge-purple">Stack</span></td><td>Full self-hosted with billing</td></tr>
+      </tbody>
+    </table>
+    
+    <div class="review">
+      <div class="review-title">Docs Review — Persona Mapping</div>
+      <div class="review-row"><span class="review-dim">Clarity</span><span class="review-score ok">B</span><span class="review-note">The docs don't provide this persona → product mapping explicitly. We inferred it from scattered pages.</span></div>
+      <div class="review-row"><span class="review-dim">Prerequisites</span><span class="review-score gap">C</span><span class="review-note">No "which product should I start with?" guide exists in the docs. Each product lives in its own silo.</span></div>
+      <div class="review-section">
+        <div class="review-section-title">⚠️ Could improve</div>
+        A "Getting Started — Choose Your Path" page that maps persona → product → quickstart would reduce first-visit confusion significantly.
+      </div>
+    </div>
+<div class="sources">
+      <span class="src-num">1</span> <a href="https://docs.doubleword.ai/inference-api/intro-to-doubleword-inference" target="_blank">Intro to Inference</a> · 
+      <span class="src-num">2</span> <a href="https://docs.doubleword.ai/control-layer/control-layer-overview" target="_blank">Control Layer Overview</a> · 
+      <span class="src-num">3</span> <a href="https://docs.doubleword.ai/inference-api/autobatcher" target="_blank">Autobatcher</a>
+    </div>
+  </section>
+</section>
+
+<!-- ======================== SECTION 2: INFERENCE API ======================== -->
+<section>
+  <section class="section-header">
+    <div class="section-num">Section 02 · <span style="color:var(--dw-accent);">Inference API</span></div>
+    <h2>Inference API</h2>
+    <p class="small">Managed inference: realtime, async, batch · 13 models · OpenAI-compatible · <strong style="color:#4ade80;">20M free tokens</strong></p>
+  </section>
+
+  <section>
+    <h2>One API, Three Speeds</h2>
+    <table class="cmp-table">
+      <thead><tr><th style="width:16%">Mode</th><th style="width:22%">How it works</th><th>Latency</th><th>Cost vs RT</th><th>Best for</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge badge-red">Dev Mode</span></td><td>Standard request→response</td><td>Immediate</td><td>Standard</td><td>Prototyping, prompt dev</td></tr>
+        <tr><td><span class="badge badge-amber">Background</span></td><td>Autobatcher defers to async</td><td>~1 hour</td><td>up to 50% off</td><td>Agents, pipelines</td></tr>
+        <tr><td><span class="badge badge-green">Overnight</span></td><td>JSONL upload → retrieve</td><td>~24 hours</td><td>up to 75% off</td><td>Datasets, evals, bulk</td></tr>
+      </tbody>
+    </table>
+    <div class="two-col" style="font-size:0.7em;">
+      <div class="insight-box" style="margin:0;">
+        <div class="insight-label">📝 Cost at Scale (1B in + 1B out, frontier tier)</div>
+        Anthropic: <strong>$30K</strong> · OpenAI: <strong>$15.8K</strong> · Industry avg: <strong>$2.7K</strong> · <strong style="color:#4ade80;">Doubleword (1h): $2.1K</strong>
+      </div>
+      <div class="callout-green callout" style="margin:0;font-size:1em;">
+        <strong>SLA guarantee:</strong> Miss the SLA, that job is free. Results stream as they complete — no waiting for full batch.
+      </div>
+    </div>
+    
+    <div class="review">
+      <div class="review-title">Docs Review — Intro Page</div>
+      <div class="review-row"><span class="review-dim">Clarity</span><span class="review-score good">A</span><span class="review-note">Comparison table is the best thing on the entire docs site. Clear axes: how it works, latency, cost, API change, best for.</span></div>
+      <div class="review-row"><span class="review-dim">Prerequisites</span><span class="review-score ok">B</span><span class="review-note">Mentions OpenAI SDK familiarity implicitly but doesn't state it. No "you need Python 3.x, pip, an API key" checklist.</span></div>
+      <div class="review-row"><span class="review-dim">Examples</span><span class="review-score gap">D</span><span class="review-note">No code on this page. All three sections just link to subpages. A hello-world per tier would save a click.</span></div>
+      <div class="review-row"><span class="review-dim">Level</span><span class="review-score good">A</span><span class="review-note">Accessible to junior devs. Clear, no jargon.</span></div>
+      <div class="review-section">
+        <div class="review-section-title">✅ What went well</div>
+        Best comparison table in any inference API docs · Clear tier naming · Good CTA links
+        <div class="review-section-title" style="margin-top:0.2em;">⚠️ Could improve</div>
+        Add inline code snippets · Show concrete pricing numbers (not just "Reduced") · Add prerequisites checklist
+      </div>
+    </div>
+<div class="sources">
+      <span class="src-num">1</span> <a href="https://docs.doubleword.ai/inference-api/intro-to-doubleword-inference" target="_blank">Intro to Doubleword Inference</a> · 
+      <span class="src-num">2</span> <a href="https://www.doubleword.ai/pricing" target="_blank">Pricing — doubleword.ai</a> · 
+      <span class="src-num">3</span> <a href="https://docs.doubleword.ai/inference-api/why-batch-inference-matters" target="_blank">Why Batch Inference Matters</a> · 
+      <span class="src-num">4</span> <a href="https://www.doubleword.ai/" target="_blank">Homepage — SLA Guarantee</a>
+    </div>
+  </section>
+
+  <section>
+    <h2>The Two-Line Migration</h2>
+    <div class="code-output">
+      <div class="code-side">
+        <div class="output-label" style="color:#f87171;padding:0.4em 0.7em 0;">❌ Before (full price)</div>
+        <pre><code class="language-python">from openai import AsyncOpenAI
+client = AsyncOpenAI(api_key="sk-...")</code></pre>
+      </div>
+      <div class="code-side">
+        <div class="output-label" style="color:var(--dw-green);padding:0.4em 0.7em 0;">✅ After (~80% off)</div>
+        <pre><code class="language-python">from autobatcher import AsyncOpenAI
+client = AsyncOpenAI(api_key="dw-...")</code></pre>
+      </div>
+    </div>
+    <p class="small" style="text-align:center;">One import change. One API key swap. Same <code>ChatCompletion</code> response objects.</p>
+    <hr>
+    <h3 style="margin-top:0.4em;">Quick Start</h3>
+    <div class="step"><div class="step-num">1</div><div class="step-content"><strong>Sign up:</strong> <a href="https://app.doubleword.ai" target="_blank">app.doubleword.ai</a> → API Keys</div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-content"><strong>Install:</strong> <code>pip install autobatcher</code></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-content"><strong>Try it:</strong> Playground at <a href="https://app.doubleword.ai/playground" target="_blank">app.doubleword.ai/playground</a></div></div>
+    
+    <div class="review">
+      <div class="review-title">Docs Review — Async + Realtime Pages</div>
+      <div class="review-row"><span class="review-dim">Clarity</span><span class="review-score good">A</span><span class="review-note">Both pages clearly explain the migration: swap import, swap API key, done. Very well written.</span></div>
+      <div class="review-row"><span class="review-dim">Prerequisites</span><span class="review-score good">A</span><span class="review-note">pip install autobatcher stated clearly. API key creation linked. Playground mentioned.</span></div>
+      <div class="review-row"><span class="review-dim">Examples</span><span class="review-score good">A</span><span class="review-note">Python, JavaScript, and cURL examples on every page. Multi-language coverage is excellent.</span></div>
+      <div class="review-row"><span class="review-dim">Level</span><span class="review-score good">A</span><span class="review-note">Beginner-friendly. Even a junior dev can follow the 3-step quickstart.</span></div>
+      <div class="review-section">
+        <div class="review-section-title">✅ What went well</div>
+        Multi-language code examples · Clear 3-step flow · Playground link for zero-code testing · "How it works" section explains the batching mechanism
+      </div>
+    </div>
+<div class="sources">
+      <span class="src-num">1</span> <a href="https://docs.doubleword.ai/inference-api/async-inference" target="_blank">Async Inference</a> · 
+      <span class="src-num">2</span> <a href="https://docs.doubleword.ai/inference-api/autobatcher" target="_blank">Autobatcher Reference</a> · 
+      <span class="src-num">3</span> <a href="https://docs.doubleword.ai/inference-api/creating-an-api-key" target="_blank">Creating an API Key</a> · 
+      <span class="src-num">4</span> <a href="https://app.doubleword.ai/playground" target="_blank">Playground</a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Which Inference Mode?</h2>
+    <svg viewBox="0 0 820 370" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:820px;margin:0 auto;display:block;">
+      <defs>
+        <marker id="arrowG" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#6b7280"/></marker>
+        <style>
+          .dt-box { rx: 10; ry: 10; stroke-width: 1.5; }
+          .dt-q { fill: rgba(37,99,235,0.12); stroke: #3b82f6; }
+          .dt-a-rt { fill: rgba(239,68,68,0.12); stroke: #f87171; }
+          .dt-a-as { fill: rgba(217,119,6,0.12); stroke: #fbbf24; }
+          .dt-a-ba { fill: rgba(22,163,74,0.12); stroke: #4ade80; }
+          .dt-text { fill: #e2e8f0; font-family: -apple-system, system-ui, sans-serif; }
+          .dt-label { fill: #94a3b8; font-family: -apple-system, system-ui, sans-serif; font-size: 12px; }
+          .dt-badge { font-family: 'SF Mono', Menlo, monospace; font-weight: 700; font-size: 15px; }
+          .dt-line { stroke: #6b7280; stroke-width: 1.5; fill: none; marker-end: url(#arrowG); }
+          @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+          .dt-g1 { animation: fadeSlideIn 0.4s ease-out 0.1s both; }
+          .dt-g2 { animation: fadeSlideIn 0.4s ease-out 0.35s both; }
+          .dt-g3 { animation: fadeSlideIn 0.4s ease-out 0.6s both; }
+          .dt-g4 { animation: fadeSlideIn 0.4s ease-out 0.85s both; }
+        </style>
+      </defs>
+
+      <!-- Question 1 -->
+      <g class="dt-g1">
+        <rect class="dt-box dt-q" x="220" y="10" width="380" height="44"/>
+        <text class="dt-text" x="410" y="38" text-anchor="middle" font-size="14" font-weight="600">Does the user need an instant response?</text>
+      </g>
+
+      <!-- Branches from Q1 -->
+      <g class="dt-g2">
+        <line class="dt-line" x1="310" y1="54" x2="130" y2="115"/>
+        <text class="dt-label" x="195" y="82">Yes</text>
+        <line class="dt-line" x1="510" y1="54" x2="580" y2="115"/>
+        <text class="dt-label" x="555" y="82">No</text>
+      </g>
+
+      <!-- Answer: Realtime -->
+      <g class="dt-g2">
+        <rect class="dt-box dt-a-rt" x="30" y="120" width="200" height="70"/>
+        <text class="dt-badge" x="130" y="147" text-anchor="middle" fill="#f87171">REALTIME</text>
+        <text class="dt-text" x="130" y="168" text-anchor="middle" font-size="12" fill="#94a3b8">Chat UIs, prototyping,</text>
+        <text class="dt-text" x="130" y="182" text-anchor="middle" font-size="12" fill="#94a3b8">prompt development</text>
+      </g>
+
+      <!-- Question 2 -->
+      <g class="dt-g3">
+        <rect class="dt-box dt-q" x="430" y="120" width="340" height="44"/>
+        <text class="dt-text" x="600" y="148" text-anchor="middle" font-size="14" font-weight="600">Is this inside application code?</text>
+      </g>
+
+      <!-- Branches from Q2 -->
+      <g class="dt-g3">
+        <line class="dt-line" x1="520" y1="164" x2="380" y2="240"/>
+        <text class="dt-label" x="430" y="200">Yes</text>
+        <line class="dt-line" x1="680" y1="164" x2="680" y2="240"/>
+        <text class="dt-label" x="695" y="200">No</text>
+      </g>
+
+      <!-- Answer: Async -->
+      <g class="dt-g4">
+        <rect class="dt-box dt-a-as" x="250" y="248" width="240" height="100"/>
+        <text class="dt-badge" x="370" y="278" text-anchor="middle" fill="#fbbf24">ASYNC</text>
+        <text class="dt-text" x="370" y="298" text-anchor="middle" font-size="12" fill="#94a3b8">Agents, background pipelines,</text>
+        <text class="dt-text" x="370" y="312" text-anchor="middle" font-size="12" fill="#94a3b8">production workloads</text>
+        <text class="dt-text" x="370" y="334" text-anchor="middle" font-size="11" fill="#fbbf24">~50% savings · pip install autobatcher</text>
+      </g>
+
+      <!-- Answer: Batch -->
+      <g class="dt-g4">
+        <rect class="dt-box dt-a-ba" x="560" y="248" width="240" height="100"/>
+        <text class="dt-badge" x="680" y="278" text-anchor="middle" fill="#4ade80">BATCH</text>
+        <text class="dt-text" x="680" y="298" text-anchor="middle" font-size="12" fill="#94a3b8">Datasets, evals, bulk</text>
+        <text class="dt-text" x="680" y="312" text-anchor="middle" font-size="12" fill="#94a3b8">generation, data enrichment</text>
+        <text class="dt-text" x="680" y="334" text-anchor="middle" font-size="11" fill="#4ade80">~80% savings · JSONL upload</text>
+      </g>
+    </svg>
+    
+    <div class="review">
+      <div class="review-title">Docs Review — Decision Guidance</div>
+      <div class="review-row"><span class="review-dim">Clarity</span><span class="review-score ok">B</span><span class="review-note">The decision tree here is our creation — the docs don't provide an explicit "which should I pick?" flowchart.</span></div>
+      <div class="review-row"><span class="review-dim">Prerequisites</span><span class="review-score ok">B</span><span class="review-note">Each mode page lists "best suited for" use cases, but no single page helps you decide between them.</span></div>
+      <div class="review-section">
+        <div class="review-section-title">⚠️ Could improve</div>
+        A single "Which inference mode should I use?" page with a decision matrix or interactive picker would be high value. Currently requires reading 3 separate pages to compare.
+      </div>
+    </div>
+<div class="sources">
+      <span class="src-num">1</span> <a href="https://docs.doubleword.ai/inference-api/intro-to-doubleword-inference" target="_blank">Intro — Comparison Table</a> · 
+      <span class="src-num">2</span> <a href="https://docs.doubleword.ai/inference-api/realtime-inference" target="_blank">Realtime Inference</a> · 
+      <span class="src-num">3</span> <a href="https://docs.doubleword.ai/inference-api/async-inference" target="_blank">Async Inference</a> · 
+      <span class="src-num">4</span> <a href="https://docs.doubleword.ai/inference-api/batch-inference" target="_blank">Batch Inference</a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Autobatcher — The Sweet Spot</h2>
+    <pre><code class="language-python">from autobatcher import AsyncOpenAI
+
+client = AsyncOpenAI(api_key="dw-your-key")
+
+# Your existing async code works as-is
+response = await client.chat.completions.create(
+    model="Qwen/Qwen3.5-35B-A3B-FP8",
+    messages=[{"role": "user", "content": "Explain quantum computing"}],
+)
+print(response.choices[0].message.content)</code></pre>
+    <!-- Autobatcher flow SVG -->
+    <svg viewBox="0 0 800 90" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:800px;margin:0.4em auto;display:block;">
+      <defs>
+        <marker id="arrAb" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="7" markerHeight="5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#fbbf24"/></marker>
+        <style>
+          .ab-box { rx: 6; ry: 6; stroke-width: 1.2; }
+          .ab-txt { fill: #e2e8f0; font-family: -apple-system, system-ui, sans-serif; font-size: 11px; text-anchor: middle; }
+          .ab-sub { fill: #94a3b8; font-family: -apple-system, system-ui, sans-serif; font-size: 9px; text-anchor: middle; }
+          @keyframes pulse { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
+          .ab-pulse { animation: pulse 2s ease-in-out infinite; }
+          @keyframes flowRight { from { stroke-dashoffset: 20; } to { stroke-dashoffset: 0; } }
+          .ab-flow { stroke: #fbbf24; stroke-width: 1.5; fill: none; stroke-dasharray: 6 3; animation: flowRight 1s linear infinite; marker-end: url(#arrAb); }
+        </style>
+      </defs>
+      <!-- Step 1: Your calls -->
+      <rect class="ab-box" x="5" y="15" width="120" height="55" fill="rgba(255,255,255,0.05)" stroke="#6b7280"/>
+      <text class="ab-txt" x="65" y="38">Your async calls</text>
+      <text class="ab-sub" x="65" y="52">await client.create()</text>
+      <text class="ab-sub" x="65" y="63">await client.create()</text>
+      <!-- Arrow -->
+      <line class="ab-flow" x1="127" y1="42" x2="168" y2="42"/>
+      <!-- Step 2: Collect -->
+      <rect class="ab-box" x="170" y="15" width="130" height="55" fill="rgba(217,119,6,0.08)" stroke="#fbbf24"/>
+      <text class="ab-txt" x="235" y="35" fill="#fbbf24">Autobatcher</text>
+      <text class="ab-sub" x="235" y="50">Collects for 10s</text>
+      <text class="ab-sub" x="235" y="61">or batch_size hit</text>
+      <!-- Arrow -->
+      <line class="ab-flow" x1="302" y1="42" x2="343" y2="42"/>
+      <!-- Step 3: Submit batch -->
+      <rect class="ab-box" x="345" y="15" width="130" height="55" fill="rgba(37,99,235,0.08)" stroke="#3b82f6"/>
+      <text class="ab-txt" x="410" y="35" fill="#60a5fa">Batch API</text>
+      <text class="ab-sub" x="410" y="50">Submitted as 1h or</text>
+      <text class="ab-sub" x="410" y="61">24h priority batch</text>
+      <!-- Arrow -->
+      <line class="ab-flow" x1="477" y1="42" x2="518" y2="42"/>
+      <!-- Step 4: Poll -->
+      <g class="ab-pulse">
+        <rect class="ab-box" x="520" y="15" width="110" height="55" fill="rgba(139,92,246,0.08)" stroke="#8b5cf6"/>
+        <text class="ab-txt" x="575" y="35" fill="#a78bfa">Poll &amp; Return</text>
+        <text class="ab-sub" x="575" y="50">Results polled</text>
+        <text class="ab-sub" x="575" y="61">every 5s</text>
+      </g>
+      <!-- Arrow -->
+      <line class="ab-flow" x1="632" y1="42" x2="668" y2="42"/>
+      <!-- Step 5: Response -->
+      <rect class="ab-box" x="670" y="15" width="120" height="55" fill="rgba(22,163,74,0.08)" stroke="#4ade80"/>
+      <text class="ab-txt" x="730" y="35" fill="#4ade80">ChatCompletion</text>
+      <text class="ab-sub" x="730" y="50">Standard response</text>
+      <text class="ab-sub" x="730" y="61">objects returned</text>
+    </svg>
+    <table class="cmp-table" style="font-size:0.65em;">
+      <thead><tr><th>Config</th><th>Default</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><code>batch_size</code></td><td><code>1000</code></td><td>Submit when N requests queued</td></tr>
+        <tr><td><code>batch_window_seconds</code></td><td><code>10.0</code></td><td>Submit after N seconds</td></tr>
+        <tr><td><code>completion_window</code></td><td><code>"24h"</code></td><td><code>"24h"</code> (cheapest) or <code>"1h"</code> (faster)</td></tr>
+      </tbody>
+    </table>
+    <p class="small">Supports chat completions, embeddings, and Responses API. Mix types in a single batch.</p>
+    
+    <div class="review">
+      <div class="review-title">Docs Review — Autobatcher Reference</div>
+      <div class="review-row"><span class="review-dim">Clarity</span><span class="review-score good">A</span><span class="review-note">Excellent. Clear "before/after" code comparison. Configuration table is comprehensive.</span></div>
+      <div class="review-row"><span class="review-dim">Prerequisites</span><span class="review-score good">A</span><span class="review-note">pip install autobatcher stated. OPENAI_API_KEY env var documented. Clear.</span></div>
+      <div class="review-row"><span class="review-dim">Examples</span><span class="review-score good">A</span><span class="review-note">Chat completions, embeddings, responses API, parallel requests, mixed batching, context manager — all with code.</span></div>
+      <div class="review-row"><span class="review-dim">Level</span><span class="review-score good">A</span><span class="review-note">Intermediate. Assumes async Python familiarity but explains clearly.</span></div>
+      <div class="review-section">
+        <div class="review-section-title">✅ What went well</div>
+        Most complete page in the docs · Covers every use pattern · Configuration table · Limitations section is honest
+        <div class="review-section-title" style="margin-top:0.2em;">⚠️ Minor gaps</div>
+        No error handling examples · No guidance on choosing batch_size/window for different workloads
+      </div>
+    </div>
+<div class="sources">
+      <span class="src-num">1</span> <a href="https://docs.doubleword.ai/inference-api/autobatcher" target="_blank">Autobatcher Reference</a> · 
+      <span class="src-num">2</span> <a href="https://docs.doubleword.ai/inference-api/async-inference" target="_blank">Async Inference — How It Works</a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Batch Mode — Maximum Savings</h2>
+    <p class="small">JSONL file → upload → process → retrieve. 24h SLA for deepest discounts.</p>
+    <!-- Batch flow SVG -->
+    <svg viewBox="0 0 800 65" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:800px;margin:0.3em auto;display:block;">
+      <defs>
+        <marker id="arrGn" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="7" markerHeight="5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#4ade80"/></marker>
+        <style>
+          .bf-box { rx: 6; ry: 6; stroke-width: 1.2; }
+          .bf-txt { fill: #e2e8f0; font-family: -apple-system, system-ui, sans-serif; font-size: 12px; text-anchor: middle; font-weight: 600; }
+          .bf-sub { fill: #94a3b8; font-family: -apple-system, system-ui, sans-serif; font-size: 9.5px; text-anchor: middle; }
+          .bf-num { fill: #4ade80; font-family: 'SF Mono', Menlo, monospace; font-size: 10px; text-anchor: middle; font-weight: 700; }
+          .bf-flow { stroke: #4ade80; stroke-width: 1.5; fill: none; stroke-dasharray: 5 3; marker-end: url(#arrGn); }
+        </style>
+      </defs>
+      <g><rect class="bf-box" x="5" y="8" width="130" height="48" fill="rgba(22,163,74,0.06)" stroke="#4ade80"/><text class="bf-num" x="70" y="22">1</text><text class="bf-txt" x="70" y="36">Prepare JSONL</text><text class="bf-sub" x="70" y="48">1 request per line</text></g>
+      <line class="bf-flow" x1="137" y1="32" x2="168" y2="32"/>
+      <g><rect class="bf-box" x="170" y="8" width="130" height="48" fill="rgba(22,163,74,0.06)" stroke="#4ade80"/><text class="bf-num" x="235" y="22">2</text><text class="bf-txt" x="235" y="36">Upload File</text><text class="bf-sub" x="235" y="48">POST /v1/files</text></g>
+      <line class="bf-flow" x1="302" y1="32" x2="333" y2="32"/>
+      <g><rect class="bf-box" x="335" y="8" width="130" height="48" fill="rgba(22,163,74,0.06)" stroke="#4ade80"/><text class="bf-num" x="400" y="22">3</text><text class="bf-txt" x="400" y="36">Create Batch</text><text class="bf-sub" x="400" y="48">POST /v1/batches</text></g>
+      <line class="bf-flow" x1="467" y1="32" x2="498" y2="32"/>
+      <g><rect class="bf-box" x="500" y="8" width="130" height="48" fill="rgba(37,99,235,0.06)" stroke="#3b82f6"/><text class="bf-num" x="565" y="22" fill="#60a5fa">4</text><text class="bf-txt" x="565" y="36" fill="#60a5fa">Poll / Webhook</text><text class="bf-sub" x="565" y="48">Partial results OK!</text></g>
+      <line class="bf-flow" x1="632" y1="32" x2="663" y2="32"/>
+      <g><rect class="bf-box" x="665" y="8" width="130" height="48" fill="rgba(22,163,74,0.1)" stroke="#4ade80"/><text class="bf-num" x="730" y="22">5</text><text class="bf-txt" x="730" y="36">Download</text><text class="bf-sub" x="730" y="48">GET /v1/files/{id}</text></g>
+    </svg>
+    <pre><code class="language-python">client = OpenAI(api_key="dw-...", base_url="https://api.doubleword.ai/v1")
+
+# 1. Upload JSONL
+f = client.files.create(file=open("batch.jsonl","rb"), purpose="batch")
+
+# 2. Create batch
+batch = client.batches.create(
+    input_file_id=f.id, endpoint="/v1/chat/completions",
+    completion_window="24h"  # or "1h" for faster
+)
+
+# 3. Download partial results WHILE still processing
+import requests
+resp = requests.get(
+    f"https://api.doubleword.ai/v1/files/{batch.output_file_id}/content",
+    headers={"Authorization": "Bearer dw-..."}
+)
+# Check resp.headers["X-Incomplete"] for partial status</code></pre>
+    <div class="callout-accent callout">
+      <strong>DW advantage:</strong> Download partial results while processing (OpenAI makes you wait). Max 200MB / 50K requests per file. Webhooks available.
+    </div>
+    
+    <div class="review">
+      <div class="review-title">Docs Review — Batch Inference Guide</div>
+      <div class="review-row"><span class="review-dim">Clarity</span><span class="review-score good">A</span><span class="review-note">7-step walkthrough with numbered steps. Very clear progression from JSONL prep to result download.</span></div>
+      <div class="review-row"><span class="review-dim">Prerequisites</span><span class="review-score good">A</span><span class="review-note">API key, JSONL format, file size limits all documented. Links to JSONL explainer page.</span></div>
+      <div class="review-row"><span class="review-dim">Examples</span><span class="review-score good">A</span><span class="review-note">Python, JS, cURL for every step. Downloadable example JSONL file. Console UI alternative shown.</span></div>
+      <div class="review-row"><span class="review-dim">Level</span><span class="review-score ok">B+</span><span class="review-note">Intermediate. Assumes familiarity with API concepts, file uploads, async patterns.</span></div>
+      <div class="review-section">
+        <div class="review-section-title">✅ What went well</div>
+        Partial download feature well-documented (DW advantage) · Console UI alternative for non-coders · Common pitfalls section · Footnotes linking related pages
+        <div class="review-section-title" style="margin-top:0.2em;">⚠️ Could improve</div>
+        No end-to-end script combining all 7 steps · No guidance on batch sizing strategy for different workloads
+      </div>
+    </div>
+<div class="sources">
+      <span class="src-num">1</span> <a href="https://docs.doubleword.ai/inference-api/batch-inference" target="_blank">Batch Inference Guide</a> · 
+      <span class="src-num">2</span> <a href="https://docs.doubleword.ai/inference-api/jsonl-files" target="_blank">What is a JSONL file?</a> · 
+      <span class="src-num">3</span> <a href="https://docs.doubleword.ai/inference-api/batch-notifications-and-webhooks" target="_blank">Notifications & Webhooks</a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Models &amp; Pricing</h2>
+    <p style="font-size:0.7em;color:var(--dw-muted);margin-bottom:0.3em;">13 models across text, vision, embedding, and OCR. 20M free tokens to start. <strong style="color:#4ade80;">SLA guarantee: miss the SLA, that job is free.</strong></p>
+    <div class="model-grid">
+      <div class="model-card"><div class="model-name">Qwen/Qwen3.5-397B-A17B</div><div class="model-desc">Frontier. GPT-5 class. $2.1K/B tokens (1h). 93% cheaper.</div></div>
+      <div class="model-card"><div class="model-name">Qwen/Qwen3.5-35B-A3B-FP8</div><div class="model-desc">Sweet spot. Beats GPT-5-mini. $370/B (1h). 94% cheaper.</div></div>
+      <div class="model-card"><div class="model-name">nvidia/Nemotron-3-Super-120B</div><div class="model-desc">Hybrid Mamba-Transformer. $790/B (1h). 87% cheaper.</div></div>
+      <div class="model-card"><div class="model-name">Qwen/Qwen3-VL-235B-A22B</div><div class="model-desc">Vision frontier. Images + text. $700/B (1h).</div></div>
+      <div class="model-card"><div class="model-name">Qwen/Qwen3-VL-30B-A3B</div><div class="model-desc">Vision mid-tier. Batch pricing. $370/B (1h).</div></div>
+      <div class="model-card"><div class="model-name">openai/gpt-oss-20b</div><div class="model-desc">OpenAI open-source 20B. $230/B (1h). 98% cheaper.</div></div>
+      <div class="model-card"><div class="model-name">Qwen/Qwen3-Embedding-8B</div><div class="model-desc">#1 MTEB multilingual. 32k ctx. $30/B (1h).</div></div>
+      <div class="model-card"><div class="model-name">Qwen3.5-4B · 9B · 14B</div><div class="model-desc">Small/budget. $100–$390/B (1h). Up to 99% cheaper.</div></div>
+      <div class="model-card" style="border-color:rgba(217,119,6,0.3);"><div class="model-name" style="color:var(--dw-amber);">DeepSeek-OCR-2 <span class="badge badge-amber" style="font-size:0.8em;">OCR</span></div><div class="model-desc">Document OCR. $0.08/$0.08 per MTok (1h).</div></div>
+      <div class="model-card" style="border-color:rgba(217,119,6,0.3);"><div class="model-name" style="color:var(--dw-amber);">olmOCR-2-7B · LightOnOCR-2-1B <span class="badge badge-amber" style="font-size:0.8em;">OCR</span></div><div class="model-desc">Additional OCR models for document processing.</div></div>
+    </div>
+    <p class="smaller" style="text-align:center;">Full pricing: <a href="https://www.doubleword.ai/pricing" target="_blank">doubleword.ai/pricing</a> · Docs: <a href="https://docs.doubleword.ai/inference-api/model-pricing" target="_blank">docs.doubleword.ai/inference-api/model-pricing</a></p>
+    
+    <div class="review">
+      <div class="review-title">Docs Review — Models & Pricing Page</div>
+      <div class="review-row"><span class="review-dim">Clarity</span><span class="review-score good">A</span><span class="review-note">Clean pricing table. Per-model details with playground links. Sampling parameter guidance included.</span></div>
+      <div class="review-row"><span class="review-dim">Prerequisites</span><span class="review-score good">A</span><span class="review-note">Each model card explains best use cases, context lengths, and recommended parameters.</span></div>
+      <div class="review-row"><span class="review-dim">Examples</span><span class="review-score ok">B</span><span class="review-note">Playground links per model are good. No inline code showing how to use specific models with special features (e.g., Nemotron reasoning mode).</span></div>
+      <div class="review-row"><span class="review-dim">Level</span><span class="review-score good">A</span><span class="review-note">All levels. Pricing table is universally useful.</span></div>
+      <div class="review-section">
+        <div class="review-section-title">✅ What went well</div>
+        Thinking mode / reasoning toggle documented per model · Embedding model specs are detailed · Playground links per model
+        <div class="review-section-title" style="margin-top:0.2em;">⚠️ Could improve</div>
+        OCR models on pricing page but not on docs pricing page yet · No model comparison chart (quality vs cost) · No guidance on which model to pick for common tasks
+      </div>
+    </div>
+<div class="sources">
+      <span class="src-num">1</span> <a href="https://docs.doubleword.ai/inference-api/model-pricing" target="_blank">Models & Pricing — Docs</a> · 
+      <span class="src-num">2</span> <a href="https://www.doubleword.ai/pricing" target="_blank">Pricing Page — doubleword.ai</a> · 
+      <span class="src-num">3</span> <a href="https://www.doubleword.ai/models/deepseek-ocr-2" target="_blank">DeepSeek-OCR-2</a> · 
+      <span class="src-num">4</span> <a href="https://www.doubleword.ai/models/olmocr-2-7b" target="_blank">olmOCR-2-7B</a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Cost Calculator</h2>
+    <p class="small" style="margin-bottom:0.3em;">Compare costs across models and tiers. Reference: <a href="https://www.doubleword.ai/pricing" target="_blank">1B in+out benchmarks</a> · <a href="https://www.doubleword.ai/calculator" target="_blank">Official savings calculator</a></p>
+    <div class="calc-container" id="costCalc">
+      <div class="calc-row"><label>Model</label>
+        <select id="calcModel" onchange="recalc()">
+          <option value="0" data-ri="0.25" data-ro="2.00" data-ai="0.07" data-ao="0.30" data-bi="0.05" data-bo="0.20">Qwen3.5-35B-A3B (sweet spot)</option>
+          <option value="1" data-ri="0.60" data-ro="3.60" data-ai="0.30" data-ao="1.80" data-bi="0.15" data-bo="1.20">Qwen3.5-397B-A17B (frontier)</option>
+          <option value="2" data-ri="0.30" data-ro="0.75" data-ai="0.23" data-ao="0.56" data-bi="0.15" data-bo="0.38">Nemotron-3-Super-120B (agentic)</option>
+          <option value="3" data-ri="0.05" data-ro="0.60" data-ai="0.03" data-ao="0.30" data-bi="0.02" data-bo="0.20">Qwen3-14B-FP8 (budget)</option>
+          <option value="4" data-ri="0.16" data-ro="0.80" data-ai="0.07" data-ao="0.30" data-bi="0.05" data-bo="0.20">Qwen3-VL-30B (vision)</option>
+          <option value="5" data-ri="0.60" data-ro="1.20" data-ai="0.15" data-ao="0.55" data-bi="0.10" data-bo="0.40">Qwen3-VL-235B (vision frontier)</option>
+          <option value="6" data-ri="0.08" data-ro="0.70" data-ai="0.04" data-ao="0.35" data-bi="0.03" data-bo="0.29">Qwen3.5-9B (small+smart)</option>
+          <option value="7" data-ri="0.08" data-ro="0.08" data-ai="0.08" data-ao="0.08" data-bi="0.05" data-bo="0.05">DeepSeek-OCR-2 (OCR)</option>
+          <option value="8" data-ri="0.15" data-ro="0.15" data-ai="0.15" data-ao="0.15" data-bi="0.10" data-bo="0.10">olmOCR-2-7B (OCR)</option>
+        </select>
+      </div>
+      <div class="calc-row"><label>Input tokens (M)</label><input type="number" id="calcInput" value="10" min="0.1" step="1" onchange="recalc()" oninput="recalc()"></div>
+      <div class="calc-row"><label>Output tokens (M)</label><input type="number" id="calcOutput" value="5" min="0.1" step="1" onchange="recalc()" oninput="recalc()"></div>
+      <div class="calc-result">
+        <div class="calc-result-card"><div class="price price-rt" id="priceRt">$12.50</div><div class="label">Realtime</div></div>
+        <div class="calc-result-card"><div class="price price-async" id="priceAsync">$2.20</div><div class="label">Async (1h)</div></div>
+        <div class="calc-result-card"><div class="price price-batch" id="priceBatch">$1.50</div><div class="label">Batch (24h)</div></div>
+      </div>
+      <div style="text-align:center;margin-top:0.4em;"><span class="savings-tag" id="savingsTag">Batch saves 88% vs Realtime</span></div>
+    </div>
+    
+    <div class="review">
+      <div class="review-title">Docs Review — Pricing Tools</div>
+      <div class="review-row"><span class="review-dim">Clarity</span><span class="review-score ok">B</span><span class="review-note">Console has a file-upload cost estimator. Marketing site has a savings calculator. Neither is linked from the docs pricing page.</span></div>
+      <div class="review-row"><span class="review-dim">Prerequisites</span><span class="review-score ok">B</span><span class="review-note">Need to know your token counts to use. No guidance on how to estimate token usage for a new project.</span></div>
+      <div class="review-section">
+        <div class="review-section-title">⚠️ Could improve</div>
+        Link the savings calculator from the docs pricing page · Add a "how to estimate your token usage" guide · Show the 1B in+out benchmark cost comparison (currently only on marketing site)
+      </div>
+    </div>
+<div class="sources">
+      <span class="src-num">1</span> <a href="https://docs.doubleword.ai/inference-api/model-pricing" target="_blank">Models & Pricing — Docs</a> · 
+      <span class="src-num">2</span> <a href="https://www.doubleword.ai/pricing" target="_blank">Pricing Page — doubleword.ai</a> · 
+      <span class="src-num">3</span> <a href="https://www.doubleword.ai/calculator" target="_blank">Official Savings Calculator</a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Features: Tool Calling, Structured Outputs, Vision</h2>
+    <div class="three-col" style="font-size:0.72em;">
+      <div>
+        <h3>Tool Calling</h3>
+        <p class="small">OpenAI-compatible function calling. Pass <code>tools</code> array + <code>tool_choice</code>. Works in batch.</p>
+      </div>
+      <div>
+        <h3>Structured Outputs</h3>
+        <p class="small">Force JSON Schema compliance via <code>response_format</code>. No hallucinated keys. <code>strict: true</code>.</p>
+      </div>
+      <div>
+        <h3>Vision + Embeddings</h3>
+        <p class="small">Image URLs or base64 with VL models. Embedding model #1 on MTEB. 100+ languages, 32k ctx.</p>
+      </div>
+    </div>
+    <hr>
+    <h3>Workbook Examples (9 production-ready tutorials)</h3>
+    <div class="two-col" style="font-size:0.68em;">
+      <div>Async Agents · Synthetic Data Gen · Data Pipelines · Structured Extraction · Model Evals</div>
+      <div>Embeddings · Image Summarization · Security Vuln Detection · Dataset Compilation</div>
+    </div>
+    <p class="smaller" style="text-align:center;"><a href="https://docs.doubleword.ai/inference-api/cli-examples" target="_blank">All workbooks →</a> &nbsp;·&nbsp; <a href="https://docs.doubleword.ai/inference-api/research-summaries" target="_blank">Research Digest →</a> &nbsp;·&nbsp; <a href="https://docs.doubleword.ai/inference-api/semantic-search-without-embeddings" target="_blank">Semantic Search →</a></p>
+    
+    <div class="review">
+      <div class="review-title">Docs Review — Tool Calling & Structured Outputs</div>
+      <div class="review-row"><span class="review-dim">Clarity</span><span class="review-score ok">B</span><span class="review-note">Shows the JSON schema format for both features. References OpenAI compatibility.</span></div>
+      <div class="review-row"><span class="review-dim">Prerequisites</span><span class="review-score ok">B</span><span class="review-note">Assumes familiarity with OpenAI function calling. No beginner explanation of what tool calling is or when to use it.</span></div>
+      <div class="review-row"><span class="review-dim">Examples</span><span class="review-score ok">B</span><span class="review-note">Python-only examples. The batch JSONL format for tool calling is shown but not as a complete runnable script.</span></div>
+      <div class="review-row"><span class="review-dim">Level</span><span class="review-score ok">B</span><span class="review-note">Intermediate-to-advanced. Assumes you already know function calling from OpenAI.</span></div>
+      <div class="review-section">
+        <div class="review-section-title">✅ What went well</div>
+        Structured outputs with strict:true documented · JSON schema example is practical
+        <div class="review-section-title" style="margin-top:0.2em;">⚠️ Could improve</div>
+        Add JS/cURL examples · Add a "when to use tool calling vs structured outputs" decision guide · Show a complete batch JSONL with tools example
+      </div>
+    </div>
+<div class="sources">
+      <span class="src-num">1</span> <a href="https://docs.doubleword.ai/inference-api/tool-calling" target="_blank">Tool Calling & Structured Outputs</a> · 
+      <span class="src-num">2</span> <a href="https://docs.doubleword.ai/inference-api/model-pricing" target="_blank">Vision Models (VL-30B, VL-235B)</a> · 
+      <span class="src-num">3</span> <a href="https://docs.doubleword.ai/inference-api/cli-examples" target="_blank">Workbooks Index</a> · 
+      <span class="src-num">4</span> <a href="https://docs.doubleword.ai/inference-api/embeddings" target="_blank">Embeddings Workbook</a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Organizations &amp; Webhooks</h2>
+    <div class="two-col" style="font-size:0.75em;">
+      <div>
+        <h3>Organizations</h3>
+        <p class="small">Teams share credits and usage under one account. Each member retains their personal account and can switch context freely.</p>
+        <table class="cmp-table" style="font-size:0.88em;">
+          <thead><tr><th>Role</th><th>Can do</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Owner</strong></td><td>Full control, billing, members</td></tr>
+            <tr><td><strong>Admin</strong></td><td>Manage members, keys, resources</td></tr>
+            <tr><td><strong>Member</strong></td><td>Create keys, submit batches</td></tr>
+          </tbody>
+        </table>
+        <p class="small" style="margin-top:0.3em;">Org API keys are <em>per-member</em> (not shared) but bill to the org. Request creation via the Console support modal.</p>
+        <p class="smaller"><a href="https://docs.doubleword.ai/inference-api/organizations-overview" target="_blank">Orgs overview →</a> · <a href="https://docs.doubleword.ai/inference-api/organization-api-keys" target="_blank">Org keys →</a> · <a href="https://docs.doubleword.ai/inference-api/organization-credits" target="_blank">Org billing →</a></p>
+      </div>
+      <div>
+        <h3>Webhooks &amp; Notifications</h3>
+        <p class="small">Get notified when batches complete instead of polling. Email toggle + webhook URL in your <a href="https://app.doubleword.ai/profile" target="_blank">profile</a>.</p>
+        <p class="small" style="margin-top:0.3em;"><strong>Events:</strong> <code>batch.completed</code>, <code>batch.failed</code></p>
+        <p class="small"><strong>Security:</strong> Standard Webhooks spec. HMAC-SHA256 signed. Headers: <code>webhook-id</code>, <code>webhook-timestamp</code>, <code>webhook-signature</code>.</p>
+        <pre style="margin:0.3em 0;"><code class="language-python"># Verify signature (Flask example)
+secret = base64.b64decode(
+    SIGNING_KEY.removeprefix("whsec_"))
+signed = f"{msg_id}.{timestamp}.{body}"
+expected = base64.b64encode(
+    hmac.new(secret, signed.encode(),
+             hashlib.sha256).digest()
+).decode()
+# Compare: f"v1,{expected}" == signature</code></pre>
+        <p class="smaller">Retries with exponential backoff. Auto-disables after 10 consecutive failures. <a href="https://docs.doubleword.ai/inference-api/batch-notifications-and-webhooks" target="_blank">Full docs →</a></p>
+      </div>
+    </div>
+    
+    <div class="review">
+      <div class="review-title">Docs Review — Organizations + Webhooks Pages</div>
+      <div class="review-row"><span class="review-dim">Clarity</span><span class="review-score good">A</span><span class="review-note">Webhook spec is excellent — Standard Webhooks, HMAC-SHA256, retry behavior all documented. Org roles are clear.</span></div>
+      <div class="review-row"><span class="review-dim">Prerequisites</span><span class="review-score ok">B</span><span class="review-note">Webhook page has Flask example + ngrok setup. Orgs require manual request — no self-service yet.</span></div>
+      <div class="review-row"><span class="review-dim">Examples</span><span class="review-score good">A</span><span class="review-note">Full Python Flask webhook server with signature verification. Webhook.site testing guide. Event payload format.</span></div>
+      <div class="review-row"><span class="review-dim">Level</span><span class="review-score ok">B</span><span class="review-note">Intermediate. Webhook verification requires crypto knowledge. Org setup is straightforward.</span></div>
+      <div class="review-section">
+        <div class="review-section-title">✅ What went well</div>
+        Webhook page is one of the best-documented features — testing guide, signature verification code, event format, retry policy all covered
+        <div class="review-section-title" style="margin-top:0.2em;">⚠️ Could improve</div>
+        Org creation should be self-service · No Node.js webhook example · hmac.new should be hmac.HMAC (bug in Flask example)
+      </div>
+    </div>
+<div class="sources">
+      <span class="src-num">1</span> <a href="https://docs.doubleword.ai/inference-api/organizations-overview" target="_blank">Organizations Overview</a> · 
+      <span class="src-num">2</span> <a href="https://docs.doubleword.ai/inference-api/organization-api-keys" target="_blank">Org API Keys</a> · 
+      <span class="src-num">3</span> <a href="https://docs.doubleword.ai/inference-api/batch-notifications-and-webhooks" target="_blank">Notifications & Webhooks — Full Spec</a> · 
+      <span class="src-num">4</span> <a href="https://docs.doubleword.ai/inference-api/organization-credits" target="_blank">Org Credits & Billing</a>
+    </div>
+  </section>
+</section>
+
+<!-- ======================== SECTION 3: CONTROL LAYER ======================== -->
+<section>
+  <section class="section-header">
+    <div class="section-num">Section 03 · <span style="color:var(--dw-accent2);">Control Layer</span></div>
+    <h2>Control Layer</h2>
+    <p class="small">Open-source AI gateway · Rust-based · Self-hosted · RBAC + billing + analytics</p>
+  </section>
+
+  <section>
+    <h2>What Is the Control Layer?</h2>
+    <p style="font-size:0.78em;color:var(--dw-muted);">A single OpenAI-compatible gateway to <em>all</em> your AI models, across <em>all</em> providers.</p>
+    <div class="two-col">
+      <div>
+        <h3 style="color:var(--dw-accent2);">Key Capabilities</h3>
+        <div class="step"><div class="step-num step-num-blue">1</div><div class="step-content"><strong>OpenAI-Compatible API</strong><br><span class="small">Point any app at <code>/ai/v1/</code>. Zero code changes.</span></div></div>
+        <div class="step"><div class="step-num step-num-blue">2</div><div class="step-content"><strong>Users, Groups & RBAC</strong><br><span class="small">Group-based model access. Granular permissions.</span></div></div>
+        <div class="step"><div class="step-num step-num-blue">3</div><div class="step-content"><strong>Real-Time Analytics</strong><br><span class="small">Token usage, response times, model breakdown, per-user.</span></div></div>
+        <div class="step"><div class="step-num step-num-blue">4</div><div class="step-content"><strong>Built-in Billing</strong><br><span class="small">Credits system, tariffs, Stripe integration.</span></div></div>
+      </div>
+      <div>
+        <h3 style="color:var(--dw-accent2);">Why It Exists</h3>
+        <div class="insight-box">
+          <div class="insight-label">📝 From the Benchmarking Deep Dive</div>
+          Written in Rust. 450x less overhead than LiteLLM at 100 concurrent users. The best thing a gateway can do is <em>disappear</em> — if you notice it, it's doing a bad job. Open-source at <a href="https://github.com/doublewordai/control-layer" target="_blank">github.com/doublewordai/control-layer</a>.
+        </div>
+        <p class="small" style="margin-top:0.4em;">Supports: OpenAI, Anthropic, Google, Together, Groq, Fireworks, local vLLM/Ollama, or any OpenAI-compatible endpoint.</p>
+      </div>
+    </div>
+    
+    <div class="review">
+      <div class="review-title">Docs Review — Control Layer Overview</div>
+      <div class="review-row"><span class="review-dim">Clarity</span><span class="review-score good">A</span><span class="review-note">Clear explanation of what it does, with screenshots of the dashboard, playground, and analytics.</span></div>
+      <div class="review-row"><span class="review-dim">Prerequisites</span><span class="review-score good">A</span><span class="review-note">Docker + an API key from any provider. Clearly stated on getting started page.</span></div>
+      <div class="review-row"><span class="review-dim">Examples</span><span class="review-score ok">B</span><span class="review-note">Overview page has screenshots but no code. Getting started page has code. Split across 2 pages.</span></div>
+      <div class="review-row"><span class="review-dim">Level</span><span class="review-score ok">B</span><span class="review-note">Intermediate. Requires Docker familiarity. Kubernetes knowledge for production deploy.</span></div>
+      <div class="review-section">
+        <div class="review-section-title">✅ What went well</div>
+        Screenshots of every UI feature · Key resources section with GitHub, blog, CTO deep-dive, benchmarks · Open-source positioning is strong
+        <div class="review-section-title" style="margin-top:0.2em;">⚠️ Could improve</div>
+        Merge overview + getting started into one page · Add a "5-minute quickstart" video embed
+      </div>
+    </div>
+<div class="sources">
+      <span class="src-num">1</span> <a href="https://docs.doubleword.ai/control-layer/control-layer-overview" target="_blank">Control Layer Overview</a> · 
+      <span class="src-num">2</span> <a href="https://docs.doubleword.ai/conceptual/21-19-2025-dwctl-benchmark/" target="_blank">Benchmarking the Control Layer</a> · 
+      <span class="src-num">3</span> <a href="https://github.com/doublewordai/control-layer" target="_blank">GitHub Repo</a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Quick Start — Docker to First Request</h2>
+    <div class="step"><div class="step-num step-num-blue">1</div><div class="step-content"><strong>Start the stack</strong>
+    <pre style="margin:0.2em 0;"><code class="language-bash">wget https://raw.githubusercontent.com/doublewordai/control-layer/main/docker-compose.yml
+docker compose up -d
+# → Open http://localhost:3001</code></pre></div></div>
+    <div class="step"><div class="step-num step-num-blue">2</div><div class="step-content"><strong>Log in</strong> — <code>test@doubleword.ai</code> / <code>hunter2</code> (change immediately!)</div></div>
+    <div class="step"><div class="step-num step-num-blue">3</div><div class="step-content"><strong>Add an endpoint</strong> — Endpoints → Add → paste your OpenAI/Anthropic key → Discover Models</div></div>
+    <div class="step"><div class="step-num step-num-blue">4</div><div class="step-content"><strong>Grant access</strong> — Model card → Add groups → "Everyone"</div></div>
+    <div class="step"><div class="step-num step-num-blue">5</div><div class="step-content"><strong>Test it</strong>
+    <pre style="margin:0.2em 0;"><code class="language-python">from openai import OpenAI
+client = OpenAI(
+    base_url="http://localhost:3001/ai/v1",
+    api_key="YOUR_CONTROL_LAYER_KEY"
+)
+response = client.chat.completions.create(
+    model="gpt-4o-mini",
+    messages=[{"role": "user", "content": "Hello!"}]
+)</code></pre></div></div>
+    
+    <div class="review">
+      <div class="review-title">Docs Review — Getting Started Tutorial</div>
+      <div class="review-row"><span class="review-dim">Clarity</span><span class="review-score good">A</span><span class="review-note">6-step tutorial with "Verify" checkpoints after each step. Excellent progressive structure.</span></div>
+      <div class="review-row"><span class="review-dim">Prerequisites</span><span class="review-score good">A</span><span class="review-note">Docker + Docker Compose + a provider API key. All three explicitly listed with links.</span></div>
+      <div class="review-row"><span class="review-dim">Examples</span><span class="review-score good">A</span><span class="review-note">docker compose command, curl example, Python example. Default credentials documented.</span></div>
+      <div class="review-row"><span class="review-dim">Level</span><span class="review-score good">A</span><span class="review-note">Beginner-friendly Docker experience assumed. Clear enough for a junior dev to follow.</span></div>
+      <div class="review-section">
+        <div class="review-section-title">✅ What went well</div>
+        Best quickstart in the entire docs — verify checkpoints, security warnings, next steps all present · "Before deploying to production" callout is responsible
+      </div>
+    </div>
+<div class="sources">
+      <span class="src-num">1</span> <a href="https://docs.doubleword.ai/control-layer/getting-started" target="_blank">Getting Started Tutorial</a> · 
+      <span class="src-num">2</span> <a href="https://docs.doubleword.ai/control-layer/how-to/api" target="_blank">Connect to the API</a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Access Control &amp; Billing</h2>
+    <div class="two-col" style="font-size:0.78em;">
+      <div>
+        <h3 style="color:var(--dw-accent2);">Users &amp; Groups</h3>
+        <table class="cmp-table cmp-table-blue" style="font-size:0.88em;">
+          <thead><tr><th>Pattern</th><th>Example Groups</th></tr></thead>
+          <tbody>
+            <tr><td>By team</td><td><code>engineering</code>, <code>data-science</code></td></tr>
+            <tr><td>By access level</td><td><code>basic-models</code>, <code>advanced</code></td></tr>
+            <tr><td>By project</td><td><code>project-alpha</code>, <code>summer-intern</code></td></tr>
+          </tbody>
+        </table>
+        <p class="small">Users → Groups → Models. Access is the union of all groups. Changes take effect immediately.</p>
+      </div>
+      <div>
+        <h3 style="color:var(--dw-accent2);">Credits &amp; Tariffs</h3>
+        <p class="small">Each model gets tariffs (per-token pricing) for realtime, batch, and playground separately. Credits-based billing with Stripe integration.</p>
+        <p class="small" style="margin-top:0.3em;"><strong>Key features:</strong> Append-only transaction ledger, no race conditions, idempotent payment processing, immediate blocking at zero credits, historical tariff versioning.</p>
+        <p class="small" style="margin-top:0.3em;">Models without tariffs are free. Mix paid and free models.</p>
+      </div>
+    </div>
+    
+    <div class="review">
+      <div class="review-title">Docs Review — Users/Groups + Billing Pages</div>
+      <div class="review-row"><span class="review-dim">Clarity</span><span class="review-score good">A</span><span class="review-note">Group patterns table is excellent. Billing conceptual guide explains the append-only ledger design clearly.</span></div>
+      <div class="review-row"><span class="review-dim">Prerequisites</span><span class="review-score ok">B</span><span class="review-note">Stripe integration for payments requires Stripe account. Not all orgs need this but it's not called out as optional.</span></div>
+      <div class="review-row"><span class="review-dim">Examples</span><span class="review-score ok">B</span><span class="review-note">Tariff API examples with JSON payloads. No UI walkthrough screenshots for the billing setup.</span></div>
+      <div class="review-row"><span class="review-dim">Level</span><span class="review-score ok">B</span><span class="review-note">Intermediate. Platform admin audience. Billing concepts may be unfamiliar to pure devs.</span></div>
+      <div class="review-section">
+        <div class="review-section-title">✅ What went well</div>
+        Billing page is a genuine conceptual guide, not just a how-to — explains idempotency, race conditions, balance calculation · Tariff versioning for audit trails
+        <div class="review-section-title" style="margin-top:0.2em;">⚠️ Could improve</div>
+        Add "billing is optional" callout for teams that just want free RBAC · Add dashboard screenshots for billing setup
+      </div>
+    </div>
+<div class="sources">
+      <span class="src-num">1</span> <a href="https://docs.doubleword.ai/control-layer/how-to/users-and-groups" target="_blank">Manage Users & Groups</a> · 
+      <span class="src-num">2</span> <a href="https://docs.doubleword.ai/control-layer/conceptual-guides/how-billing-works" target="_blank">How Billing Works</a> · 
+      <span class="src-num">3</span> <a href="https://docs.doubleword.ai/control-layer/how-to/tariffs" target="_blank">Set Up Model Pricing</a> · 
+      <span class="src-num">4</span> <a href="https://docs.doubleword.ai/control-layer/how-to/payments" target="_blank">Set Up Payments</a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Production Deployment &amp; Monitoring</h2>
+    <div class="two-col" style="font-size:0.78em;">
+      <div>
+        <h3 style="color:var(--dw-accent2);">Security Checklist</h3>
+        <div class="step"><div class="step-num step-num-blue" style="width:22px;height:22px;font-size:0.6em;">✓</div><div class="step-content"><span class="small">Change admin password (not <code>hunter2</code>!)</span></div></div>
+        <div class="step"><div class="step-num step-num-blue" style="width:22px;height:22px;font-size:0.6em;">✓</div><div class="step-content"><span class="small">Generate SECRET_KEY: <code>openssl rand -base64 32</code></span></div></div>
+        <div class="step"><div class="step-num step-num-blue" style="width:22px;height:22px;font-size:0.6em;">✓</div><div class="step-content"><span class="small">Production PostgreSQL (<code>DATABASE_URL</code>)</span></div></div>
+        <div class="step"><div class="step-num step-num-blue" style="width:22px;height:22px;font-size:0.6em;">✓</div><div class="step-content"><span class="small">CORS: your frontend URL only</span></div></div>
+        <div class="step"><div class="step-num step-num-blue" style="width:22px;height:22px;font-size:0.6em;">✓</div><div class="step-content"><span class="small">Disable open registration</span></div></div>
+      </div>
+      <div>
+        <h3 style="color:var(--dw-accent2);">Health Monitoring</h3>
+        <p class="small">Configure probes per model: default (lightweight inference) or custom HTTP (<code>/health</code>). Green/red status indicators. Uptime history timeline.</p>
+        <p class="small" style="margin-top:0.3em;">Supports: SSO (proxy header auth), API key rate limiting (1–10K req/s + burst), streaming, model aliases.</p>
+        <p class="small" style="margin-top:0.3em;"><a href="https://docs.doubleword.ai/control-layer/reference/configuration" target="_blank">Full configuration reference →</a></p>
+      </div>
+    </div>
+    
+    <div class="review">
+      <div class="review-title">Docs Review — Deploy to Production + Health Monitoring</div>
+      <div class="review-row"><span class="review-dim">Clarity</span><span class="review-score good">A</span><span class="review-note">Security checklist format is excellent. Quick reference table (dev vs prod settings) is immediately useful.</span></div>
+      <div class="review-row"><span class="review-dim">Prerequisites</span><span class="review-score ok">B</span><span class="review-note">PostgreSQL, reverse proxy (nginx/Caddy), TLS — assumed but not deeply explained.</span></div>
+      <div class="review-row"><span class="review-dim">Examples</span><span class="review-score ok">B</span><span class="review-note">YAML config snippets and env vars shown. No complete docker-compose.prod.yml example.</span></div>
+      <div class="review-row"><span class="review-dim">Level</span><span class="review-score ok">B+</span><span class="review-note">Advanced. Requires DevOps/infra experience. Not for junior devs.</span></div>
+      <div class="review-section">
+        <div class="review-section-title">✅ What went well</div>
+        Security-first approach — password, secret key, CORS, registration lockdown all covered · Health monitoring with custom HTTP probes is production-ready
+        <div class="review-section-title" style="margin-top:0.2em;">⚠️ Could improve</div>
+        A production-ready docker-compose.yml or Helm chart would save hours · No HA (high availability) guidance
+      </div>
+    </div>
+<div class="sources">
+      <span class="src-num">1</span> <a href="https://docs.doubleword.ai/control-layer/how-to/deploy-to-production" target="_blank">Deploy to Production</a> · 
+      <span class="src-num">2</span> <a href="https://docs.doubleword.ai/control-layer/how-to/health-monitoring" target="_blank">Set Up Health Monitoring</a> · 
+      <span class="src-num">3</span> <a href="https://docs.doubleword.ai/control-layer/reference/configuration" target="_blank">Configuration Reference</a>
+    </div>
+  </section>
+</section>
+
+<!-- ======================== SECTION 4: INFERENCE STACK ======================== -->
+<section>
+  <section class="section-header">
+    <div class="section-num">Section 04 · <span style="color:var(--dw-purple);">Inference Stack</span></div>
+    <h2>Inference Stack</h2>
+    <p class="small">Self-hosted LLM deployment · Kubernetes · GPU infrastructure · Multi-engine</p>
+  </section>
+
+  <section>
+    <h2>Self-Hosted LLM Infrastructure</h2>
+    <p style="font-size:0.78em;color:var(--dw-muted);">Deploy open-source models on your own GPUs with production-grade tooling.</p>
+    <div class="two-col">
+      <div>
+        <h3 style="color:var(--dw-purple);">Core Components</h3>
+        <div class="step"><div class="step-num step-num-purple">1</div><div class="step-content"><strong>Helm Charts</strong><br><span class="small">Kubernetes-native deployment. Model groups, scaling, volumes.</span></div></div>
+        <div class="step"><div class="step-num step-num-purple">2</div><div class="step-content"><strong>Bit Harbor</strong><br><span class="small">Pre-built containers with popular model weights. No download delays.</span></div></div>
+        <div class="step"><div class="step-num step-num-purple">3</div><div class="step-content"><strong>Pre-Porter</strong><br><span class="small">Scheduled job distributes model containers across all nodes before needed.</span></div></div>
+        <div class="step"><div class="step-num step-num-purple">4</div><div class="step-content"><strong>Multi-Engine</strong><br><span class="small">vLLM, TensorRT-LLM, SGLang, Dynamo — pick the right engine per workload.</span></div></div>
+      </div>
+      <div>
+        <div class="insight-box">
+          <div class="insight-label">📝 Behind the Stack Ep 8: Choosing Engines</div>
+          <strong>Local (Llama.cpp, mistral.rs):</strong> Portable, lightweight, personal use.<br>
+          <strong>Server (vLLM, TRT-LLM):</strong> Multi-tenant, high-throughput, GPU-optimized.<br>
+          <strong>Distributed (Dynamo):</strong> Disaggregated prefill/decode, cloud-scale.<br>
+          Choose based on: who's using it, where it runs, and call frequency.
+        </div>
+        <div class="insight-box" style="margin-top:0.4em;">
+          <div class="insight-label">📝 Ep 4: LLM-Aware Load Balancing</div>
+          Traditional round-robin fails for LLMs — a 50-token vs 10K-token request have wildly different GPU cost. Route by KV cache utilization, not CPU metrics.
+        </div>
+      </div>
+    </div>
+    
+    <div class="review">
+      <div class="review-title">Docs Review — Inference Stack Pages</div>
+      <div class="review-row"><span class="review-dim">Clarity</span><span class="review-score ok">B</span><span class="review-note">Model loading page is detailed. But the Inference Stack section feels incomplete — no overview/intro page.</span></div>
+      <div class="review-row"><span class="review-dim">Prerequisites</span><span class="review-score gap">C</span><span class="review-note">Assumes Kubernetes, Helm, GPU infrastructure. No "what you need before starting" page exists.</span></div>
+      <div class="review-row"><span class="review-dim">Examples</span><span class="review-score ok">B</span><span class="review-note">Helm chart YAML snippets for Bit Harbor and Pre-Porter. No end-to-end deployment example.</span></div>
+      <div class="review-row"><span class="review-dim">Level</span><span class="review-score gap">C+</span><span class="review-note">Expert only. K8s + GPU ops + inference engine selection knowledge assumed.</span></div>
+      <div class="review-section">
+        <div class="review-section-title">✅ What went well</div>
+        Bit Harbor (pre-built model containers) solves a real pain point · Pre-Porter for node-level caching is thoughtful · Blog series fills conceptual gaps
+        <div class="review-section-title" style="margin-top:0.2em;">⚠️ Could improve</div>
+        Needs an Inference Stack overview/intro page · Needs a prerequisites checklist (K8s version, GPU types, driver versions) · Missing getting-started tutorial comparable to Control Layer's
+      </div>
+    </div>
+<div class="sources">
+      <span class="src-num">1</span> <a href="https://docs.doubleword.ai/inference-stack/deployment/loading/" target="_blank">Faster Model Loading</a> · 
+      <span class="src-num">2</span> <a href="https://docs.doubleword.ai/conceptual/15-07-2025-bts-8/" target="_blank">BTS Ep 8: Choosing Inference Engines</a> · 
+      <span class="src-num">3</span> <a href="https://docs.doubleword.ai/conceptual/18-06-2025-bts-4/" target="_blank">BTS Ep 4: LLM-Aware Load Balancing</a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Model Loading: Bit Harbor + Pre-Porter</h2>
+    <p class="small" style="margin-bottom:0.4em;">LLM weights take minutes to download at startup. InitContainers eliminate this.</p>
+    <pre><code class="language-yaml"># Helm chart values
+modelGroups:
+  vllm-example:
+    initContainers:
+      - name: copy-model-weights
+        image: ghcr.io/doublewordai/bit-harbor:gemma-3-12b-it
+        command: ["/pause"]
+        volumeMounts:
+          - name: models
+            mountPath: /models
+    volumeMounts:
+      - name: models
+        mountPath: /root/.cache/huggingface
+        readOnly: false
+    volumes:
+      - name: models
+        emptyDir:
+          sizeLimit: 50Gi</code></pre>
+    <div class="callout-purple callout">
+      <strong>Pre-Porter</strong> runs as a cron job pulling model containers to all worker nodes hourly. Target GPU nodes only with <code>nvidia.com/gpu.present: "true"</code> node selectors.
+    </div>
+    
+    <div class="review">
+      <div class="review-title">Docs Review — Faster Model Loading Page</div>
+      <div class="review-row"><span class="review-dim">Clarity</span><span class="review-score good">A</span><span class="review-note">Clear comparison of InitContainers vs Persistent Volumes with explicit trade-offs.</span></div>
+      <div class="review-row"><span class="review-dim">Prerequisites</span><span class="review-score ok">B</span><span class="review-note">Kubernetes, Helm, GPU node familiarity assumed. Not stated explicitly.</span></div>
+      <div class="review-row"><span class="review-dim">Examples</span><span class="review-score good">A</span><span class="review-note">Complete Helm chart YAML for both approaches. Node selector examples for GPU targeting.</span></div>
+      <div class="review-row"><span class="review-dim">Level</span><span class="review-score ok">B+</span><span class="review-note">Advanced Kubernetes operator level.</span></div>
+      <div class="review-section">
+        <div class="review-section-title">✅ What went well</div>
+        Honestly addresses persistent volume limitations (concurrency risks, storage duplication) · Pre-Porter cron job pattern is production-proven
+      </div>
+    </div>
+<div class="sources">
+      <span class="src-num">1</span> <a href="https://docs.doubleword.ai/inference-stack/deployment/loading/" target="_blank">Faster Model Loading — InitContainers & Bit Harbor</a> · 
+      <span class="src-num">2</span> <a href="https://github.com/doublewordai/bit-harbor" target="_blank">Bit Harbor — GitHub</a>
+    </div>
+  </section>
+</section>
+
+<!-- ======================== SECTION 5: ENGINEERING INSIGHTS ======================== -->
+<section>
+  <section class="section-header">
+    <div class="section-num">Section 05</div>
+    <h2>Engineering Deep Dives</h2>
+    <p class="small">From the "Behind the Stack" blog series + conceptual guides</p>
+  </section>
+
+  <section>
+    <h2>Key Insights from the Blog Series</h2>
+    <div class="three-col" style="font-size:0.72em;">
+      <div class="insight-box" style="margin:0;">
+        <div class="insight-label">Ep 9 · Evaluating LLMs</div>
+        Benchmarks (MMLU, ARC) don't always reflect real-world use. LM Arena uses blind head-to-head with ELO scoring — closest to how real users experience models. Build in-house evals for your exact task, but use Arena as first stop.
+      </div>
+      <div class="insight-box" style="margin:0;">
+        <div class="insight-label">Gateway Benchmarking</div>
+        dwctl (Rust) adds imperceptible overhead at 100 concurrent users. LiteLLM adds >1s to median requests. Self-host your gateway — don't let a cloud proxy man-in-the-middle your AI requests.
+      </div>
+      <div class="insight-box" style="margin:0;">
+        <div class="insight-label">Parallel Primitives</div>
+        Multi-agent workflows need parallel batched calls. Autobatcher handles this transparently: <code>asyncio.gather</code> + BatchOpenAI. Mix chat completions, embeddings, and responses in a single batch.
+      </div>
+    </div>
+    <hr>
+    <h3>Conceptual Guides</h3>
+    <div class="two-col" style="font-size:0.72em;">
+      <div>
+        <a href="https://docs.doubleword.ai/inference-api/why-batch-inference-matters" target="_blank">Why Batch Matters</a> — From chatbots to autonomous AI workloads<br>
+        <a href="https://docs.doubleword.ai/inference-api/jsonl-files" target="_blank">What is JSONL?</a> — File format deep dive<br>
+        <a href="https://docs.doubleword.ai/inference-api/behind-the-stack-batched-endpoints" target="_blank">Batched Endpoints</a> — How the system works internally
+      </div>
+      <div>
+        <a href="https://docs.doubleword.ai/inference-api/parallel-primitives" target="_blank">Parallel Primitives</a> — Multi-agent workflow patterns<br>
+        <a href="https://docs.doubleword.ai/inference-api/zerodp-just-in-time-weight-offloading-over-nvlink-for-data-parallelism" target="_blank">ZeroDP</a> — Weight offloading over NVLink<br>
+        <a href="https://docs.doubleword.ai/conceptual/21-19-2025-dwctl-benchmark/" target="_blank">Control Layer Benchmarks</a> — Performance vs LiteLLM, Bifrost
+      </div>
+    </div>
+    
+    <div class="review">
+      <div class="review-title">Docs Review — Behind the Stack Blog Series</div>
+      <div class="review-row"><span class="review-dim">Clarity</span><span class="review-score good">A</span><span class="review-note">Blog posts are well-written engineering deep dives. Each stands alone as a reference.</span></div>
+      <div class="review-row"><span class="review-dim">Prerequisites</span><span class="review-score ok">B</span><span class="review-note">Assumes ML infrastructure familiarity. Not beginner content.</span></div>
+      <div class="review-row"><span class="review-dim">Examples</span><span class="review-score ok">B</span><span class="review-note">Conceptual with some code snippets. More educational than practical.</span></div>
+      <div class="review-row"><span class="review-dim">Level</span><span class="review-score ok">B</span><span class="review-note">Intermediate to advanced. Best for architects and ML engineers.</span></div>
+      <div class="review-section">
+        <div class="review-section-title">✅ What went well</div>
+        Benchmarking post is transparent about methodology · Inference engine comparison is genuinely useful for platform decisions · LM Arena recommendation for model eval is practical
+        <div class="review-section-title" style="margin-top:0.2em;">⚠️ Could improve</div>
+        Blog lives at docs.doubleword.ai/conceptual but there's also blog.doubleword.ai — two separate blogs is confusing · No table of contents or series index page
+      </div>
+    </div>
+<div class="sources">
+      <span class="src-num">1</span> <a href="https://docs.doubleword.ai/conceptual/03-09-2025-bts-9/" target="_blank">BTS Ep 9: Evaluating Open Source LLMs</a> · 
+      <span class="src-num">2</span> <a href="https://docs.doubleword.ai/conceptual/21-19-2025-dwctl-benchmark/" target="_blank">Control Layer Benchmarking</a> · 
+      <span class="src-num">3</span> <a href="https://docs.doubleword.ai/inference-api/parallel-primitives" target="_blank">Parallel Primitives</a> · 
+      <span class="src-num">4</span> <a href="https://docs.doubleword.ai/inference-api/why-batch-inference-matters" target="_blank">Why Batch Matters</a> · 
+      <span class="src-num">5</span> <a href="https://docs.doubleword.ai/inference-api/zerodp-just-in-time-weight-offloading-over-nvlink-for-data-parallelism" target="_blank">ZeroDP</a>
+    </div>
+  </section>
+</section>
+
+<!-- ======================== SECTION 6: AI SKILL + OPEN SOURCE ======================== -->
+<section>
+  <section class="section-header">
+    <div class="section-num">Section 06 · <span style="color:var(--dw-green);">Developer Tooling</span></div>
+    <h2>AI Coding Skill &amp; Open Source</h2>
+    <p class="small">Agent skill for Claude Code / Cursor / Windsurf + the open-source ecosystem</p>
+  </section>
+
+  <section>
+    <h2>Doubleword Batch Skill for AI Agents</h2>
+    <p style="font-size:0.78em;color:var(--dw-muted);">A reusable skill that teaches AI coding agents how to work with the Doubleword Batch API.</p>
+    <div class="two-col">
+      <div>
+        <h3 style="color:var(--dw-green);">What it covers</h3>
+        <div class="step"><div class="step-num" style="background:var(--dw-green);">1</div><div class="step-content"><strong>Submitting batch jobs</strong> via the API</div></div>
+        <div class="step"><div class="step-num" style="background:var(--dw-green);">2</div><div class="step-content"><strong>Monitoring status</strong> + downloading results</div></div>
+        <div class="step"><div class="step-num" style="background:var(--dw-green);">3</div><div class="step-content"><strong>Using Autobatcher</strong> from Python</div></div>
+        <div class="step"><div class="step-num" style="background:var(--dw-green);">4</div><div class="step-content"><strong>Tool calling</strong> + structured outputs</div></div>
+        <div class="step"><div class="step-num" style="background:var(--dw-green);">5</div><div class="step-content"><strong>Models &amp; pricing</strong> reference</div></div>
+        <h3 style="margin-top:0.6em;color:var(--dw-green);">Supported Agents</h3>
+        <p class="small">Claude Code · Cursor · Windsurf · Codex · any agent supporting the skills format</p>
+      </div>
+      <div>
+        <h3 style="color:var(--dw-green);">Install</h3>
+        <pre><code class="language-bash"># Via Skills CLI
+npx skills add \
+  https://github.com/doublewordai/batch-skill
+
+# Or via Git
+git clone \
+  https://github.com/doublewordai/batch-skill \
+  ~/.claude/skills/batch-skill</code></pre>
+        <h3 style="margin-top:0.5em;color:var(--dw-green);">Usage</h3>
+        <p class="small">Once installed, ask your agent:</p>
+        <p class="small" style="color:#e2e8f0;"><em>"How do I submit a batch job to Doubleword?"</em><br><em>"Help me download partial results"</em><br><em>"What models are available and what do they cost?"</em></p>
+        <pre style="margin-top:0.3em;"><code class="language-bash"># Update
+npx skills update doubleword-batch
+# Or: cd ~/.claude/skills/batch-skill && git pull</code></pre>
+        <p class="smaller"><a href="https://docs.doubleword.ai/inference-api/skill" target="_blank">Skill docs →</a> · <a href="https://github.com/doublewordai/batch-skill" target="_blank">GitHub →</a> · <a href="https://github.com/skills-sh/skills" target="_blank">Skills CLI →</a></p>
+      </div>
+    </div>
+    
+    <div class="review">
+      <div class="review-title">Docs Review — AI Skill Page</div>
+      <div class="review-row"><span class="review-dim">Clarity</span><span class="review-score good">A</span><span class="review-note">Clear install commands for both Skills CLI and git. Supported agents listed.</span></div>
+      <div class="review-row"><span class="review-dim">Prerequisites</span><span class="review-score good">A</span><span class="review-note">npx or git. Agent (Claude Code, Cursor, etc.) assumed already installed.</span></div>
+      <div class="review-row"><span class="review-dim">Examples</span><span class="review-score ok">B</span><span class="review-note">Usage examples are prompts, not code. The skill itself provides the code when invoked.</span></div>
+      <div class="review-row"><span class="review-dim">Level</span><span class="review-score good">A</span><span class="review-note">All levels. If you can type a prompt, you can use the skill.</span></div>
+      <div class="review-section">
+        <div class="review-section-title">✅ What went well</div>
+        Low barrier to entry · Covers the full API surface through natural language · MIT licensed
+        <div class="review-section-title" style="margin-top:0.2em;">⚠️ Could improve</div>
+        No example of what the skill actually outputs when invoked · No comparison with using the API directly
+      </div>
+    </div>
+<div class="sources">
+      <span class="src-num">1</span> <a href="https://docs.doubleword.ai/inference-api/skill" target="_blank">API Skill — Docs</a> · 
+      <span class="src-num">2</span> <a href="https://github.com/doublewordai/batch-skill" target="_blank">batch-skill — GitHub</a> · 
+      <span class="src-num">3</span> <a href="https://github.com/skills-sh/skills" target="_blank">Skills CLI — GitHub</a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Open Source Ecosystem</h2>
+    <p style="font-size:0.78em;color:var(--dw-muted);">Key repositories from <a href="https://github.com/doublewordai" target="_blank">github.com/doublewordai</a></p>
+    <table class="cmp-table" style="font-size:0.7em;">
+      <thead><tr><th>Repo</th><th>What it is</th><th>License</th></tr></thead>
+      <tbody>
+        <tr><td><a href="https://github.com/doublewordai/control-layer" target="_blank"><strong>control-layer</strong></a></td><td>The AI gateway. Rust. 450x faster than LiteLLM. RBAC, billing, analytics.</td><td>OSS</td></tr>
+        <tr><td><a href="https://github.com/doublewordai/batch-skill" target="_blank"><strong>batch-skill</strong></a></td><td>AI coding agent skill for batch API. Claude Code, Cursor, Windsurf.</td><td>MIT</td></tr>
+        <tr><td><a href="https://github.com/doublewordai/dw" target="_blank"><strong>dw</strong></a></td><td>CLI tool. Upload files, run batches, stream results from terminal.</td><td>OSS</td></tr>
+        <tr><td><a href="https://github.com/doublewordai/autobatcher" target="_blank"><strong>autobatcher</strong></a></td><td>Drop-in AsyncOpenAI replacement. Transparent batching. MIT.</td><td>MIT</td></tr>
+        <tr><td><a href="https://github.com/doublewordai/qlm" target="_blank"><strong>qlm</strong></a></td><td>QLM — Query Language for Models.</td><td>OSS</td></tr>
+        <tr><td><strong>bit-harbor</strong></td><td>Pre-built containers with model weights for fast K8s startup.</td><td>OSS</td></tr>
+        <tr><td><a href="https://github.com/doublewordai/use-cases" target="_blank"><strong>use-cases</strong></a></td><td>All 9 workbook examples as runnable code.</td><td>OSS</td></tr>
+      </tbody>
+    </table>
+    <div class="two-col" style="font-size:0.72em;">
+      <div class="callout-green callout" style="margin:0;font-size:1em;">
+        <strong>Autobatcher:</strong> <code>pip install autobatcher</code> — drop-in <code>AsyncOpenAI</code>/<code>BatchOpenAI</code> replacement. Works with OpenAI batch too (best-effort).
+      </div>
+      <div class="callout" style="margin:0;font-size:1em;">
+        <strong><code>dw</code> CLI:</strong> <code>pip install dw-cli</code> — upload, run, stream from terminal.<br>
+        <code style="font-size:0.9em;">dw login && dw stream batch.jsonl > results.jsonl</code>
+      </div>
+    </div>
+    
+    <div class="review">
+      <div class="review-title">Docs Review — GitHub Ecosystem</div>
+      <div class="review-row"><span class="review-dim">Clarity</span><span class="review-score ok">B</span><span class="review-note">Repos exist but no single "ecosystem overview" page on the docs site. We assembled this from GitHub.</span></div>
+      <div class="review-row"><span class="review-dim">Prerequisites</span><span class="review-score ok">B</span><span class="review-note">Varies by repo. Some need Python, some K8s, some just npx.</span></div>
+      <div class="review-section">
+        <div class="review-section-title">⚠️ Could improve</div>
+        An "Open Source" page in the docs linking all repos with descriptions would be valuable · README quality varies across repos · dw CLI docs are on a separate GitHub Pages site
+      </div>
+    </div>
+<div class="sources">
+      <span class="src-num">1</span> <a href="https://github.com/doublewordai" target="_blank">github.com/doublewordai</a> · 
+      <span class="src-num">2</span> <a href="https://github.com/doublewordai/autobatcher" target="_blank">Autobatcher</a> · 
+      <span class="src-num">3</span> <a href="https://github.com/doublewordai/dw" target="_blank">dw CLI — GitHub</a> · 
+      <span class="src-num">4</span> <a href="https://doublewordai.github.io/dw/" target="_blank">dw CLI — Docs</a> · 
+      <span class="src-num">5</span> <a href="https://github.com/doublewordai/qlm" target="_blank">QLM</a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Seen in the Wild — Community &amp; Customer Stories</h2>
+    <p style="font-size:0.72em;color:var(--dw-muted);">Real-world projects using Doubleword in production.</p>
+    <div class="two-col" style="font-size:0.72em;">
+      <div>
+        <h3 style="color:var(--dw-green);">Customer Stories</h3>
+        <div class="model-card"><div class="model-name" style="color:var(--dw-green);">OpenMed × SynthVision</div><div class="model-desc">110K synthetic medical VQA dataset with cross-model validation. <a href="https://www.doubleword.ai/customer-stories/openmed" target="_blank">Story →</a></div></div>
+        <div class="model-card"><div class="model-name" style="color:var(--dw-green);">Dataiku × Kiji Privacy Proxy</div><div class="model-desc">Dataset generation to train privacy proxy model. <a href="https://www.doubleword.ai/customer-stories/dataiku" target="_blank">Story →</a></div></div>
+        <div class="model-card"><div class="model-name" style="color:var(--dw-green);">1,000 Invoices for Under $0.50</div><div class="model-desc">235B LLM structured extraction at batch pricing. <a href="https://www.youtube.com/watch?v=v-Uonk3jmOw" target="_blank">Video →</a></div></div>
+      </div>
+      <div>
+        <h3 style="color:var(--dw-green);">Community Projects</h3>
+        <div class="model-card"><div class="model-name" style="color:var(--dw-green);">UK Charity Doc Extraction</div><div class="model-desc">Multi-model benchmark by Mani Sarkar. <a href="https://github.com/neomatrix369/playgroup_202602_docextract/tree/add-support-for-doubleword" target="_blank">GitHub →</a></div></div>
+        <div class="model-card"><div class="model-name" style="color:var(--dw-green);">Batchling</div><div class="model-desc">Convert any GenAI async function into batch jobs. <a href="https://vienneraphael.github.io/batchling/" target="_blank">Docs →</a></div></div>
+        <div class="model-card"><div class="model-name" style="color:var(--dw-green);">OpenClaw Skill</div><div class="model-desc">Community-built Doubleword skill. <a href="https://github.com/openclaw/skills/tree/main/skills/pjb157/doubleword" target="_blank">GitHub →</a></div></div>
+      </div>
+    </div>
+    
+    <div class="review">
+      <div class="review-title">Docs Review — Community Showcase</div>
+      <div class="review-row"><span class="review-dim">Clarity</span><span class="review-score good">A</span><span class="review-note">Marketing site has an excellent showcase page with categorized community projects, videos, and blog posts.</span></div>
+      <div class="review-row"><span class="review-dim">Examples</span><span class="review-score good">A</span><span class="review-note">Real-world projects with links to code, videos, and writeups. Covers diverse use cases.</span></div>
+      <div class="review-section">
+        <div class="review-section-title">✅ What went well</div>
+        Social proof from real users · Diverse use cases (medical VQA, invoice processing, privacy proxies, evals) · Your own project is featured!
+        <div class="review-section-title" style="margin-top:0.2em;">⚠️ Could improve</div>
+        This lives on doubleword.ai not docs.doubleword.ai — devs browsing docs may never find it · No "submit your project" CTA
+      </div>
+    </div>
+<div class="sources">
+      <span class="src-num">1</span> <a href="https://www.doubleword.ai/seen-in-the-wild" target="_blank">Seen in the Wild — doubleword.ai</a> · 
+      <span class="src-num">2</span> <a href="https://www.doubleword.ai/customer-stories/openmed" target="_blank">OpenMed Story</a> · 
+      <span class="src-num">3</span> <a href="https://www.doubleword.ai/customer-stories/dataiku" target="_blank">Dataiku Story</a> · 
+      <span class="src-num">4</span> <a href="https://huggingface.co/blog/OpenMed/synthvision" target="_blank">SynthVision — HuggingFace Blog</a>
+    </div>
+  </section>
+</section>
+
+<!-- ======================== SECTION 7: QUICK REFERENCE ======================== -->
+<section>
+  <section class="section-header">
+    <div class="section-num">Section 07</div>
+    <h2>Quick Reference</h2>
+    <p class="small">Cheat sheets, API endpoints, and all the links</p>
+  </section>
+
+  <section>
+    <h2>Inference API Cheat Sheet</h2>
+    <table class="cmp-table" style="font-size:0.65em;">
+      <thead><tr><th>Action</th><th>Method</th><th>Endpoint</th></tr></thead>
+      <tbody>
+        <tr><td>Chat completion</td><td>POST</td><td><code>/v1/chat/completions</code></td></tr>
+        <tr><td>Embeddings</td><td>POST</td><td><code>/v1/embeddings</code></td></tr>
+        <tr><td>Upload file</td><td>POST</td><td><code>/v1/files</code></td></tr>
+        <tr><td>Create batch</td><td>POST</td><td><code>/v1/batches</code></td></tr>
+        <tr><td>Check batch</td><td>GET</td><td><code>/v1/batches/{id}</code></td></tr>
+        <tr><td>Download results</td><td>GET</td><td><code>/v1/files/{id}/content</code></td></tr>
+        <tr><td>Cancel batch</td><td>POST</td><td><code>/v1/batches/{id}/cancel</code></td></tr>
+      </tbody>
+    </table>
+    <div class="two-col" style="font-size:0.72em;">
+      <div class="callout" style="margin:0;">
+        <strong>Inference API Base:</strong> <code>https://api.doubleword.ai/v1</code><br>
+        <strong>Auth:</strong> <code>Authorization: Bearer dw-...</code>
+      </div>
+      <div class="callout" style="margin:0;border-left-color:var(--dw-accent2);">
+        <strong>Control Layer Base:</strong> <code>http://your-host:3001/ai/v1</code><br>
+        <strong>Auth:</strong> Control Layer API key
+      </div>
+    </div>
+    
+    <div class="review">
+      <div class="review-title">Docs Review — API Reference</div>
+      <div class="review-row"><span class="review-dim">Clarity</span><span class="review-score ok">B</span><span class="review-note">API reference page exists but is interactive (Swagger-style). Not easily scannable as a cheat sheet.</span></div>
+      <div class="review-row"><span class="review-dim">Prerequisites</span><span class="review-score good">A</span><span class="review-note">Base URL and auth format clearly documented on multiple pages.</span></div>
+      <div class="review-section">
+        <div class="review-section-title">⚠️ Could improve</div>
+        A static "cheat sheet" or quick reference card in the docs (like this slide) would be useful for devs who want to bookmark a single page · The interactive API ref doesn't work well offline
+      </div>
+    </div>
+<div class="sources">
+      <span class="src-num">1</span> <a href="https://docs.doubleword.ai/inference-api/api-reference" target="_blank">Full API Reference</a> · 
+      <span class="src-num">2</span> <a href="https://docs.doubleword.ai/control-layer/how-to/api" target="_blank">Control Layer API</a>
+    </div>
+  </section>
+
+  <section>
+    <h2>All Links</h2>
+    <div class="three-col" style="font-size:0.68em;">
+      <div>
+        <h3>Inference API</h3>
+        <a href="https://app.doubleword.ai" target="_blank">Console</a> · <a href="https://app.doubleword.ai/playground" target="_blank">Playground</a><br>
+        <a href="https://docs.doubleword.ai/inference-api/intro-to-doubleword-inference" target="_blank">Intro Guide</a><br>
+        <a href="https://docs.doubleword.ai/inference-api/model-pricing" target="_blank">Models & Pricing</a><br>
+        <a href="https://docs.doubleword.ai/inference-api/autobatcher" target="_blank">Autobatcher</a> · <a href="https://docs.doubleword.ai/inference-api/skill" target="_blank">AI Skill</a><br>
+        <a href="https://docs.doubleword.ai/inference-api/tool-calling" target="_blank">Tool Calling</a> · <a href="https://docs.doubleword.ai/inference-api/api-reference" target="_blank">API Ref</a><br>
+        <a href="https://docs.doubleword.ai/inference-api/batch-notifications-and-webhooks" target="_blank">Webhooks</a> · <a href="https://docs.doubleword.ai/inference-api/organizations-overview" target="_blank">Organizations</a><br>
+        <a href="https://docs.doubleword.ai/inference-api/cli-examples" target="_blank">All Workbooks (9)</a><br>
+        <a href="https://docs.doubleword.ai/inference-api/adding-credits-to-your-account" target="_blank">Credits</a> · <a href="https://docs.doubleword.ai/inference-api/auto-topup" target="_blank">Auto Top-Up</a> · <a href="https://docs.doubleword.ai/inference-api/how-to-manage-payments" target="_blank">Payments</a>
+      </div>
+      <div>
+        <h3 style="color:var(--dw-accent2);">Control Layer</h3>
+        <a href="https://github.com/doublewordai/control-layer" target="_blank">GitHub (OSS)</a><br>
+        <a href="https://docs.doubleword.ai/control-layer/getting-started" target="_blank">Quick Start</a><br>
+        <a href="https://docs.doubleword.ai/control-layer/how-to/api" target="_blank">Connect to API</a> · <a href="https://docs.doubleword.ai/control-layer/how-to/endpoints" target="_blank">Endpoints</a><br>
+        <a href="https://docs.doubleword.ai/control-layer/how-to/users-and-groups" target="_blank">Users & Groups</a><br>
+        <a href="https://docs.doubleword.ai/control-layer/how-to/health-monitoring" target="_blank">Health Monitoring</a><br>
+        <a href="https://docs.doubleword.ai/control-layer/how-to/deploy-to-production" target="_blank">Deploy to Prod</a><br>
+        <a href="https://docs.doubleword.ai/control-layer/how-to/tariffs" target="_blank">Tariffs/Pricing</a> · <a href="https://docs.doubleword.ai/control-layer/how-to/payments" target="_blank">Payments</a><br>
+        <a href="https://docs.doubleword.ai/control-layer/conceptual-guides/how-billing-works" target="_blank">Billing Guide</a> · <a href="https://docs.doubleword.ai/control-layer/reference/configuration" target="_blank">Config Ref</a>
+      </div>
+      <div>
+        <h3 style="color:var(--dw-purple);">Infra, OSS &amp; Resources</h3>
+        <a href="https://github.com/doublewordai/dw" target="_blank">dw CLI</a> · <a href="https://doublewordai.github.io/dw/" target="_blank">dw Docs</a><br>
+        <a href="https://github.com/doublewordai/batch-skill" target="_blank">Batch Skill</a> · <a href="https://github.com/doublewordai/qlm" target="_blank">QLM</a><br>
+        <a href="https://docs.doubleword.ai/inference-stack/deployment/loading/" target="_blank">Model Loading</a><br>
+        <a href="https://docs.doubleword.ai/conceptual/21-19-2025-dwctl-benchmark/" target="_blank">Gateway Benchmarks</a><br>
+        <a href="https://www.doubleword.ai/seen-in-the-wild" target="_blank">Seen in the Wild</a><br>
+        <a href="https://blog.doubleword.ai/" target="_blank">Technical Blog</a> · <a href="https://www.doubleword.ai/resources" target="_blank">Resources</a><br>
+        <a href="https://www.doubleword.ai/calculator" target="_blank">Savings Calculator</a><br>
+        <a href="https://onboarding.doubleword.ai/" target="_blank">Async Pipeline Builder</a><br>
+        <a href="https://www.doubleword.ai/glossary" target="_blank">AI Dictionary</a> · <a href="https://www.doubleword.ai/about" target="_blank">About</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="title-slide">
+    <h1>Start Building</h1>
+    <div class="accent-bar"></div>
+    <p style="font-size:0.75em;color:var(--dw-muted);margin-top:0.3em;">Process your first <strong style="color:#4ade80;">20,000,000 tokens free</strong></p>
+    <div class="three-col" style="margin-top:0.8em;font-size:0.72em;text-align:center;">
+      <div>
+        <span class="badge badge-red" style="font-size:0.9em;">Inference API</span><br>
+        <code style="font-size:0.85em;">pip install autobatcher</code><br>
+        <a href="https://app.doubleword.ai" target="_blank" style="font-size:0.85em;">app.doubleword.ai</a>
+      </div>
+      <div>
+        <span class="badge badge-blue" style="font-size:0.9em;">Control Layer</span><br>
+        <code style="font-size:0.85em;">docker compose up -d</code><br>
+        <a href="https://github.com/doublewordai/control-layer" target="_blank" style="font-size:0.85em;">GitHub</a>
+      </div>
+      <div>
+        <span class="badge badge-green" style="font-size:0.9em;">dw CLI</span><br>
+        <code style="font-size:0.85em;">pip install dw-cli</code><br>
+        <a href="https://doublewordai.github.io/dw/" target="_blank" style="font-size:0.85em;">Docs</a>
+      </div>
+    </div>
+    <p class="smaller" style="margin-top:1.5em;">Built from 55+ docs pages + doubleword.ai &nbsp;·&nbsp; March 2026</p>
+  </section>
+</section>
+
+</div>
+
+<div class="nav-bar">
+  <button id="btnPrev">← Prev</button>
+  <span class="nav-counter" id="navCounter">1 / 38</span>
+  <button id="btnNext">Next →</button>
+</div>
+<div class="progress-bar" id="progressBar" style="width:3%;"></div>
+
+<script>
+(function() {
+  var deck = document.getElementById('deck');
+  var topSections = Array.from(deck.children).filter(function(el) { return el.tagName === 'SECTION'; });
+  var hIndex = 0, vIndex = 0;
+
+  function getSubSlides(section) {
+    var subs = Array.from(section.children).filter(function(el) { return el.tagName === 'SECTION'; });
+    return subs.length > 0 ? subs : null;
+  }
+
+  function totalSlides() {
+    var count = 0;
+    topSections.forEach(function(s) {
+      var subs = getSubSlides(s);
+      count += subs ? subs.length : 1;
+    });
+    return count;
+  }
+
+  function currentSlideNum() {
+    var count = 0;
+    for (var i = 0; i < hIndex; i++) {
+      var subs = getSubSlides(topSections[i]);
+      count += subs ? subs.length : 1;
+    }
+    count += vIndex + 1;
+    return count;
+  }
+
+  function show() {
+    topSections.forEach(function(s, i) {
+      s.classList.toggle('active', i === hIndex);
+      var subs = getSubSlides(s);
+      if (subs) {
+        subs.forEach(function(sub, j) { sub.classList.toggle('active', j === vIndex); });
+      }
+    });
+    document.getElementById('navCounter').textContent = currentSlideNum() + ' / ' + totalSlides();
+    var pct = (currentSlideNum() / totalSlides()) * 100;
+    document.getElementById('progressBar').style.width = pct + '%';
+  }
+
+  function goRight() {
+    if (hIndex < topSections.length - 1) { hIndex++; vIndex = 0; show(); }
+  }
+  function goLeft() {
+    if (hIndex > 0) { hIndex--; vIndex = 0; show(); }
+  }
+  function goDown() {
+    var subs = getSubSlides(topSections[hIndex]);
+    if (subs && vIndex < subs.length - 1) { vIndex++; show(); }
+    else { goRight(); }
+  }
+  function goUp() {
+    if (vIndex > 0) { vIndex--; show(); }
+    else { goLeft(); }
+  }
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); goDown(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'Backspace') { e.preventDefault(); goUp(); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); goDown(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); goUp(); }
+  });
+
+  // Nav bar buttons
+  document.getElementById('btnPrev').addEventListener('click', goUp);
+  document.getElementById('btnNext').addEventListener('click', goDown);
+
+  show();
+})();
+</script>
+
+<script>
+function recalc() {
+  var sel = document.getElementById('calcModel');
+  if (!sel) return;
+  var opt = sel.options[sel.selectedIndex];
+  var iM = parseFloat(document.getElementById('calcInput').value) || 0;
+  var oM = parseFloat(document.getElementById('calcOutput').value) || 0;
+  var ri = +opt.dataset.ri, ro = +opt.dataset.ro;
+  var ai = +opt.dataset.ai, ao = +opt.dataset.ao;
+  var bi = +opt.dataset.bi, bo = +opt.dataset.bo;
+  var cRt = ri*iM + ro*oM, cAs = ai*iM + ao*oM, cBa = bi*iM + bo*oM;
+  document.getElementById('priceRt').textContent = '$' + cRt.toFixed(2);
+  document.getElementById('priceAsync').textContent = '$' + cAs.toFixed(2);
+  document.getElementById('priceBatch').textContent = '$' + cBa.toFixed(2);
+  var s = cRt > 0 ? Math.round((1 - cBa/cRt) * 100) : 0;
+  document.getElementById('savingsTag').textContent = cRt > 0 ? 'Batch saves ' + s + '% vs Realtime' : 'Enter values above';
+}
+recalc();
+</script>
+<button class="review-toggle" onclick="document.querySelectorAll('.review').forEach(r=>r.classList.toggle('visible'));this.textContent=this.textContent==='☆ Reviews'?'★ Reviews':'☆ Reviews'">☆ Reviews</button>
+</body>
+</html>
