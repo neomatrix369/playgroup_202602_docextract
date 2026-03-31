@@ -172,3 +172,36 @@ datetime,provider,model_short_name,model_full_name,tier,multimodal,row_num,pdf_f
 2026-03-20 23:45:09,Doubleword,dw-nemotron-120b,nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4,premium,False,8,cfe956d594cd45a0267d966dadebf72e.pdf,ok,0,32363,2194,0.008672,8,
 2026-03-20 23:45:09,Doubleword,dw-nemotron-120b,nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4,premium,False,9,cc19e4fd0c4a605a7f537050df52483e.pdf,ok,0,7044,2951,0.003273,8,
 2026-03-20 23:45:09,Doubleword,dw-nemotron-120b,nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4,premium,False,10,871b94cb6b28fb7fd1f7447306f38717.pdf,ok,0,70649,1209,0.016926,8,
+2026-03-29 02:12:15,Doubleword,dw-deepseek-ocr-2,deepseek-ai/DeepSeek-OCR-2,ultra_cheap,False,0,d07c46323bb61186b6175bad9a274225.pdf,empty,0,4771,157,0.000394,0,
+2026-03-29 02:12:15,Doubleword,dw-deepseek-ocr-2,deepseek-ai/DeepSeek-OCR-2,ultra_cheap,False,1,a84c1c7a3e570a716f6c61de557b5ff1.pdf,empty,0,9360,248,0.000769,0,
+2026-03-29 02:12:15,Doubleword,dw-deepseek-ocr-2,deepseek-ai/DeepSeek-OCR-2,ultra_cheap,False,2,34646877386855695219579059c07302.pdf,empty,0,4462,1140,0.000448,0,
+2026-03-29 02:12:15,Doubleword,dw-deepseek-ocr-2,deepseek-ai/DeepSeek-OCR-2,ultra_cheap,False,3,bc1881761cdd5edf2d7e5c12958a82f2.pdf,empty,0,2987,146,0.000251,0,
+2026-03-29 02:12:15,Doubleword,dw-deepseek-ocr-2,deepseek-ai/DeepSeek-OCR-2,ultra_cheap,False,4,7d56c6cc848666198c050855dbb16092.pdf,empty,0,4196,76,0.000342,0,
+2026-03-29 02:12:15,Doubleword,dw-deepseek-ocr-2,deepseek-ai/DeepSeek-OCR-2,ultra_cheap,False,5,44ba842bbbd4f18587ad8ae3fe4ecdd7.pdf,error,0,0,0,0,0,No result returned
+2026-03-29 02:12:15,Doubleword,dw-deepseek-ocr-2,deepseek-ai/DeepSeek-OCR-2,ultra_cheap,False,6,6f9b8f27fd43be13d822c0b4654be167.pdf,empty,0,2643,50,0.000215,0,
+2026-03-29 02:12:15,Doubleword,dw-deepseek-ocr-2,deepseek-ai/DeepSeek-OCR-2,ultra_cheap,False,7,556ee39a83d9a15738918e8e60dc45a7.pdf,empty,0,9523,696,0.000818,0,
+2026-03-29 02:12:15,Doubleword,dw-deepseek-ocr-2,deepseek-ai/DeepSeek-OCR-2,ultra_cheap,False,8,cfe956d594cd45a0267d966dadebf72e.pdf,error,0,0,0,0,0,No result returned
+2026-03-29 02:12:15,Doubleword,dw-deepseek-ocr-2,deepseek-ai/DeepSeek-OCR-2,ultra_cheap,False,9,cc19e4fd0c4a605a7f537050df52483e.pdf,empty,0,5934,940,0.00055,0,
+2026-03-29 02:12:15,Doubleword,dw-deepseek-ocr-2,deepseek-ai/DeepSeek-OCR-2,ultra_cheap,False,10,871b94cb6b28fb7fd1f7447306f38717.pdf,error,0,0,0,0,0,No result returned
+2026-03-29 02:12:15,Doubleword,dw-olmocr-2-7b-1025-fp8,allenai/olmOCR-2-7B-1025-FP8,ultra_cheap,False,0,d07c46323bb61186b6175bad9a274225.pdf,ok,0,5459,140,0.00084,8,
+2026-03-29 02:12:15,Doubleword,dw-olmocr-2-7b-1025-fp8,allenai/olmOCR-2-7B-1025-FP8,ultra_cheap,False,1,a84c1c7a3e570a716f6c61de557b5ff1.pdf,ok,0,11577,159,0.00176,8,
+2026-03-29 02:12:15,Doubleword,dw-olmocr-2-7b-1025-fp8,allenai/olmOCR-2-7B-1025-FP8,ultra_cheap,False,2,34646877386855695219579059c07302.pdf,ok,0,4804,135,0.000741,8,
+2026-03-29 02:12:15,Doubleword,dw-olmocr-2-7b-1025-fp8,allenai/olmOCR-2-7B-1025-FP8,ultra_cheap,False,3,bc1881761cdd5edf2d7e5c12958a82f2.pdf,ok,0,3385,137,0.000528,8,
+2026-03-29 02:12:15,Doubleword,dw-olmocr-2-7b-1025-fp8,allenai/olmOCR-2-7B-1025-FP8,ultra_cheap,False,4,7d56c6cc848666198c050855dbb16092.pdf,ok,0,4795,137,0.00074,8,
+2026-03-29 02:12:15,Doubleword,dw-olmocr-2-7b-1025-fp8,allenai/olmOCR-2-7B-1025-FP8,ultra_cheap,False,5,44ba842bbbd4f18587ad8ae3fe4ecdd7.pdf,error,0,0,0,0,0,No result returned
+2026-03-29 02:12:15,Doubleword,dw-olmocr-2-7b-1025-fp8,allenai/olmOCR-2-7B-1025-FP8,ultra_cheap,False,6,6f9b8f27fd43be13d822c0b4654be167.pdf,ok,0,3064,139,0.00048,8,
+2026-03-29 02:12:15,Doubleword,dw-olmocr-2-7b-1025-fp8,allenai/olmOCR-2-7B-1025-FP8,ultra_cheap,False,7,556ee39a83d9a15738918e8e60dc45a7.pdf,ok,0,9900,141,0.001506,8,
+2026-03-29 02:12:15,Doubleword,dw-olmocr-2-7b-1025-fp8,allenai/olmOCR-2-7B-1025-FP8,ultra_cheap,False,8,cfe956d594cd45a0267d966dadebf72e.pdf,error,0,0,0,0,0,No result returned
+2026-03-29 02:12:15,Doubleword,dw-olmocr-2-7b-1025-fp8,allenai/olmOCR-2-7B-1025-FP8,ultra_cheap,False,9,cc19e4fd0c4a605a7f537050df52483e.pdf,ok,0,6712,140,0.001028,8,
+2026-03-29 02:12:15,Doubleword,dw-olmocr-2-7b-1025-fp8,allenai/olmOCR-2-7B-1025-FP8,ultra_cheap,False,10,871b94cb6b28fb7fd1f7447306f38717.pdf,error,0,0,0,0,0,No result returned
+2026-03-31 18:50:16,Doubleword,dw-lightonocr-2-1b-bbox-soup,lightonai/LightOnOCR-2-1B-bbox-soup,ultra_cheap,False,0,d07c46323bb61186b6175bad9a274225.pdf,empty,0,5459,31,0.000439,0,
+2026-03-31 18:50:16,Doubleword,dw-lightonocr-2-1b-bbox-soup,lightonai/LightOnOCR-2-1B-bbox-soup,ultra_cheap,False,1,a84c1c7a3e570a716f6c61de557b5ff1.pdf,empty,0,11577,4805,0.001311,0,
+2026-03-31 18:50:16,Doubleword,dw-lightonocr-2-1b-bbox-soup,lightonai/LightOnOCR-2-1B-bbox-soup,ultra_cheap,False,2,34646877386855695219579059c07302.pdf,empty,0,4804,31,0.000387,0,
+2026-03-31 18:50:16,Doubleword,dw-lightonocr-2-1b-bbox-soup,lightonai/LightOnOCR-2-1B-bbox-soup,ultra_cheap,False,3,bc1881761cdd5edf2d7e5c12958a82f2.pdf,empty,0,3385,12997,0.001311,0,
+2026-03-31 18:50:16,Doubleword,dw-lightonocr-2-1b-bbox-soup,lightonai/LightOnOCR-2-1B-bbox-soup,ultra_cheap,False,4,7d56c6cc848666198c050855dbb16092.pdf,empty,0,4795,31,0.000386,0,
+2026-03-31 18:50:16,Doubleword,dw-lightonocr-2-1b-bbox-soup,lightonai/LightOnOCR-2-1B-bbox-soup,ultra_cheap,False,5,44ba842bbbd4f18587ad8ae3fe4ecdd7.pdf,error,0,0,0,0,0,No result returned
+2026-03-31 18:50:16,Doubleword,dw-lightonocr-2-1b-bbox-soup,lightonai/LightOnOCR-2-1B-bbox-soup,ultra_cheap,False,6,6f9b8f27fd43be13d822c0b4654be167.pdf,ok,0,3064,1433,0.00036,8,
+2026-03-31 18:50:16,Doubleword,dw-lightonocr-2-1b-bbox-soup,lightonai/LightOnOCR-2-1B-bbox-soup,ultra_cheap,False,7,556ee39a83d9a15738918e8e60dc45a7.pdf,empty,0,9900,6482,0.001311,0,
+2026-03-31 18:50:16,Doubleword,dw-lightonocr-2-1b-bbox-soup,lightonai/LightOnOCR-2-1B-bbox-soup,ultra_cheap,False,8,cfe956d594cd45a0267d966dadebf72e.pdf,error,0,0,0,0,0,No result returned
+2026-03-31 18:50:16,Doubleword,dw-lightonocr-2-1b-bbox-soup,lightonai/LightOnOCR-2-1B-bbox-soup,ultra_cheap,False,9,cc19e4fd0c4a605a7f537050df52483e.pdf,empty,0,6712,9670,0.001311,0,
+2026-03-31 18:50:16,Doubleword,dw-lightonocr-2-1b-bbox-soup,lightonai/LightOnOCR-2-1B-bbox-soup,ultra_cheap,False,10,871b94cb6b28fb7fd1f7447306f38717.pdf,error,0,0,0,0,0,No result returned

@@ -64,26 +64,31 @@ async def submit_batch(
     prompt_template: str,
     rows: list[tuple[int, str, str]],
     completion_window: str = "1h",
+    extra_params: dict | None = None,
 ) -> str:
     """Submit rows as a batch job. Saves checkpoint. Returns batch_id.
 
     Args:
         rows: list of (row_num, pdf_filename, text_combined)
+        extra_params: optional sampling params merged into each request body (e.g. {"top_k": 1})
     """
     lines = []
     for row_num, _pdf_filename, text_combined in rows:
         prompt = prompt_template + text_combined
+        body = {
+            "model": model_full_name,
+            "messages": [
+                {"role": "system", "content": SYSTEM_MESSAGE},
+                {"role": "user", "content": prompt},
+            ],
+        }
+        if extra_params:
+            body.update(extra_params)
         line = {
             "custom_id": f"row_{row_num}",
             "method": "POST",
             "url": "/v1/chat/completions",
-            "body": {
-                "model": model_full_name,
-                "messages": [
-                    {"role": "system", "content": SYSTEM_MESSAGE},
-                    {"role": "user", "content": prompt},
-                ],
-            },
+            "body": body,
         }
         lines.append(json.dumps(line))
 

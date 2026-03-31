@@ -420,6 +420,7 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
         batch_id = await llm_doubleword.submit_batch(
             client, model_short_name, model_cfg["model"],
             PROMPT_TEMPLATE, rows, completion_window,
+            extra_params=model_cfg.get("extra_params"),
         )
         log.info("[Doubleword] Submitted {}: batch {}", model_short_name, batch_id)
         pending[model_short_name] = batch_id
@@ -435,8 +436,21 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
         try:
             status, _, counts = await llm_doubleword.poll_batch(client, batch_id)
         except Exception as e:
-            log.error("[Doubleword] Could not retrieve batch {} for {}: {}", batch_id, model_short_name, e)
+            log.warning("[Doubleword] Batch {} for {} not found ({}), resubmitting",
+                        batch_id, model_short_name, e)
             llm_doubleword.remove_checkpoint_entry(model_short_name)
+            model_cfg = DOUBLEWORD_MODELS[model_short_name]
+            multimodal = model_cfg["multimodal"]
+            log.info("[Doubleword] Submitting {} ({}) {}, {} rows, window={}",
+                     model_short_name, model_cfg['model'], _mod_tag(multimodal), len(rows), completion_window)
+            batch_id = await llm_doubleword.submit_batch(
+                client, model_short_name, model_cfg["model"],
+                PROMPT_TEMPLATE, rows, completion_window,
+                extra_params=model_cfg.get("extra_params"),
+            )
+            log.info("[Doubleword] Submitted {}: batch {}", model_short_name, batch_id)
+            pending[model_short_name] = batch_id
+            submitted_at[model_short_name] = time.time()
             continue
 
         if status in ("completed", "in_progress", "validating", "finalizing"):
@@ -455,6 +469,7 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
             batch_id = await llm_doubleword.submit_batch(
                 client, model_short_name, model_cfg["model"],
                 PROMPT_TEMPLATE, rows, completion_window,
+                extra_params=model_cfg.get("extra_params"),
             )
             log.info("[Doubleword] Submitted {}: batch {}", model_short_name, batch_id)
             pending[model_short_name] = batch_id
@@ -604,8 +619,21 @@ def _print_run_summary(all_statuses):
 # ═══════════════════════════════════════════════════════════════════
 
 def _resolve_model(model_short_name):
-    """Return (model_cfg, backend) or exit with error."""
+    """Return backend string ('doubleword' or 'openrouter') or exit with error.
+
+    potentially_deprecated models are NOT skipped — they still run normally.
+    Only a manually set 'deprecated': True flag would retire a model (if that
+    logic is ever added in future).
+    """
     if model_short_name in DOUBLEWORD_MODELS:
+        cfg = DOUBLEWORD_MODELS[model_short_name]
+        if cfg.get("potentially_deprecated"):
+            first_seen = cfg.get("first_noticed_missing", "unknown")
+            log.warning(
+                "[Extractor] ⚠  '{}' is potentially_deprecated (first noticed missing: {}). "
+                "Running it anyway — confirm manually to fully retire.",
+                model_short_name, first_seen,
+            )
         return "doubleword"
     if model_short_name in OPENROUTER_MODELS:
         return "openrouter"
@@ -644,14 +672,28 @@ async def main():
                        help="Run only OpenRouter models")
     args = parser.parse_args()
 
+    # Announce potentially_deprecated models (informational — they still run)
+    pdep_dw = {k: v for k, v in DOUBLEWORD_MODELS.items() if v.get("potentially_deprecated")}
+    if pdep_dw:
+        log.warning("=" * 60)
+        log.warning("⚠  {} POTENTIALLY DEPRECATED Doubleword model(s) — still running:",
+                    len(pdep_dw))
+        for short_name, cfg in pdep_dw.items():
+            first_seen = cfg.get("first_noticed_missing", "unknown")
+            log.warning("    • {} ({}) — first noticed missing: {}",
+                        short_name, cfg["model"], first_seen)
+        log.warning("  These models are included in runs — flag is informational only.")
+        log.warning("  Confirm and set 'deprecated': True manually to fully retire.")
+        log.warning("=" * 60)
+
     if args.models:
         models_to_run = args.models
     elif args.all_doubleword:
-        models_to_run = list(DOUBLEWORD_MODELS)
+        models_to_run = list(DOUBLEWORD_MODELS)   # includes potentially_deprecated
     elif args.all_openrouter:
         models_to_run = list(OPENROUTER_MODELS)
     else:
-        models_to_run = list(ALL_MODELS)
+        models_to_run = list(ALL_MODELS)           # includes potentially_deprecated
 
     # Partition models by backend
     dw_models = []

@@ -3,10 +3,23 @@
 Uses the agent-friendly markdown endpoint at docs.doubleword.ai (llms.txt enabled)
 to fetch a clean pricing table instead of scraping HTML. Skips saving when nothing
 has changed. Designed to run at the start of each extractor run.
+
+IMPORTANT — augment-only policy
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Models are NEVER removed from config_models_doubleword.py by this script.
+If a model disappears from the remote pricing page it is marked:
+    "potentially_deprecated": True,
+    "first_noticed_missing": "YYYY-MM-DD",
+and moved to the POTENTIALLY DEPRECATED MODELS section at the bottom of the
+file.  The flag is informational only — the model still runs normally.
+This preserves pricing/metadata for historical runs and makes the absence
+visible in every subsequent sync log as a prominent WARNING.
+A human must confirm and set "deprecated": True manually to actually retire it.
 """
 
 import os
 import re
+from datetime import date
 
 import httpx
 
@@ -148,39 +161,144 @@ def _parse_markdown_table(markdown):
     return models
 
 
+def _load_existing_models():
+    """Safely load the current DOUBLEWORD_MODELS dict from CONFIG_PATH.
+
+    Returns an empty dict if the file doesn't exist or can't be parsed.
+    """
+    if not os.path.exists(CONFIG_PATH):
+        return {}
+    try:
+        namespace = {}
+        with open(CONFIG_PATH, "r") as f:
+            exec(f.read(), namespace)  # noqa: S102
+        return namespace.get("DOUBLEWORD_MODELS", {})
+    except Exception as e:
+        log.warning("[Sync] Could not load existing config ({}), starting fresh", e)
+        return {}
+
+
+def _merge_with_existing(fetched_models, existing_models):
+    """Merge freshly-fetched models into the existing model dict.
+
+    Rules:
+    - New model in API response  → added (no flags set).
+    - Existing model in response → pricing/metadata updated;
+      potentially_deprecated flag cleared (model is back).
+    - Existing model NOT in resp → kept as-is; potentially_deprecated=True
+      and first_noticed_missing set only on the first occasion (so the
+      original observation date is preserved across subsequent runs).
+      The flag is informational — the model is NOT skipped.
+
+    Returns the merged list ordered:
+      active text → active VL → potentially-deprecated text → potentially-deprecated VL.
+    """
+    today = date.today().isoformat()
+    fetched_by_short = {m["short_name"]: m for m in fetched_models}
+
+    merged = {}  # short_name -> model dict
+
+    # Start from existing so manual hand-edits to notes/ctx are preserved.
+    # Inject "short_name" because the config stores it as the dict key, not
+    # as a field inside the value dict.
+    for short_name, cfg in existing_models.items():
+        entry = dict(cfg)
+        entry.setdefault("short_name", short_name)
+        merged[short_name] = entry
+
+    # Apply/add fetched models (update existing, add new).
+    # Clear the potentially_deprecated flag if the model is back on the page.
+    for short_name, m in fetched_by_short.items():
+        entry = dict(m)  # copy from fetched
+        entry.pop("potentially_deprecated", None)   # clear stale flag
+        entry.pop("first_noticed_missing", None)     # clear stale date
+        # Preserve manual overrides (e.g. extra_params) from the existing entry.
+        existing = merged.get(short_name, {})
+        if existing.get("extra_params"):
+            entry["extra_params"] = existing["extra_params"]
+        merged[short_name] = entry
+
+    # Flag anything in existing that's missing from the API response.
+    # Only set first_noticed_missing on the first occasion.
+    for short_name in list(merged.keys()):
+        if short_name not in fetched_by_short:
+            entry = merged[short_name]
+            if not entry.get("potentially_deprecated"):
+                entry["potentially_deprecated"] = True
+                entry["first_noticed_missing"] = today
+                log.warning(
+                    "[Sync] ⚠  Model '{}' is NO LONGER in the Doubleword pricing page — "
+                    "flagging as potentially_deprecated (first noticed: {}). "
+                    "It will NOT be removed and will still run normally.",
+                    short_name, today,
+                )
+
+    # ── Sort: active first (text then VL), potentially-deprecated last ─
+    def _sort_key(item):
+        _, m = item
+        pdep = 1 if m.get("potentially_deprecated") else 0
+        vl   = 1 if m.get("multimodal") else 0
+        return (pdep, vl)
+
+    return [m for _, m in sorted(merged.items(), key=_sort_key)]
+
+
 def _generate_config(models):
-    """Generate the Python config file content matching the existing format."""
-    text_models = [m for m in models if not m["multimodal"]]
-    vl_models = [m for m in models if m["multimodal"]]
+    """Generate the Python config file content matching the existing format.
 
-    def _fmt_entry(m):
-        mods = "[" + ", ".join(f'"{x}"' for x in m["modalities"]) + "]"
-        pin = f'{m["price_in"]:.2f}'
-        pout = f'{m["price_out"]:.2f}'
-        return (
-            f'    "{m["short_name"]}": {{\n'
-            f'        "model":      "{m["model"]}",\n'
-            f'        "multimodal": {m["multimodal"]},\n'
-            f'        "modalities": {mods},\n'
-            f'        "tier":       "{m["tier"]}",\n'
-            f'        "price_in":   {pin}, "price_out": {pout},\n'
-            f'        "ctx":        {m["ctx"]:_},\n'
-            f'        "notes":      "{m["notes"]}",\n'
-            f'    }},'
-        )
+    Active models (including potentially_deprecated ones) appear in the
+    TEXT-ONLY / VISION-LANGUAGE sections.
+    Models flagged potentially_deprecated=True are additionally grouped into
+    a POTENTIALLY DEPRECATED MODELS section at the bottom for visibility.
+    """
+    pdep    = [m for m in models if m.get("potentially_deprecated")]
+    active  = [m for m in models if not m.get("potentially_deprecated")]
 
-    lines = [
+    text_models = [m for m in active if not m.get("multimodal")]
+    vl_models   = [m for m in active if m.get("multimodal")]
+    pdep_text   = [m for m in pdep  if not m.get("multimodal")]
+    pdep_vl     = [m for m in pdep  if m.get("multimodal")]
+
+    def _fmt_entry(m, *, include_pdep=False):
+        # short_name is always present after _merge_with_existing injects it.
+        short_name = m["short_name"]
+        mods  = "[" + ", ".join(f'"{x}"' for x in m["modalities"]) + "]"
+        pin   = f'{m["price_in"]:.2f}'
+        pout  = f'{m["price_out"]:.2f}'
+        lines = [
+            f'    "{short_name}": {{',
+            f'        "model":      "{m["model"]}",',
+            f'        "multimodal": {m["multimodal"]},',
+            f'        "modalities": {mods},',
+            f'        "tier":       "{m["tier"]}",',
+            f'        "price_in":   {pin}, "price_out": {pout},',
+            f'        "ctx":        {m["ctx"]:_},',
+            f'        "notes":      "{m["notes"]}",',
+        ]
+        if m.get("extra_params"):
+            lines.append(f'        "extra_params": {m["extra_params"]!r},')
+        if include_pdep and m.get("potentially_deprecated"):
+            first_seen = m.get("first_noticed_missing", "unknown")
+            lines += [
+                f'        "potentially_deprecated":  True,',
+                f'        "first_noticed_missing":   "{first_seen}",',
+            ]
+        lines.append("    },")
+        return "\n".join(lines)
+
+    output_lines = [
         "# Doubleword Batch API models — model names use HuggingFace conventions",
         "# Verify model availability at https://app.doubleword.ai/ before running",
         "# Pricing from https://docs.doubleword.ai/batches/model-pricing",
         '# Prices shown are "High" (1h) batch tier — "Standard" (24h) is ~30-50% cheaper',
         "# AUTO-GENERATED by sync_doubleword_models.py — do not edit manually",
+        "# Models are NEVER removed — potentially_deprecated ones are flagged, not deleted.",
         "",
         "DOUBLEWORD_MODELS = {",
     ]
 
     if text_models:
-        lines += [
+        output_lines += [
             "",
             "    # ═══════════════════════════════════════════════════════════",
             "    #  TEXT-ONLY MODELS",
@@ -188,10 +306,10 @@ def _generate_config(models):
             "",
         ]
         for m in text_models:
-            lines.append(_fmt_entry(m))
+            output_lines.append(_fmt_entry(m))
 
     if vl_models:
-        lines += [
+        output_lines += [
             "",
             "    # ═══════════════════════════════════════════════════════════",
             "    #  VISION-LANGUAGE MODELS",
@@ -199,18 +317,36 @@ def _generate_config(models):
             "",
         ]
         for m in vl_models:
-            lines.append(_fmt_entry(m))
+            output_lines.append(_fmt_entry(m))
 
-    lines.append("}")
-    lines.append("")
-    return "\n".join(lines)
+    if pdep:
+        output_lines += [
+            "",
+            "    # ═══════════════════════════════════════════════════════════",
+            "    #  POTENTIALLY DEPRECATED MODELS",
+            "    #  Not seen on the Doubleword pricing page as of first_noticed_missing.",
+            "    #  These models still run normally — the flag is informational only.",
+            "    #  Confirm manually and set \"deprecated\": True to fully retire.",
+            "    # ═══════════════════════════════════════════════════════════",
+            "",
+        ]
+        for m in pdep_text + pdep_vl:
+            output_lines.append(_fmt_entry(m, include_pdep=True))
+
+    output_lines.append("}")
+    output_lines.append("")
+    return "\n".join(output_lines)
 
 
 def sync(write=True):
-    """Fetch pricing page, parse models, and optionally write config file.
+    """Fetch pricing page, merge with existing config, and optionally write.
 
-    Returns the parsed models list. Skips writing if the generated config
-    is identical to the existing file (no changes detected).
+    Augment-only: models absent from the remote pricing page are flagged
+    potentially_deprecated=True (with first_noticed_missing date) rather
+    than removed.  The flag is informational — flagged models still run.
+
+    Returns the full merged models list (confirmed active + potentially deprecated).
+    Skips writing if the generated config is identical to the existing file.
     """
     log.info("[Sync] Fetching Doubleword model pricing...")
     try:
@@ -222,32 +358,55 @@ def sync(write=True):
     log.info("[Sync] Fetched pricing data ({} bytes)", len(resp.text))
 
     log.info("[Sync] Parsing model pricing and details...")
-    models = _parse_markdown_table(resp.text)
-    if not models:
+    fetched = _parse_markdown_table(resp.text)
+    if not fetched:
         log.warning("[Sync] No models parsed from pricing page, keeping existing config")
         return None
 
-    log.info("[Sync] Collected {} models from Doubleword:", len(models))
-    for m in models:
+    log.info("[Sync] API returned {} model(s):", len(fetched))
+    for m in fetched:
         tag = "[VL]" if m["multimodal"] else "[text]"
-        log.info("  {} {:25s}  ${:.2f} in / ${:.2f} out  {}",
+        log.info("  {} {:28s}  ${:.2f} in / ${:.2f} out  {}",
                  tag, m["short_name"], m["price_in"], m["price_out"], m["model"])
+
+    # ── Merge with existing config (augment-only) ─────────────────
+    existing_models = _load_existing_models()
+    models = _merge_with_existing(fetched, existing_models)
+
+    confirmed  = [m for m in models if not m.get("potentially_deprecated")]
+    pdep       = [m for m in models if m.get("potentially_deprecated")]
+
+    log.info("[Sync] Merged registry: {} confirmed active, {} potentially deprecated",
+             len(confirmed), len(pdep))
+
+    # ── Informational warnings for potentially-deprecated models ──
+    if pdep:
+        log.warning("[Sync] " + "═" * 55)
+        log.warning("[Sync] ⚠  {} POTENTIALLY DEPRECATED model(s) — not seen on pricing page:",
+                    len(pdep))
+        for m in pdep:
+            first_seen = m.get("first_noticed_missing", "unknown")
+            log.warning("[Sync]   • {} ({}) — first noticed missing: {}",
+                        m["short_name"], m["model"], first_seen)
+        log.warning("[Sync] These models still run normally (flag is informational).")
+        log.warning("[Sync] Confirm manually and set 'deprecated': True to fully retire.")
+        log.warning("[Sync] " + "═" * 55)
 
     if write:
         config_text = _generate_config(models)
 
-        # Check if anything actually changed
-        existing = ""
+        existing_text = ""
         if os.path.exists(CONFIG_PATH):
             with open(CONFIG_PATH, "r") as f:
-                existing = f.read()
+                existing_text = f.read()
 
-        if config_text == existing:
+        if config_text == existing_text:
             log.info("[Sync] No changes detected, skipping save")
         else:
             with open(CONFIG_PATH, "w") as f:
                 f.write(config_text)
-            log.info("[Sync] Saved {} models to {}", len(models), CONFIG_PATH)
+            log.info("[Sync] Saved {} confirmed + {} potentially-deprecated model(s) to {}",
+                     len(confirmed), len(pdep), CONFIG_PATH)
 
     return models
 
