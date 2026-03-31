@@ -212,6 +212,10 @@ def _merge_with_existing(fetched_models, existing_models):
         entry = dict(m)  # copy from fetched
         entry.pop("potentially_deprecated", None)   # clear stale flag
         entry.pop("first_noticed_missing", None)     # clear stale date
+        # Preserve manual overrides (e.g. extra_params) from the existing entry.
+        existing = merged.get(short_name, {})
+        if existing.get("extra_params"):
+            entry["extra_params"] = existing["extra_params"]
         merged[short_name] = entry
 
     # Flag anything in existing that's missing from the API response.
