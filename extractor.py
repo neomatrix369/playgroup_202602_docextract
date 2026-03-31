@@ -420,6 +420,7 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
         batch_id = await llm_doubleword.submit_batch(
             client, model_short_name, model_cfg["model"],
             PROMPT_TEMPLATE, rows, completion_window,
+            extra_params=model_cfg.get("extra_params"),
         )
         log.info("[Doubleword] Submitted {}: batch {}", model_short_name, batch_id)
         pending[model_short_name] = batch_id
@@ -455,6 +456,7 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
             batch_id = await llm_doubleword.submit_batch(
                 client, model_short_name, model_cfg["model"],
                 PROMPT_TEMPLATE, rows, completion_window,
+                extra_params=model_cfg.get("extra_params"),
             )
             log.info("[Doubleword] Submitted {}: batch {}", model_short_name, batch_id)
             pending[model_short_name] = batch_id
