@@ -55,7 +55,7 @@ DOUBLEWORD_MODELS = {
         "price_in":   0.08, "price_out": 0.08,
         "ctx":        262_000,
         "notes":      "1B",
-        "extra_params": {"top_k": 1},
+        "extra_params": {'top_k': 1},
     },
     "dw-qwen3.5-9b": {
         "model":      "Qwen/Qwen3.5-9B",
