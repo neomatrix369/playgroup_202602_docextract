@@ -436,8 +436,21 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
         try:
             status, _, counts = await llm_doubleword.poll_batch(client, batch_id)
         except Exception as e:
-            log.error("[Doubleword] Could not retrieve batch {} for {}: {}", batch_id, model_short_name, e)
+            log.warning("[Doubleword] Batch {} for {} not found ({}), resubmitting",
+                        batch_id, model_short_name, e)
             llm_doubleword.remove_checkpoint_entry(model_short_name)
+            model_cfg = DOUBLEWORD_MODELS[model_short_name]
+            multimodal = model_cfg["multimodal"]
+            log.info("[Doubleword] Submitting {} ({}) {}, {} rows, window={}",
+                     model_short_name, model_cfg['model'], _mod_tag(multimodal), len(rows), completion_window)
+            batch_id = await llm_doubleword.submit_batch(
+                client, model_short_name, model_cfg["model"],
+                PROMPT_TEMPLATE, rows, completion_window,
+                extra_params=model_cfg.get("extra_params"),
+            )
+            log.info("[Doubleword] Submitted {}: batch {}", model_short_name, batch_id)
+            pending[model_short_name] = batch_id
+            submitted_at[model_short_name] = time.time()
             continue
 
         if status in ("completed", "in_progress", "validating", "finalizing"):

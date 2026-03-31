@@ -271,6 +271,8 @@ def _generate_config(models):
             f'        "ctx":        {m["ctx"]:_},',
             f'        "notes":      "{m["notes"]}",',
         ]
+        if m.get("extra_params"):
+            lines.append(f'        "extra_params": {m["extra_params"]!r},')
         if include_pdep and m.get("potentially_deprecated"):
             first_seen = m.get("first_noticed_missing", "unknown")
             lines += [
