@@ -291,6 +291,33 @@ def _run_openrouter(model_short_name):
 DOUBLEWORD_POLL_INTERVAL = 10  # seconds between poll cycles
 
 
+_PROMPT_OVERHEAD_TOKENS = 500   # system + user prompt template + JSON response budget
+_CHARS_PER_TOKEN = 3            # conservative for whitespace-heavy OCR text
+
+
+def _truncate_rows_to_ctx(rows, model_cfg) -> list:
+    """Return rows with text_combined truncated to fit within the model's context window.
+
+    Uses a conservative 3 chars/token estimate (OCR text has lots of whitespace).
+    Logs a warning for each row that gets truncated.
+    """
+    ctx = model_cfg.get("ctx", 262_000)
+    max_chars = (ctx - _PROMPT_OVERHEAD_TOKENS) * _CHARS_PER_TOKEN
+    model_name = model_cfg.get("model", "?")
+    truncated = []
+    for row_num, pdf_filename, text_combined in rows:
+        if len(text_combined) > max_chars:
+            log.warning(
+                "[Ctx] Truncating row {} ({}) for {}: {} chars → {} (ctx={:,})",
+                row_num, pdf_filename, model_name,
+                len(text_combined), max_chars, ctx,
+            )
+            truncated.append((row_num, pdf_filename, text_combined[:max_chars]))
+        else:
+            truncated.append((row_num, pdf_filename, text_combined))
+    return truncated
+
+
 def _load_input_rows():
     """Load all input rows from the TSV. Returns list of (row_num, pdf_filename, text_combined)."""
     csv.field_size_limit(10 * 1024 * 1024)
@@ -542,7 +569,7 @@ async def _retry_failed_rows_doubleword(models_to_retry, completion_window="1h")
 
         batch_id = await llm_doubleword.submit_batch(
             client, model_short_name, model_cfg["model"],
-            PROMPT_TEMPLATE, subset, completion_window,
+            PROMPT_TEMPLATE, _truncate_rows_to_ctx(subset, model_cfg), completion_window,
             extra_params=model_cfg.get("extra_params"),
         )
         log.info("[Retry] Submitted {}: batch {}", model_short_name, batch_id)
@@ -585,6 +612,17 @@ async def _retry_failed_rows_doubleword(models_to_retry, completion_window="1h")
                             for rn, emsg in pre_errors.items():
                                 if rn not in new_results:
                                     new_results[rn] = {"error": emsg}
+                            import sync_doubleword_models as _sync
+                            for emsg in pre_errors.values():
+                                detected_ctx = _sync.extract_ctx_from_error(emsg)
+                                if detected_ctx:
+                                    cfg_ctx = DOUBLEWORD_MODELS[model_short_name].get("ctx", 0)
+                                    if detected_ctx != cfg_ctx:
+                                        log.warning("[Retry][{}] DW reports actual ctx: {:,} "
+                                                    "(config has {:,}) — auto-correcting",
+                                                    model_short_name, detected_ctx, cfg_ctx)
+                                        _sync.update_model_ctx(model_short_name, detected_ctx)
+                                    break
                     rows_fixed, still_failed = _merge_doubleword_results(
                         model_short_name, new_results, row_subsets[model_short_name]
                     )
@@ -670,7 +708,7 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
                  model_short_name, model_cfg['model'], _mod_tag(multimodal), len(rows), completion_window)
         batch_id = await llm_doubleword.submit_batch(
             client, model_short_name, model_cfg["model"],
-            PROMPT_TEMPLATE, rows, completion_window,
+            PROMPT_TEMPLATE, _truncate_rows_to_ctx(rows, model_cfg), completion_window,
             extra_params=model_cfg.get("extra_params"),
         )
         log.info("[Doubleword] Submitted {}: batch {}", model_short_name, batch_id)
@@ -696,7 +734,7 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
                      model_short_name, model_cfg['model'], _mod_tag(multimodal), len(rows), completion_window)
             batch_id = await llm_doubleword.submit_batch(
                 client, model_short_name, model_cfg["model"],
-                PROMPT_TEMPLATE, rows, completion_window,
+                PROMPT_TEMPLATE, _truncate_rows_to_ctx(rows, model_cfg), completion_window,
                 extra_params=model_cfg.get("extra_params"),
             )
             log.info("[Doubleword] Submitted {}: batch {}", model_short_name, batch_id)
@@ -719,7 +757,7 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
                      model_short_name, model_cfg['model'], _mod_tag(multimodal), len(rows), completion_window)
             batch_id = await llm_doubleword.submit_batch(
                 client, model_short_name, model_cfg["model"],
-                PROMPT_TEMPLATE, rows, completion_window,
+                PROMPT_TEMPLATE, _truncate_rows_to_ctx(rows, model_cfg), completion_window,
                 extra_params=model_cfg.get("extra_params"),
             )
             log.info("[Doubleword] Submitted {}: batch {}", model_short_name, batch_id)
@@ -780,6 +818,18 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
                             for rn, emsg in pre_errors.items():
                                 if rn not in results:
                                     results[rn] = {"error": emsg}
+                            # Parse ctx limit from error messages and auto-correct config
+                            import sync_doubleword_models as _sync
+                            for emsg in pre_errors.values():
+                                detected_ctx = _sync.extract_ctx_from_error(emsg)
+                                if detected_ctx:
+                                    cfg_ctx = DOUBLEWORD_MODELS[model_short_name].get("ctx", 0)
+                                    if detected_ctx != cfg_ctx:
+                                        log.warning("[{}] DW reports actual ctx limit: {:,} tokens "
+                                                    "(config has {:,}) — auto-correcting",
+                                                    model_short_name, detected_ctx, cfg_ctx)
+                                        _sync.update_model_ctx(model_short_name, detected_ctx)
+                                    break  # one correction per model per batch
                     _write_doubleword_results(model_short_name, results, rows, elapsed, batch_id=batch_id)
                     llm_doubleword.remove_checkpoint_entry(model_short_name)
                     done.append(model_short_name)
