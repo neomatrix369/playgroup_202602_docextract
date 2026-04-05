@@ -658,6 +658,13 @@ async def _retry_failed_rows_doubleword(models_to_retry, completion_window="1h")
                                   model_short_name)
                     else:
                         log.error("[Retry][{}] Batch cancelled", model_short_name)
+                    if error_file_id:
+                        pre_errors = await llm_doubleword.download_error_file(client, error_file_id)
+                        if pre_errors:
+                            log.error("[Retry][{}] {} row(s) in DW error file:",
+                                      model_short_name, len(pre_errors))
+                            for rn, emsg in sorted(pre_errors.items()):
+                                log.error("  row {}: {}", rn, str(emsg)[:200])
                     llm_doubleword.remove_checkpoint_entry(model_short_name)
                     done.append(model_short_name)
                     statuses[model_short_name] = status
@@ -886,6 +893,12 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
                                   "next run will resubmit automatically", model_short_name)
                     else:
                         log.error("[{}] Batch was cancelled — resubmit manually or re-run", model_short_name)
+                    if error_file_id:
+                        pre_errors = await llm_doubleword.download_error_file(client, error_file_id)
+                        if pre_errors:
+                            log.error("[{}] {} row(s) in DW error file:", model_short_name, len(pre_errors))
+                            for rn, emsg in sorted(pre_errors.items()):
+                                log.error("  row {}: {}", rn, str(emsg)[:200])
                     llm_doubleword.remove_checkpoint_entry(model_short_name)
                     done.append(model_short_name)
                     failed_models += 1
