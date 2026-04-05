@@ -145,9 +145,15 @@ python extractor.py gemini-2.0-flash dw-qwen3-14b
 
 # All Doubleword models with 24h window (cheapest)
 python extractor.py --all-doubleword --completion-window 24h
+
+# Re-submit only rows that failed in the previous run (merges back into existing output files)
+python extractor.py --retry-failed
+
+# Retry failed rows for specific Doubleword models only
+python extractor.py dw-olmocr-2-7b-1025-fp8 dw-lightonocr-2-1b-bbox-soup --retry-failed
 ```
 
-Each run auto-syncs Doubleword model pricing first, then prints a per-provider plan (which models will run, skip, or resume) and executes extraction. Ctrl-C during Doubleword polling triggers a graceful shutdown — checkpoints are preserved and batches resume on next run. On completion it prints a combined summary with completed/skipped/interrupted/failed counts. Output files: `data/playgroup_dev_extracted__<provider>__<model-name>.tsv`, `data/extraction_stats.csv` (provider, row counts, per-field hit rates, time and cost), and `data/extraction_call_log.csv` (per-row details).
+Each run auto-syncs Doubleword model pricing first, then prints a per-provider plan (which models will run, skip, or resume) and executes extraction. Ctrl-C during Doubleword polling triggers a graceful shutdown — checkpoints are preserved and batches resume on next run. On completion it prints a combined summary with completed/skipped/interrupted/failed counts. When a Doubleword batch completes with partial failures, the DW error file is automatically downloaded and the per-row rejection reasons (e.g. `context_length_exceeded`) are logged and recorded. Use `--retry-failed` on a subsequent run to re-submit only those rows and merge the results back into the existing output file. Output files: `data/playgroup_dev_extracted__<provider>__<model-name>.tsv`, `data/extraction_stats.csv` (provider, row counts, per-field hit rates, time and cost), `data/extraction_call_log.csv` (per-row details), and `data/.doubleword_failed_rows.json` (failed row index per model, consumed by `--retry-failed`).
 
 ### 4. Score and rank all models
 
@@ -170,7 +176,7 @@ python score.py data/playgroup_dev_extracted__openrouter__gemini-2.0-flash.tsv
 | `llm_openrouter.py` | LLM client for OpenRouter (synchronous). Run directly for a smoke test. |
 | `llm_doubleword.py` | LLM client for Doubleword Batch API (async, direct batch management with checkpoint/resume). |
 | `extraction_and_prompt_example.py` | Simple single-model extraction loop, good for prompt experiments. |
-| `extractor.py` | Unified extraction runner. Auto-detects backend from model prefix (`dw-*` → Doubleword batch, others → OpenRouter). Auto-syncs Doubleword pricing at startup. Doubleword models are submitted in parallel and polled with checkpoint/resume. Graceful Ctrl-C preserves checkpoints. Supports `--completion-window`, `--all-doubleword`, and `--all-openrouter` flags. |
+| `extractor.py` | Unified extraction runner. Auto-detects backend from model prefix (`dw-*` → Doubleword batch, others → OpenRouter). Auto-syncs Doubleword pricing at startup. Doubleword models are submitted in parallel and polled with checkpoint/resume. Graceful Ctrl-C preserves checkpoints. Downloads DW error files for pre-processing rejections (e.g. context overflow). Supports `--completion-window`, `--all-doubleword`, `--all-openrouter`, and `--retry-failed` flags. |
 | `sync_doubleword_models.py` | Auto-syncs Doubleword model pricing from their [docs markdown endpoint](https://docs.doubleword.ai/inference-api/model-pricing.md). Regenerates `config_models_doubleword.py`. Skips save when nothing changed. Called by `extractor.py` at startup; can also run standalone. |
 | `score.py` | Scorer with F1/Precision/Recall. No args → ranked leaderboard; pass a filename → verbose field-by-field diff. |
 | `utils.py` | Shared helpers (`extract_from_triple_backticks`, `sanitize_error_message`). |
@@ -213,6 +219,7 @@ Each model entry includes: model ID, `multimodal` flag, supported modalities, co
 | `extraction_stats.csv` | Cumulative run stats: provider, model, row counts, per-field hit rates, time, cost, batch_id (Doubleword) |
 | `extraction_call_log.csv` | Per-row call log: provider, model, row, status, elapsed time, tokens, cost |
 | `.doubleword_checkpoints.json` | Doubleword batch checkpoint: maps model → batch_id for resume on cancel/re-run |
+| `.doubleword_failed_rows.json` | Failed-row index: maps model → list of row indices that errored in last completed batch; consumed by `--retry-failed` |
 | `*.pdf` | 11 UK charity financial PDFs (≤ 200 pages each) |
 
 ### Visualisations

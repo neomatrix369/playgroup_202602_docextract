@@ -166,11 +166,17 @@ def _append_stats(provider, model_short_name, model_cfg, total, rows_with_values
 
 
 def _print_summary(provider, model_short_name, multimodal, rows_with_values, rows_empty, field_counts,
-                    total_elapsed_secs=None, total_prompt_tokens=None, total_completion_tokens=None, total_cost_usd=None):
+                    total_elapsed_secs=None, total_prompt_tokens=None, total_completion_tokens=None,
+                    total_cost_usd=None, rows_error=0):
     total = rows_with_values + rows_empty
     log.info("[{}] {} {} summary", provider, model_short_name, _mod_tag(multimodal))
     log.info("  Rows with values : {}/{}", rows_with_values, total)
-    log.info("  Rows empty       : {}/{}", rows_empty, total)
+    rows_no_values = rows_empty - rows_error
+    if rows_error:
+        log.error("  Rows errored     : {}/{}", rows_error, total)
+        log.info("  Rows empty       : {}/{}", rows_no_values, total)
+    else:
+        log.info("  Rows empty       : {}/{}", rows_empty, total)
     if total_elapsed_secs is not None:
         log.info("  Total time       : {:.1f}s", total_elapsed_secs)
     if total_prompt_tokens is not None:
@@ -301,6 +307,7 @@ def _write_doubleword_results(model_short_name, results, rows, elapsed_secs, bat
     """Write batch results to TSV, per-row call logs, and model stats.
 
     Uses atomic write (temp file + rename) so a partial file is never left behind on cancel.
+    Also saves a failed-rows manifest so --retry-failed can re-submit only the failed row indices.
     """
     model_cfg = DOUBLEWORD_MODELS[model_short_name]
     model = model_cfg["model"]
@@ -312,6 +319,7 @@ def _write_doubleword_results(model_short_name, results, rows, elapsed_secs, bat
 
     rows_with_values = 0
     rows_empty = 0
+    rows_error = 0
     field_counts = {}
     total_prompt_tokens = 0
     total_completion_tokens = 0
@@ -335,6 +343,8 @@ def _write_doubleword_results(model_short_name, results, rows, elapsed_secs, bat
                 error_msg = result["error"][:500] if result else "No result returned"
                 outfile.write(f"error={error_msg}\n")
                 rows_empty += 1
+                rows_error += 1
+                log.error("  [Doubleword] {} row {} -> ERROR: {}", model_short_name, row_num, error_msg[:200])
                 _append_call_log({**call_log_base, "status": "error", "elapsed_secs": 0,
                                   "prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0,
                                   "fields_extracted": 0, "error": error_msg[:500]})
@@ -369,11 +379,252 @@ def _write_doubleword_results(model_short_name, results, rows, elapsed_secs, bat
     os.replace(tmp_filename, out_filename)
 
     _print_summary("Doubleword", model_short_name, multimodal, rows_with_values, rows_empty, field_counts,
-                   elapsed_secs, total_prompt_tokens, total_completion_tokens, total_cost_usd)
+                   elapsed_secs, total_prompt_tokens, total_completion_tokens, total_cost_usd,
+                   rows_error=rows_error)
     _append_stats("Doubleword", model_short_name, model_cfg,
                   rows_with_values + rows_empty, rows_with_values, rows_empty, field_counts,
                   elapsed_secs, total_prompt_tokens, total_completion_tokens, total_cost_usd,
                   batch_id=batch_id)
+
+    # ── Failed rows manifest ────────────────────────────────────────
+    import llm_doubleword
+    failed_row_nums = [
+        row_num for row_num, _pdf, _text in rows
+        if results.get(row_num) is None or "error" in results.get(row_num, {})
+    ]
+    if failed_row_nums:
+        llm_doubleword.update_failed_rows_entry(model_short_name, failed_row_nums)
+        # Cat A detection: ALL rows failed — likely model not available to this account
+        if len(failed_row_nums) == len(rows):
+            sample_error = (results.get(rows[0][0]) or {}).get("error", "")
+            if any(kw in sample_error.lower() for kw in ("not configured", "not available")):
+                log.warning("=" * 60)
+                log.warning("[Doubleword] !! ALL {} rows for '{}' failed with: {}",
+                            len(rows), model_short_name, sample_error[:200])
+                log.warning("[Doubleword] !! This model may not be available on your account.")
+                log.warning("[Doubleword] !! Consider setting 'deprecated': True for '{}' in config.",
+                            model_short_name)
+                log.warning("=" * 60)
+            else:
+                log.warning("[Doubleword] All {} rows failed for '{}' — check errors above.",
+                            len(rows), model_short_name)
+    else:
+        llm_doubleword.remove_failed_rows_entry(model_short_name)
+
+
+def _merge_doubleword_results(model_short_name, new_results, rows):
+    """Merge retry results into an existing output TSV for a Doubleword model.
+
+    Reads the existing file (one line per row, positional), replaces lines for
+    the retried row_nums with recomputed values, then writes back atomically.
+    Updates the failed-rows manifest: removes rows that now succeed, keeps still-failing ones.
+
+    Returns (rows_fixed, still_failed) counts.
+    """
+    import llm_doubleword
+
+    model_cfg = DOUBLEWORD_MODELS[model_short_name]
+    model = model_cfg["model"]
+    multimodal = model_cfg["multimodal"]
+    price_in = model_cfg.get("price_in", 0)
+    price_out = model_cfg.get("price_out", 0)
+    out_filename = f"data/playgroup_dev_extracted__doubleword__{model_short_name}.tsv"
+    tmp_filename = out_filename + ".tmp"
+
+    with open(out_filename) as f:
+        lines = f.read().splitlines()
+
+    rows_fixed = 0
+    still_failed = []
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    for row_num, pdf_filename, _text in rows:
+        if row_num not in new_results:
+            continue
+        result = new_results[row_num]
+        call_log_base = {
+            "datetime": now,
+            "provider": "Doubleword",
+            "model_short_name": model_short_name,
+            "model_full_name": model,
+            "tier": model_cfg.get("tier", ""),
+            "multimodal": multimodal,
+            "row_num": row_num,
+            "pdf_filename": pdf_filename,
+        }
+        if "error" in result:
+            error_msg = result["error"][:500]
+            lines[row_num] = f"error={error_msg}"
+            still_failed.append(row_num)
+            _append_call_log({**call_log_base, "status": "error", "elapsed_secs": 0,
+                              "prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0,
+                              "fields_extracted": 0, "error": error_msg})
+        else:
+            fields = _parse_llm_response(result["text"])
+            line = _row_to_tsv_line(fields)
+            lines[row_num] = line
+            prompt_tokens = result.get("prompt_tokens", 0)
+            completion_tokens = result.get("completion_tokens", 0)
+            row_cost = (prompt_tokens * price_in + completion_tokens * price_out) / 1_000_000
+            status = "ok" if fields else "empty"
+            if fields:
+                rows_fixed += 1
+                log.info("  [Doubleword] {} row {} FIXED -> {}  [${:.6f}]",
+                         model_short_name, row_num, line[:100], row_cost)
+            else:
+                still_failed.append(row_num)
+                log.warning("  [Doubleword] {} row {} retry: still no values extracted", model_short_name, row_num)
+            _append_call_log({**call_log_base, "status": status, "elapsed_secs": 0,
+                              "prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens,
+                              "cost_usd": round(row_cost, 6), "fields_extracted": len(fields), "error": ""})
+
+    with open(tmp_filename, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    os.replace(tmp_filename, out_filename)
+
+    # Update manifest
+    if still_failed:
+        llm_doubleword.update_failed_rows_entry(model_short_name, still_failed)
+    else:
+        llm_doubleword.remove_failed_rows_entry(model_short_name)
+
+    log.info("[Doubleword] {} retry: {} row(s) fixed, {} still failing",
+             model_short_name, rows_fixed, len(still_failed))
+    return rows_fixed, len(still_failed)
+
+
+async def _retry_failed_rows_doubleword(models_to_retry, completion_window="1h"):
+    """Re-submit only the failed rows from previous DW batch runs, then merge into existing TSVs.
+
+    Reads the failed-rows manifest to determine which row indices to re-submit for each model.
+    Polls the new mini-batches, then merges results back into the existing output TSV positionally.
+
+    Returns dict of {model_short_name: status} where status is 'fixed', 'partial', 'still_failed', or 'skipped'.
+    """
+    import time
+    import llm_doubleword
+
+    all_rows = _load_input_rows()
+    failed_manifest = llm_doubleword.load_failed_rows()
+    client = llm_doubleword.create_client()
+    statuses = {}
+
+    # Filter to models that actually have failed rows recorded
+    pending = {}       # model_short_name -> batch_id
+    submitted_at = {}
+    row_subsets = {}   # model_short_name -> list of (row_num, pdf, text) for failed rows only
+
+    for model_short_name in models_to_retry:
+        if model_short_name not in DOUBLEWORD_MODELS:
+            log.warning("[Retry] '{}' not in Doubleword models, skipping", model_short_name)
+            statuses[model_short_name] = "skipped"
+            continue
+
+        failed_row_nums = failed_manifest.get(model_short_name)
+        if not failed_row_nums:
+            log.info("[Retry] No failed rows recorded for '{}', skipping", model_short_name)
+            statuses[model_short_name] = "skipped"
+            continue
+
+        out_filename = f"data/playgroup_dev_extracted__doubleword__{model_short_name}.tsv"
+        if not os.path.exists(out_filename):
+            log.warning("[Retry] No existing output for '{}' — run normally first", model_short_name)
+            statuses[model_short_name] = "skipped"
+            continue
+
+        failed_set = set(failed_row_nums)
+        subset = [(rn, pdf, text) for rn, pdf, text in all_rows if rn in failed_set]
+        row_subsets[model_short_name] = subset
+
+        model_cfg = DOUBLEWORD_MODELS[model_short_name]
+        log.info("[Retry] Submitting {} failed row(s) for '{}' ({}) window={}",
+                 len(subset), model_short_name, model_cfg["model"], completion_window)
+
+        batch_id = await llm_doubleword.submit_batch(
+            client, model_short_name, model_cfg["model"],
+            PROMPT_TEMPLATE, subset, completion_window,
+            extra_params=model_cfg.get("extra_params"),
+        )
+        log.info("[Retry] Submitted {}: batch {}", model_short_name, batch_id)
+        pending[model_short_name] = batch_id
+        submitted_at[model_short_name] = time.time()
+
+    if not pending:
+        log.info("[Retry] Nothing to retry")
+        await client.close()
+        return statuses
+
+    # Poll loop — same pattern as _run_all_doubleword
+    log.info("[Retry] Polling {} batch(es)... (Ctrl-C to stop gracefully)", len(pending))
+    interrupted = False
+    try:
+        while pending:
+            await asyncio.sleep(DOUBLEWORD_POLL_INTERVAL)
+            done = []
+            poll_summary = []
+
+            for model_short_name, batch_id in pending.items():
+                try:
+                    status, output_file_id, error_file_id, counts = await llm_doubleword.poll_batch(client, batch_id)
+                except Exception as e:
+                    log.error("[Retry][{}] Poll error: {}", model_short_name, e)
+                    poll_summary.append(f"{model_short_name}:error")
+                    continue
+
+                poll_summary.append(f"{model_short_name}:{counts['completed']}/{counts['total']}")
+
+                if status == "completed":
+                    new_results = await llm_doubleword.download_results(client, output_file_id)
+                    if error_file_id:
+                        pre_errors = await llm_doubleword.download_error_file(client, error_file_id)
+                        if pre_errors:
+                            log.warning("[Retry][{}] {} row(s) still rejected before processing:",
+                                        model_short_name, len(pre_errors))
+                            for rn, emsg in sorted(pre_errors.items()):
+                                log.warning("  row {}: {}", rn, emsg[:200])
+                            for rn, emsg in pre_errors.items():
+                                if rn not in new_results:
+                                    new_results[rn] = {"error": emsg}
+                    rows_fixed, still_failed = _merge_doubleword_results(
+                        model_short_name, new_results, row_subsets[model_short_name]
+                    )
+                    llm_doubleword.remove_checkpoint_entry(model_short_name)
+                    done.append(model_short_name)
+                    if still_failed == 0:
+                        statuses[model_short_name] = "fixed"
+                    elif rows_fixed > 0:
+                        statuses[model_short_name] = "partial"
+                    else:
+                        statuses[model_short_name] = "still_failed"
+                elif status in ("failed", "expired", "cancelled"):
+                    if status == "expired":
+                        log.error("[Retry][{}] Batch expired — consider --completion-window 24h",
+                                  model_short_name)
+                    elif status == "failed":
+                        log.error("[Retry][{}] Batch failed (DW server-side) — try again",
+                                  model_short_name)
+                    else:
+                        log.error("[Retry][{}] Batch cancelled", model_short_name)
+                    llm_doubleword.remove_checkpoint_entry(model_short_name)
+                    done.append(model_short_name)
+                    statuses[model_short_name] = status
+
+            for m in done:
+                del pending[m]
+
+            remaining = len(pending)
+            log.debug("[Retry] {} pending  |  {}", remaining, "  ".join(poll_summary))
+
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        interrupted = True
+        log.warning("Interrupted — checkpoints saved, pending retries can resume next run")
+        for model_short_name in pending:
+            statuses[model_short_name] = "interrupted"
+
+    await client.close()
+    if not interrupted:
+        log.info("[Retry] Done: {}", {m: s for m, s in statuses.items() if s != "skipped"})
+    return statuses
 
 
 async def _run_all_doubleword(models_to_run, completion_window="1h"):
@@ -434,7 +685,7 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
         cp_entry = checkpoint[model_short_name]
         batch_id = cp_entry["batch_id"]
         try:
-            status, _, counts = await llm_doubleword.poll_batch(client, batch_id)
+            status, _, _err_fid, counts = await llm_doubleword.poll_batch(client, batch_id)
         except Exception as e:
             log.warning("[Doubleword] Batch {} for {} not found ({}), resubmitting",
                         batch_id, model_short_name, e)
@@ -501,7 +752,7 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
 
             for model_short_name, batch_id in pending.items():
                 try:
-                    status, output_file_id, counts = await llm_doubleword.poll_batch(client, batch_id)
+                    status, output_file_id, error_file_id, counts = await llm_doubleword.poll_batch(client, batch_id)
                 except Exception as e:
                     log.error("[{}] Poll error: {}", model_short_name, e)
                     poll_summary.append(f"{model_short_name}:error")
@@ -517,13 +768,32 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
                     else:
                         elapsed = time.time() - submitted_at[model_short_name]
                     results = await llm_doubleword.download_results(client, output_file_id)
+                    # Download error file for rows rejected before processing (e.g. context_length_exceeded)
+                    if error_file_id:
+                        pre_errors = await llm_doubleword.download_error_file(client, error_file_id)
+                        if pre_errors:
+                            log.warning("[{}] {} row(s) failed before processing (DW error file):",
+                                        model_short_name, len(pre_errors))
+                            for rn, emsg in sorted(pre_errors.items()):
+                                log.warning("  row {}: {}", rn, emsg[:200])
+                            # Inject into results so they appear as errors in call log
+                            for rn, emsg in pre_errors.items():
+                                if rn not in results:
+                                    results[rn] = {"error": emsg}
                     _write_doubleword_results(model_short_name, results, rows, elapsed, batch_id=batch_id)
                     llm_doubleword.remove_checkpoint_entry(model_short_name)
                     done.append(model_short_name)
                     completed_models += 1
                     statuses[model_short_name] = "completed"
                 elif status in ("failed", "expired", "cancelled"):
-                    log.error("[{}] Batch {} — will need manual resubmission", model_short_name, status)
+                    if status == "expired":
+                        log.error("[{}] Batch expired — next run will resubmit; "
+                                  "consider --completion-window 24h if this recurs", model_short_name)
+                    elif status == "failed":
+                        log.error("[{}] Batch failed (DW server-side error) — "
+                                  "next run will resubmit automatically", model_short_name)
+                    else:
+                        log.error("[{}] Batch was cancelled — resubmit manually or re-run", model_short_name)
                     llm_doubleword.remove_checkpoint_entry(model_short_name)
                     done.append(model_short_name)
                     failed_models += 1
@@ -665,6 +935,8 @@ async def main():
                         help="Model short names to run (default: all models from both providers)")
     parser.add_argument("--completion-window", default="1h", choices=["1h", "24h"],
                         help="Doubleword batch completion window (default: 1h)")
+    parser.add_argument("--retry-failed", action="store_true",
+                        help="Re-submit only failed rows from previous DW batch runs and merge results")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--all-doubleword", action="store_true",
                        help="Run only Doubleword models")
@@ -727,12 +999,17 @@ async def main():
             status = _run_openrouter(model_short_name)
             all_statuses[("openrouter", model_short_name)] = status or "failed"
 
-    # Run all Doubleword models as one batch: submit all, then poll all
+    # Run Doubleword models — either full run or retry-failed-rows only
     if dw_models:
         log.info("-" * 60)
-        log.info("Starting Doubleword ({} models)", len(dw_models))
-        log.info("-" * 60)
-        dw_statuses = await _run_all_doubleword(dw_models, args.completion_window) or {}
+        if args.retry_failed:
+            log.info("Doubleword retry-failed ({} model(s) to check)", len(dw_models))
+            log.info("-" * 60)
+            dw_statuses = await _retry_failed_rows_doubleword(dw_models, args.completion_window) or {}
+        else:
+            log.info("Starting Doubleword ({} models)", len(dw_models))
+            log.info("-" * 60)
+            dw_statuses = await _run_all_doubleword(dw_models, args.completion_window) or {}
         for model_short_name in dw_models:
             all_statuses[("doubleword", model_short_name)] = dw_statuses.get(model_short_name, "unknown")
 

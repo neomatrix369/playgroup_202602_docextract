@@ -57,6 +57,10 @@ Doubleword is an LLM inference platform offering three distinct products:
 
 **Status values:** `validating` → `in_progress` → `completed` | `failed` | `expired`
 
+**Batch result files:**
+- `output_file_id` — JSONL of all processed requests (including per-request `error` fields for requests the model rejected)
+- `error_file_id` — JSONL of requests that were **rejected before processing** (e.g. `context_length_exceeded`). Only present when at least one request failed at this level. Download via `GET /files/{id}/content`. Row-level errors here are distinct from per-response errors in the output file.
+
 **Analytics endpoints (undocumented, Doubleword-specific):**
 - `GET /batches?include=analytics` — list all batches with cost/token data
 - `GET /batches/{id}/analytics` — per-batch analytics
@@ -276,6 +280,7 @@ These are confirmed gaps as of the last audit. Useful context when helping users
 | 1 | No code on intro/overview page | docs.doubleword.ai intro | High — developers expect runnable hello-world immediately |
 | 2 | Nemotron overnight pricing discrepancy | docs ($0.00/$0.00) vs marketing ($0.15/$0.38) | Medium — misleading cost estimates |
 | 3 | OCR models absent from docs pricing page | docs.doubleword.ai/batches/model-pricing | Medium — OCR models only visible on marketing site |
+| 3a | No context window info for OCR models (or most models) | docs.doubleword.ai/inference-api/model-pricing.md | High — only 2 of 10 models expose `Max Total Tokens`; OCR models give no context limit at all. Real limits (olmOCR-2-7B ≈128K, LightOnOCR-2-1B ≈32K) must be inferred from upstream model cards. Oversized requests are silently dropped to the `error_file_id` with no in-output error message. |
 | 4 | Analytics endpoints undocumented | No public docs page | High — no way to programmatically retrieve cost/token data without reverse-engineering |
 | 5 | Skills fragmentation, no cross-referencing | Docs only list official skill | Medium — users unaware of community alternatives |
 | 6 | Two separate blog locations | docs.doubleword.ai/blog AND blog.doubleword.ai | Low — confusing, content may diverge |
