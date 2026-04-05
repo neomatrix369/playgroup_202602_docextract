@@ -483,6 +483,7 @@ def _merge_doubleword_results(model_short_name, new_results, rows):
             error_msg = result["error"][:500]
             lines[row_num] = f"error={error_msg}"
             still_failed.append(row_num)
+            log.error("  [Doubleword] {} row {} retry -> ERROR: {}", model_short_name, row_num, error_msg[:200])
             _append_call_log({**call_log_base, "status": "error", "elapsed_secs": 0,
                               "prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0,
                               "fields_extracted": 0, "error": error_msg})
@@ -541,9 +542,16 @@ async def _retry_failed_rows_doubleword(models_to_retry, completion_window="1h")
     submitted_at = {}
     row_subsets = {}   # model_short_name -> list of (row_num, pdf, text) for failed rows only
 
+    unavailable = llm_doubleword.load_unavailable_models()
+
     for model_short_name in models_to_retry:
         if model_short_name not in DOUBLEWORD_MODELS:
             log.warning("[Retry] '{}' not in Doubleword models, skipping", model_short_name)
+            statuses[model_short_name] = "skipped"
+            continue
+
+        if model_short_name in unavailable:
+            log.warning("[Retry] Skipping '{}' — marked unavailable: {}", model_short_name, unavailable[model_short_name])
             statuses[model_short_name] = "skipped"
             continue
 
@@ -567,11 +575,18 @@ async def _retry_failed_rows_doubleword(models_to_retry, completion_window="1h")
         log.info("[Retry] Submitting {} failed row(s) for '{}' ({}) window={}",
                  len(subset), model_short_name, model_cfg["model"], completion_window)
 
-        batch_id = await llm_doubleword.submit_batch(
-            client, model_short_name, model_cfg["model"],
-            PROMPT_TEMPLATE, _truncate_rows_to_ctx(subset, model_cfg), completion_window,
-            extra_params=model_cfg.get("extra_params"),
-        )
+        try:
+            batch_id = await llm_doubleword.submit_batch(
+                client, model_short_name, model_cfg["model"],
+                PROMPT_TEMPLATE, _truncate_rows_to_ctx(subset, model_cfg), completion_window,
+                extra_params=model_cfg.get("extra_params"),
+            )
+        except Exception as e:
+            reason = str(e)
+            log.error("[Retry] Failed to submit batch for '{}': {} — skipping", model_short_name, reason)
+            llm_doubleword.mark_model_unavailable(model_short_name, reason)
+            statuses[model_short_name] = "skipped"
+            continue
         log.info("[Retry] Submitted {}: batch {}", model_short_name, batch_id)
         pending[model_short_name] = batch_id
         submitted_at[model_short_name] = time.time()
@@ -598,7 +613,7 @@ async def _retry_failed_rows_doubleword(models_to_retry, completion_window="1h")
                     poll_summary.append(f"{model_short_name}:error")
                     continue
 
-                poll_summary.append(f"{model_short_name}:{counts['completed']}/{counts['total']}")
+                poll_summary.append(f"{model_short_name}: {counts['completed']}/{counts['total']}")
 
                 if status == "completed":
                     new_results = await llm_doubleword.download_results(client, output_file_id)
@@ -676,6 +691,7 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
 
     rows = _load_input_rows()
     checkpoint = llm_doubleword.load_checkpoint()
+    unavailable = llm_doubleword.load_unavailable_models()
     client = llm_doubleword.create_client()
     statuses = {}  # model_short_name -> status
 
@@ -689,6 +705,11 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
         model_cfg = DOUBLEWORD_MODELS[model_short_name]
         multimodal = model_cfg["multimodal"]
         out_filename = f"data/playgroup_dev_extracted__doubleword__{model_short_name}.tsv"
+
+        if model_short_name in unavailable:
+            log.warning("[Doubleword] Skipping {} — marked unavailable: {}", model_short_name, unavailable[model_short_name])
+            statuses[model_short_name] = "skipped"
+            continue
 
         if os.path.exists(out_filename):
             log.warning("[Doubleword] Skipping {} {}: {} already exists", model_short_name, _mod_tag(multimodal), out_filename)
@@ -706,11 +727,18 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
         multimodal = model_cfg["multimodal"]
         log.info("[Doubleword] Submitting {} ({}) {}, {} rows, window={}",
                  model_short_name, model_cfg['model'], _mod_tag(multimodal), len(rows), completion_window)
-        batch_id = await llm_doubleword.submit_batch(
-            client, model_short_name, model_cfg["model"],
-            PROMPT_TEMPLATE, _truncate_rows_to_ctx(rows, model_cfg), completion_window,
-            extra_params=model_cfg.get("extra_params"),
-        )
+        try:
+            batch_id = await llm_doubleword.submit_batch(
+                client, model_short_name, model_cfg["model"],
+                PROMPT_TEMPLATE, _truncate_rows_to_ctx(rows, model_cfg), completion_window,
+                extra_params=model_cfg.get("extra_params"),
+            )
+        except Exception as e:
+            reason = str(e)
+            log.error("[Doubleword] Failed to submit '{}': {} — skipping", model_short_name, reason)
+            llm_doubleword.mark_model_unavailable(model_short_name, reason)
+            statuses[model_short_name] = "skipped"
+            continue
         log.info("[Doubleword] Submitted {}: batch {}", model_short_name, batch_id)
         pending[model_short_name] = batch_id
         submitted_at[model_short_name] = time.time()
@@ -732,11 +760,18 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
             multimodal = model_cfg["multimodal"]
             log.info("[Doubleword] Submitting {} ({}) {}, {} rows, window={}",
                      model_short_name, model_cfg['model'], _mod_tag(multimodal), len(rows), completion_window)
-            batch_id = await llm_doubleword.submit_batch(
-                client, model_short_name, model_cfg["model"],
-                PROMPT_TEMPLATE, _truncate_rows_to_ctx(rows, model_cfg), completion_window,
-                extra_params=model_cfg.get("extra_params"),
-            )
+            try:
+                batch_id = await llm_doubleword.submit_batch(
+                    client, model_short_name, model_cfg["model"],
+                    PROMPT_TEMPLATE, _truncate_rows_to_ctx(rows, model_cfg), completion_window,
+                    extra_params=model_cfg.get("extra_params"),
+                )
+            except Exception as sub_e:
+                reason = str(sub_e)
+                log.error("[Doubleword] Failed to resubmit '{}': {} — skipping", model_short_name, reason)
+                llm_doubleword.mark_model_unavailable(model_short_name, reason)
+                statuses[model_short_name] = "skipped"
+                continue
             log.info("[Doubleword] Submitted {}: batch {}", model_short_name, batch_id)
             pending[model_short_name] = batch_id
             submitted_at[model_short_name] = time.time()
@@ -755,11 +790,18 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
             multimodal = model_cfg["multimodal"]
             log.info("[Doubleword] Submitting {} ({}) {}, {} rows, window={}",
                      model_short_name, model_cfg['model'], _mod_tag(multimodal), len(rows), completion_window)
-            batch_id = await llm_doubleword.submit_batch(
-                client, model_short_name, model_cfg["model"],
-                PROMPT_TEMPLATE, _truncate_rows_to_ctx(rows, model_cfg), completion_window,
-                extra_params=model_cfg.get("extra_params"),
-            )
+            try:
+                batch_id = await llm_doubleword.submit_batch(
+                    client, model_short_name, model_cfg["model"],
+                    PROMPT_TEMPLATE, _truncate_rows_to_ctx(rows, model_cfg), completion_window,
+                    extra_params=model_cfg.get("extra_params"),
+                )
+            except Exception as sub_e:
+                reason = str(sub_e)
+                log.error("[Doubleword] Failed to resubmit '{}': {} — skipping", model_short_name, reason)
+                llm_doubleword.mark_model_unavailable(model_short_name, reason)
+                statuses[model_short_name] = "skipped"
+                continue
             log.info("[Doubleword] Submitted {}: batch {}", model_short_name, batch_id)
             pending[model_short_name] = batch_id
             submitted_at[model_short_name] = time.time()

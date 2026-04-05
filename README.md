@@ -153,7 +153,7 @@ python extractor.py --retry-failed
 python extractor.py dw-olmocr-2-7b-1025-fp8 dw-lightonocr-2-1b-bbox-soup --retry-failed
 ```
 
-Each run auto-syncs Doubleword model pricing first, then prints a per-provider plan (which models will run, skip, or resume) and executes extraction. Ctrl-C during Doubleword polling triggers a graceful shutdown — checkpoints are preserved and batches resume on next run. On completion it prints a combined summary with completed/skipped/interrupted/failed counts. When a Doubleword batch completes with partial failures, the DW error file is automatically downloaded and the per-row rejection reasons (e.g. `context_length_exceeded`) are logged and recorded. Use `--retry-failed` on a subsequent run to re-submit only those rows and merge the results back into the existing output file. Output files: `data/playgroup_dev_extracted__<provider>__<model-name>.tsv`, `data/extraction_stats.csv` (provider, row counts, per-field hit rates, time and cost), `data/extraction_call_log.csv` (per-row details), and `data/.doubleword_failed_rows.json` (failed row index per model, consumed by `--retry-failed`).
+Each run auto-syncs Doubleword model pricing first, then prints a per-provider plan (which models will run, skip, or resume) and executes extraction. Ctrl-C during Doubleword polling triggers a graceful shutdown — checkpoints are preserved and batches resume on next run. On completion it prints a combined summary with completed/skipped/interrupted/failed counts. When a Doubleword batch completes with partial failures, the DW error file is automatically downloaded and the per-row rejection reasons (e.g. `context_length_exceeded`) are logged to the console and recorded. Use `--retry-failed` on a subsequent run to re-submit only those rows and merge the results back into the existing output file. If a model is unavailable (e.g. `PermissionDenied` on submit), it is automatically recorded in `.doubleword_unavailable_models.json` and skipped on all future runs — both normal and `--retry-failed`. Output files: `data/playgroup_dev_extracted__<provider>__<model-name>.tsv`, `data/extraction_stats.csv` (provider, row counts, per-field hit rates, time and cost), `data/extraction_call_log.csv` (per-row details), `data/.doubleword_failed_rows.json` (failed row index per model, consumed by `--retry-failed`), and `data/.doubleword_unavailable_models.json` (models that errored on submit, auto-skipped).
 
 ### 4. Score and rank all models
 
@@ -220,6 +220,7 @@ Each model entry includes: model ID, `multimodal` flag, supported modalities, co
 | `extraction_call_log.csv` | Per-row call log: provider, model, row, status, elapsed time, tokens, cost |
 | `.doubleword_checkpoints.json` | Doubleword batch checkpoint: maps model → batch_id for resume on cancel/re-run |
 | `.doubleword_failed_rows.json` | Failed-row index: maps model → list of row indices that errored in last completed batch; consumed by `--retry-failed` |
+| `.doubleword_unavailable_models.json` | Models that failed to submit (e.g. PermissionDenied); automatically skipped on all future runs |
 | `*.pdf` | 11 UK charity financial PDFs (≤ 200 pages each) |
 
 ### Visualisations

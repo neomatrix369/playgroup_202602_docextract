@@ -21,6 +21,7 @@ load_dotenv()
 
 CHECKPOINT_FILE = "data/.doubleword_checkpoints.json"
 FAILED_ROWS_FILE = "data/.doubleword_failed_rows.json"
+UNAVAILABLE_MODELS_FILE = "data/.doubleword_unavailable_models.json"
 
 SYSTEM_MESSAGE = (
     "You are an expert at extracting information from UK charity financial documents. "
@@ -81,6 +82,28 @@ def remove_failed_rows_entry(model_short_name: str):
     fr = load_failed_rows()
     fr.pop(model_short_name, None)
     save_failed_rows(fr)
+
+
+# ── Unavailable models persistence ─────────────────────────────────
+
+def load_unavailable_models() -> dict:
+    """Return {model_short_name: reason} for models that are unavailable/permission-denied."""
+    if os.path.exists(UNAVAILABLE_MODELS_FILE):
+        with open(UNAVAILABLE_MODELS_FILE) as f:
+            return json.load(f)
+    return {}
+
+
+def mark_model_unavailable(model_short_name: str, reason: str):
+    """Record a model as unavailable so future runs skip it without re-attempting."""
+    data = load_unavailable_models()
+    data[model_short_name] = reason
+    with open(UNAVAILABLE_MODELS_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+    logger.warning(
+        "[Doubleword] Model '{}' marked unavailable: {} — recorded in {}",
+        model_short_name, reason, UNAVAILABLE_MODELS_FILE,
+    )
 
 
 # ── Batch operations ────────────────────────────────────────────────
