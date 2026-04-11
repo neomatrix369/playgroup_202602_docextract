@@ -19,6 +19,11 @@ To verify or create properties / entities against a template or id list, use ``v
 Idempotency: after building the document, the file is only written when the normalized JSON text
 differs from the existing file (stable key order, sorted properties, volatile API fields stripped).
 
+Non-``file`` properties whose API ``tool`` is not ``manual`` are written as
+``\"tool\": \"<model id>\"`` so one template works with every ``v7_property_model`` in
+``config_models_v7.py`` (see ``llm_v7.apply_v7_template_tool_model_id``). ``file`` rows keep the API tool
+(e.g. ``manual``).
+
 Environment (same as ``llm_v7``): ``V7_GO_API_KEY`` or ``V7_API_KEY``, ``V7_GO_WORKSPACE_ID``,
 ``V7_GO_AGENT_ID`` (project id), optional ``V7_GO_BASE_URL``.
 """
@@ -34,6 +39,7 @@ from typing import Any
 import httpx
 from dotenv import load_dotenv
 
+from llm_v7 import V7_GO_AGENT_TEMPLATE_MODEL_TOOL_PLACEHOLDER
 from v7_go_ensure import fetch_project_and_properties
 
 load_dotenv()
@@ -88,13 +94,25 @@ def _api_property_to_export_row(prop: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(skills, list):
         skills = []
 
+    ptype = prop.get("type")
+    api_tool = prop.get("tool")
+    if ptype == "file":
+        export_tool = api_tool
+    else:
+        t = str(api_tool or "").strip()
+        export_tool = (
+            V7_GO_AGENT_TEMPLATE_MODEL_TOOL_PLACEHOLDER
+            if t and t != "manual"
+            else api_tool
+        )
+
     row: dict[str, Any] = {
         "id": prop.get("id"),
         "name": prop.get("name"),
-        "type": prop.get("type"),
+        "type": ptype,
         "description": prop.get("description"),
         "group": prop.get("group"),
-        "tool": prop.get("tool"),
+        "tool": export_tool,
         "inputs": inputs,
         "is_grounded": bool(prop.get("is_grounded", False)),
         "tool_config": tool_cfg,

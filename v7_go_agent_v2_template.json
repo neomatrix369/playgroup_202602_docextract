@@ -100,7 +100,7 @@
           "is_grounded": true,
           "name": "Charity number",
           "skip_behaviour": "never",
-          "tool": "gpt_5_4",
+          "tool": "<model id>",
           "tool_config": {
             "dependencies": [],
             "input_mode": "primary_and_extracted",
@@ -133,7 +133,7 @@
           "is_grounded": true,
           "name": "Charity name",
           "skip_behaviour": "never",
-          "tool": "gpt_5_4",
+          "tool": "<model id>",
           "tool_config": {
             "dependencies": [],
             "input_mode": "primary_and_extracted",
@@ -166,7 +166,7 @@
           "is_grounded": true,
           "name": "Report date",
           "skip_behaviour": "never",
-          "tool": "gpt_5_4",
+          "tool": "<model id>",
           "tool_config": {
             "dependencies": [],
             "input_mode": "primary_and_extracted",
@@ -199,7 +199,7 @@
           "is_grounded": true,
           "name": "Income annually (GBP)",
           "skip_behaviour": "never",
-          "tool": "gpt_5_4",
+          "tool": "<model id>",
           "tool_config": {
             "dependencies": [],
             "input_mode": "primary_and_extracted",
@@ -232,7 +232,7 @@
           "is_grounded": true,
           "name": "Spending annually (GBP) copy",
           "skip_behaviour": "never",
-          "tool": "gpt_5_4",
+          "tool": "<model id>",
           "tool_config": {
             "dependencies": [],
             "input_mode": "primary_and_extracted",
@@ -265,7 +265,7 @@
           "is_grounded": true,
           "name": "Postcode",
           "skip_behaviour": "never",
-          "tool": "gpt_5_4",
+          "tool": "<model id>",
           "tool_config": {
             "dependencies": [],
             "input_mode": "primary_and_extracted",
@@ -298,7 +298,7 @@
           "is_grounded": true,
           "name": "Street line",
           "skip_behaviour": "never",
-          "tool": "gpt_5_4",
+          "tool": "<model id>",
           "tool_config": {
             "dependencies": [],
             "input_mode": "primary_and_extracted",
@@ -331,7 +331,7 @@
           "is_grounded": true,
           "name": "Town",
           "skip_behaviour": "never",
-          "tool": "gpt_5_4",
+          "tool": "<model id>",
           "tool_config": {
             "dependencies": [],
             "input_mode": "primary_and_extracted",

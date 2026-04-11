@@ -46,6 +46,7 @@ PDF upload (multimodal models): after entity create, see
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import os
 import re
@@ -92,6 +93,29 @@ _V7_GO_AGENT_V2_PROPERTY_NAME_TO_KEY: dict[str, str] = {
 
 _GO_AGENT_TEMPLATE_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 
+# v7_go_agent_v2_template.json uses this placeholder; replaced per model from ``v7_property_model``.
+V7_GO_AGENT_TEMPLATE_MODEL_TOOL_PLACEHOLDER = "<model id>"
+
+
+def apply_v7_template_tool_model_id(template: dict[str, Any], model_id: str) -> dict[str, Any]:
+    """Deep-copy ``template`` and set each property ``tool`` equal to the placeholder to ``model_id``."""
+    mid = str(model_id).strip()
+    if not mid:
+        return copy.deepcopy(template)
+    out = copy.deepcopy(template)
+    projects = out.get("projects") or []
+    if not projects:
+        return out
+    props = projects[0].get("properties")
+    if not isinstance(props, list):
+        return out
+    for prop in props:
+        if not isinstance(prop, dict):
+            continue
+        if prop.get("tool") == V7_GO_AGENT_TEMPLATE_MODEL_TOOL_PLACEHOLDER:
+            prop["tool"] = mid
+    return out
+
 
 def invalidate_go_agent_template_cache(template_path: str | None = None) -> None:
     """Drop cached parsed template so the next ``load_go_agent_v2_specs`` reads disk again."""
@@ -116,7 +140,10 @@ def _env_truthy(name: str, default: str = "1") -> bool:
 
 
 def _run_go_v2_property_preflight_sync(
-    template_abs: str, workspace_id: str, agent_id: str
+    template_abs: str,
+    workspace_id: str,
+    agent_id: str,
+    tool_model_id: str | None = None,
 ) -> None:
     import v7_go_ensure
 
@@ -131,7 +158,11 @@ def _run_go_v2_property_preflight_sync(
     ) as c:
         try:
             v7_go_ensure.preflight_template_against_remote(
-                template_abs, c, workspace_id, agent_id
+                template_abs,
+                c,
+                workspace_id,
+                agent_id,
+                tool_model_id=tool_model_id,
             )
         except v7_go_ensure.V7GoPreflightError:
             if not _env_truthy("V7_GO_AUTO_ENSURE_PROPERTIES", "1"):
@@ -141,7 +172,12 @@ def _run_go_v2_property_preflight_sync(
                 template_abs,
             )
             rc = v7_go_ensure.ensure_properties(
-                c, workspace_id, agent_id, template_abs, dry_run=False
+                c,
+                workspace_id,
+                agent_id,
+                template_abs,
+                dry_run=False,
+                tool_model_id=tool_model_id,
             )
             if rc != 0:
                 raise RuntimeError(
@@ -154,7 +190,11 @@ def _run_go_v2_property_preflight_sync(
             )
             invalidate_go_agent_template_cache(template_abs)
             v7_go_ensure.preflight_template_against_remote(
-                template_abs, c, workspace_id, agent_id
+                template_abs,
+                c,
+                workspace_id,
+                agent_id,
+                tool_model_id=tool_model_id,
             )
 
 
@@ -175,7 +215,8 @@ async def _maybe_preflight_go_v2_properties(model_cfg: dict[str, Any]) -> None:
     async with _GO_V2_PROPERTY_PREFLIGHT_LOCK:
         if not each_pdf and key in _GO_V2_PROPERTY_PREFLIGHT_DONE:
             return
-        await asyncio.to_thread(_run_go_v2_property_preflight_sync, path, ws, agent)
+        mid = str(model_cfg.get("v7_property_model") or "").strip() or None
+        await asyncio.to_thread(_run_go_v2_property_preflight_sync, path, ws, agent, mid)
         if not each_pdf:
             _GO_V2_PROPERTY_PREFLIGHT_DONE.add(key)
 
@@ -424,12 +465,16 @@ def load_go_agent_v2_specs(model_cfg: dict) -> dict[str, Any] | None:
     mtime = os.path.getmtime(path)
     cached = _GO_AGENT_TEMPLATE_CACHE.get(path)
     if cached and cached[0] == mtime:
-        return parse_go_agent_export_for_v2(cached[1])
-    with open(path, encoding="utf-8") as f:
-        data = json.load(f)
-    if not isinstance(data, dict):
-        raise ValueError("V7 template root must be a JSON object")
-    _GO_AGENT_TEMPLATE_CACHE[path] = (mtime, data)
+        data = cached[1]
+    else:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            raise ValueError("V7 template root must be a JSON object")
+        _GO_AGENT_TEMPLATE_CACHE[path] = (mtime, data)
+    mid = str(model_cfg.get("v7_property_model") or "").strip()
+    if mid:
+        data = apply_v7_template_tool_model_id(data, mid)
     return parse_go_agent_export_for_v2(data)
 
 
@@ -484,7 +529,7 @@ def resolved_v7_settings_for_log(model_cfg: dict[str, Any]) -> dict[str, Any]:
 
 
 def hints_for_v7_unavailable_reason(
-    model_short_name: str, reason: str, _model_cfg: dict[str, Any]
+    model_short_name: str, reason: str, model_cfg: dict[str, Any]
 ) -> list[str]:
     """Short actionable lines to log after a skip based on the stored failure reason."""
     lines: list[str] = []
@@ -514,6 +559,21 @@ def hints_for_v7_unavailable_reason(
             "POST /entities 500: check V7_GO_PARENT_ENTITY_ID — it must be a parent *entity* UUID, "
             "not the same as V7_GO_AGENT_ID (project id). Leave it unset for standalone agents."
         )
+    if "document-text" in r and "property_not_found" in r:
+        tpl = str(model_cfg.get("agent_template_json") or "").strip()
+        if not tpl:
+            lines.append(
+                "This error is the legacy multimodal path: the client POSTs OCR text into field "
+                "'document-text'. Go Agent v2 (File + per-field tools) has no such property — add "
+                "agent_template_json (e.g. v7_go_agent_v2_template.json) and multimodal: True so the "
+                "client creates an empty entity and uploads the PDF only; do not add 'document-text' in V7."
+            )
+        else:
+            lines.append(
+                "If config already has agent_template_json, the failure may be stale: remove this model "
+                f"from {UNAVAILABLE_MODELS_FILE} (or delete the file) so the run retries with the current "
+                "registry; adding 'document-text' in V7 is not required for Go Agent v2."
+            )
     lines.append(
         f"To retry after fixing config, remove the {model_short_name!r} entry from {UNAVAILABLE_MODELS_FILE} "
         "(or delete the file), then re-run."

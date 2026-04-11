@@ -217,13 +217,41 @@ def _resolve_remote_row(
         hit = idx.by_id.get(tid.lower())
         if hit:
             return hit
-    key = _property_key(str(row.get("name") or ""), row.get("type"), row.get("tool"))
-    return idx.by_ntt.get(key)
+    name = str(row.get("name") or "")
+    typ = row.get("type")
+    tool = row.get("tool")
+    key = _property_key(name, typ, tool)
+    hit = idx.by_ntt.get(key)
+    if hit:
+        return hit
+    # Template may use literal "<model id>" while the server stores v7_property_model (e.g. claude_4_6_opus).
+    if str(tool or "").strip() == "<model id>":
+        n_low = name.strip().lower()
+        t_str = str(typ or "")
+        for (nn, tt, _ttool), prop in idx.by_ntt.items():
+            if nn == n_low and tt == t_str:
+                return prop
+    return None
 
 
-def check_properties(template_path: str, remote: list[dict[str, Any]]) -> int:
-    """Print status per template property. Returns 0 if every row exists on the server (by id or NTT)."""
+def _load_template_resolved(template_path: str, tool_model_id: str | None) -> dict[str, Any]:
     doc = _load_template(template_path)
+    mid = str(tool_model_id or "").strip()
+    if not mid:
+        return doc
+    from llm_v7 import apply_v7_template_tool_model_id
+
+    return apply_v7_template_tool_model_id(doc, mid)
+
+
+def check_properties(
+    template_path: str,
+    remote: list[dict[str, Any]],
+    *,
+    tool_model_id: str | None = None,
+) -> int:
+    """Print status per template property. Returns 0 if every row exists on the server (by id or NTT)."""
+    doc = _load_template_resolved(template_path, tool_model_id)
     rows = _template_properties(doc)
     idx = RemotePropertyIndex.build(remote)
     missing = 0
@@ -259,6 +287,8 @@ def preflight_template_against_remote(
     client: httpx.Client,
     workspace_id: str,
     project_id: str,
+    *,
+    tool_model_id: str | None = None,
 ) -> None:
     """Raise ``V7GoPreflightError`` if any template property row is missing on the server (by id or NTT).
 
@@ -266,7 +296,7 @@ def preflight_template_against_remote(
     does not fail — only **missing** properties fail.
     """
     _, remote = fetch_project_and_properties(client, workspace_id, project_id)
-    doc = _load_template(template_path)
+    doc = _load_template_resolved(template_path, tool_model_id)
     rows = _template_properties(doc)
     idx = RemotePropertyIndex.build(remote)
     missing: list[str] = []
@@ -289,9 +319,10 @@ def ensure_properties(
     template_path: str,
     *,
     dry_run: bool,
+    tool_model_id: str | None = None,
 ) -> int:
     """Create template properties that are absent on the server (matched by id then NTT)."""
-    doc = _load_template(template_path)
+    doc = _load_template_resolved(template_path, tool_model_id)
     rows = _template_properties(doc)
     # File property must be created first so tool inputs can reference its UUID.
     files = [r for r in rows if r.get("type") == "file"]
@@ -446,9 +477,19 @@ def main() -> int:
     pc_sub = pc.add_subparsers(dest="p_cmd", required=True)
     p_check = pc_sub.add_parser("check", help="Report ok / id_drift / missing")
     p_check.add_argument("--template", "-t", required=True, help="Path to v7_go_agent_v2_template.json")
+    p_check.add_argument(
+        "--tool-model-id",
+        default="",
+        help="Replace template tool placeholder <model id> (same as v7_property_model in config_models_v7.py)",
+    )
     p_ensure = pc_sub.add_parser("ensure", help="POST missing properties from template")
     p_ensure.add_argument("--template", "-t", required=True)
     p_ensure.add_argument("--dry-run", action="store_true")
+    p_ensure.add_argument(
+        "--tool-model-id",
+        default="",
+        help="Replace template tool placeholder <model id> before POST (required if template uses placeholder)",
+    )
 
     ec = sub.add_parser("entities", help="Entity existence check / create replacements for missing ids")
     ec_sub = ec.add_subparsers(dest="e_cmd", required=True)
@@ -480,10 +521,16 @@ def main() -> int:
     ) as client:
         if args.cmd == "properties":
             _, remote = fetch_project_and_properties(client, workspace_id, project_id)
+            tm = (args.tool_model_id or "").strip() or None
             if args.p_cmd == "check":
-                return check_properties(args.template, remote)
+                return check_properties(args.template, remote, tool_model_id=tm)
             return ensure_properties(
-                client, workspace_id, project_id, args.template, dry_run=args.dry_run
+                client,
+                workspace_id,
+                project_id,
+                args.template,
+                dry_run=args.dry_run,
+                tool_model_id=tm,
             )
         if args.cmd == "entities":
             ids = _parse_ids(args.ids)

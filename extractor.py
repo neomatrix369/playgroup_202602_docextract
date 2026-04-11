@@ -337,8 +337,10 @@ def _resolve_v7_agent_template_cli_path(path: str) -> str:
 
 def _v7_model_cfg_for_run(model_short_name: str, agent_template_json_override: str | None) -> dict:
     cfg = dict(V7_MODELS[model_short_name])
-    if agent_template_json_override is not None:
-        cfg["agent_template_json"] = agent_template_json_override
+    # Only a non-empty path overrides — empty string used to mean "clear" would wipe registry
+    # agent_template_json and force legacy multimodal + document-text (wrong for Go Agent v2).
+    if agent_template_json_override is not None and str(agent_template_json_override).strip():
+        cfg["agent_template_json"] = str(agent_template_json_override).strip()
     return cfg
 
 
@@ -517,7 +519,8 @@ def _write_v7_results(model_short_name, results, rows, elapsed_secs, batch_id=""
     multimodal = model_cfg["multimodal"]
     price_in = model_cfg.get("price_in", 0)
     price_out = model_cfg.get("price_out", 0)
-    out_filename = f"data/playgroup_dev_extracted__v7__{model_short_name}.tsv"
+    safe_name = model_short_name.replace("/", "__")
+    out_filename = f"data/playgroup_dev_extracted__v7__{safe_name}.tsv"
     tmp_filename = out_filename + ".tmp"
 
     rows_with_values = 0
@@ -693,7 +696,8 @@ def _merge_v7_results(model_short_name, new_results, rows):
     multimodal = model_cfg["multimodal"]
     price_in = model_cfg.get("price_in", 0)
     price_out = model_cfg.get("price_out", 0)
-    out_filename = f"data/playgroup_dev_extracted__v7__{model_short_name}.tsv"
+    safe_name = model_short_name.replace("/", "__")
+    out_filename = f"data/playgroup_dev_extracted__v7__{safe_name}.tsv"
     tmp_filename = out_filename + ".tmp"
 
     with open(out_filename) as f:
@@ -1530,7 +1534,8 @@ def _resolve_model(model_short_name):
     Only a manually set 'deprecated': True flag would retire a model (if that
     logic is ever added in future).
     """
-    if model_short_name in V7_MODELS:
+    _v7_prefixes = {k.split("/")[0] for k in V7_MODELS if "/" in k}
+    if model_short_name in V7_MODELS or model_short_name.split("/")[0] in _v7_prefixes:
         return "v7"
     if model_short_name in DOUBLEWORD_MODELS:
         cfg = DOUBLEWORD_MODELS[model_short_name]
