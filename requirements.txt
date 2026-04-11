@@ -2,6 +2,7 @@
 #azure-ai-documentintelligence==1.0.2 
 python-dotenv
 openai
+httpx
 pytest
 pre-commit
 pytest-cov

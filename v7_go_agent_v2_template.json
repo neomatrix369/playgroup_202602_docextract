@@ -1,0 +1,353 @@
+{
+  "external_objects": {},
+  "projects": [
+    {
+      "description": "Agent to process PDFs",
+      "id": "019d7cae-852c-7c5e-a07e-14ed6d7f81c9",
+      "main_view": {
+        "filters": [],
+        "id": "view_synced_from_api",
+        "num_pinned_properties": 0,
+        "property_ids": [
+          "019d7cae-8551-7dcb-96aa-dfd9bc2c43af",
+          "019d7cae-85d7-7d4f-88dc-20ad39eb8293",
+          "019d7ccc-e168-7c6f-ad5e-d2661182bd4f",
+          "019d7ccc-ff7f-75f2-938d-b577d579382c",
+          "019d7cd3-132f-770b-ad96-063c538d6ac0",
+          "019d7cd3-d2f5-7fdc-bc32-ad53a2a67fa1",
+          "019d7cd4-2470-7b18-9eff-97747c01abb6",
+          "019d7cd5-5f94-7343-9b26-804a953e8ad6",
+          "019d7cd6-1bca-7cd7-b416-e2dd850a9bb8"
+        ],
+        "property_layouts": [],
+        "property_options": [
+          {
+            "block_workers_edits": false,
+            "property_id": "019d7cae-8551-7dcb-96aa-dfd9bc2c43af"
+          },
+          {
+            "block_workers_edits": false,
+            "property_id": "019d7cae-85d7-7d4f-88dc-20ad39eb8293"
+          },
+          {
+            "block_workers_edits": false,
+            "property_id": "019d7ccc-e168-7c6f-ad5e-d2661182bd4f"
+          },
+          {
+            "block_workers_edits": false,
+            "property_id": "019d7ccc-ff7f-75f2-938d-b577d579382c"
+          },
+          {
+            "block_workers_edits": false,
+            "property_id": "019d7cd3-132f-770b-ad96-063c538d6ac0"
+          },
+          {
+            "block_workers_edits": false,
+            "property_id": "019d7cd3-d2f5-7fdc-bc32-ad53a2a67fa1"
+          },
+          {
+            "block_workers_edits": false,
+            "property_id": "019d7cd4-2470-7b18-9eff-97747c01abb6"
+          },
+          {
+            "block_workers_edits": false,
+            "property_id": "019d7cd5-5f94-7343-9b26-804a953e8ad6"
+          },
+          {
+            "block_workers_edits": false,
+            "property_id": "019d7cd6-1bca-7cd7-b416-e2dd850a9bb8"
+          }
+        ]
+      },
+      "name": "v7_go_agent_v2",
+      "properties": [
+        {
+          "description": null,
+          "enabled_skills": [],
+          "group": null,
+          "id": "019d7cae-8551-7dcb-96aa-dfd9bc2c43af",
+          "incomplete_collection_input_rows_behaviour": "never",
+          "inputs": [],
+          "is_grounded": false,
+          "name": "File",
+          "skip_behaviour": "never",
+          "tool": "manual",
+          "tool_config": {
+            "dependencies": [],
+            "input_mode": "primary_and_extracted",
+            "thinking_effort": "disabled"
+          },
+          "type": "file",
+          "visible_in_entity_sidebar": true
+        },
+        {
+          "description": "What is the charity number @<P019d7cae-8551-7dcb-96aa-dfd9bc2c43af>",
+          "enabled_skills": [],
+          "group": null,
+          "id": "019d7cae-85d7-7d4f-88dc-20ad39eb8293",
+          "incomplete_collection_input_rows_behaviour": "never",
+          "inputs": [
+            {
+              "entities_filter": null,
+              "entity_id": null,
+              "hub_filters": null,
+              "property_id": "019d7cae-8551-7dcb-96aa-dfd9bc2c43af",
+              "target": "value",
+              "target_filter": {},
+              "via_property_id": null
+            }
+          ],
+          "is_grounded": true,
+          "name": "Charity number",
+          "skip_behaviour": "never",
+          "tool": "<model id>",
+          "tool_config": {
+            "dependencies": [],
+            "input_mode": "primary_and_extracted",
+            "llm_config": {
+              "stream_progress_updates": false,
+              "thinking_effort": "low"
+            },
+            "thinking_effort": "low"
+          },
+          "type": "text",
+          "visible_in_entity_sidebar": true
+        },
+        {
+          "description": "What is the charity_name @<P019d7cae-8551-7dcb-96aa-dfd9bc2c43af>",
+          "enabled_skills": [],
+          "group": null,
+          "id": "019d7ccc-e168-7c6f-ad5e-d2661182bd4f",
+          "incomplete_collection_input_rows_behaviour": "never",
+          "inputs": [
+            {
+              "entities_filter": null,
+              "entity_id": null,
+              "hub_filters": null,
+              "property_id": "019d7cae-8551-7dcb-96aa-dfd9bc2c43af",
+              "target": "value",
+              "target_filter": {},
+              "via_property_id": null
+            }
+          ],
+          "is_grounded": true,
+          "name": "Charity name",
+          "skip_behaviour": "never",
+          "tool": "<model id>",
+          "tool_config": {
+            "dependencies": [],
+            "input_mode": "primary_and_extracted",
+            "llm_config": {
+              "stream_progress_updates": false,
+              "thinking_effort": "low"
+            },
+            "thinking_effort": "low"
+          },
+          "type": "text",
+          "visible_in_entity_sidebar": true
+        },
+        {
+          "description": "What is the report_date @<P019d7cae-8551-7dcb-96aa-dfd9bc2c43af>",
+          "enabled_skills": [],
+          "group": null,
+          "id": "019d7ccc-ff7f-75f2-938d-b577d579382c",
+          "incomplete_collection_input_rows_behaviour": "never",
+          "inputs": [
+            {
+              "entities_filter": null,
+              "entity_id": null,
+              "hub_filters": null,
+              "property_id": "019d7cae-8551-7dcb-96aa-dfd9bc2c43af",
+              "target": "value",
+              "target_filter": {},
+              "via_property_id": null
+            }
+          ],
+          "is_grounded": true,
+          "name": "Report date",
+          "skip_behaviour": "never",
+          "tool": "<model id>",
+          "tool_config": {
+            "dependencies": [],
+            "input_mode": "primary_and_extracted",
+            "llm_config": {
+              "stream_progress_updates": false,
+              "thinking_effort": "low"
+            },
+            "thinking_effort": "low"
+          },
+          "type": "text",
+          "visible_in_entity_sidebar": true
+        },
+        {
+          "description": "What is the income_annually in British pounds @<P019d7cae-8551-7dcb-96aa-dfd9bc2c43af>",
+          "enabled_skills": [],
+          "group": null,
+          "id": "019d7cd3-132f-770b-ad96-063c538d6ac0",
+          "incomplete_collection_input_rows_behaviour": "never",
+          "inputs": [
+            {
+              "entities_filter": null,
+              "entity_id": null,
+              "hub_filters": null,
+              "property_id": "019d7cae-8551-7dcb-96aa-dfd9bc2c43af",
+              "target": "value",
+              "target_filter": {},
+              "via_property_id": null
+            }
+          ],
+          "is_grounded": true,
+          "name": "Income annually (GBP)",
+          "skip_behaviour": "never",
+          "tool": "<model id>",
+          "tool_config": {
+            "dependencies": [],
+            "input_mode": "primary_and_extracted",
+            "llm_config": {
+              "stream_progress_updates": false,
+              "thinking_effort": "low"
+            },
+            "thinking_effort": "low"
+          },
+          "type": "text",
+          "visible_in_entity_sidebar": true
+        },
+        {
+          "description": "What is the spending_annually in British pounds @<P019d7cae-8551-7dcb-96aa-dfd9bc2c43af>",
+          "enabled_skills": [],
+          "group": null,
+          "id": "019d7cd3-d2f5-7fdc-bc32-ad53a2a67fa1",
+          "incomplete_collection_input_rows_behaviour": "never",
+          "inputs": [
+            {
+              "entities_filter": null,
+              "entity_id": null,
+              "hub_filters": null,
+              "property_id": "019d7cae-8551-7dcb-96aa-dfd9bc2c43af",
+              "target": "value",
+              "target_filter": {},
+              "via_property_id": null
+            }
+          ],
+          "is_grounded": true,
+          "name": "Spending annually (GBP) copy",
+          "skip_behaviour": "never",
+          "tool": "<model id>",
+          "tool_config": {
+            "dependencies": [],
+            "input_mode": "primary_and_extracted",
+            "llm_config": {
+              "stream_progress_updates": false,
+              "thinking_effort": "low"
+            },
+            "thinking_effort": "low"
+          },
+          "type": "text",
+          "visible_in_entity_sidebar": true
+        },
+        {
+          "description": "What is the address__postcode @<P019d7cae-8551-7dcb-96aa-dfd9bc2c43af>",
+          "enabled_skills": [],
+          "group": null,
+          "id": "019d7cd4-2470-7b18-9eff-97747c01abb6",
+          "incomplete_collection_input_rows_behaviour": "never",
+          "inputs": [
+            {
+              "entities_filter": null,
+              "entity_id": null,
+              "hub_filters": null,
+              "property_id": "019d7cae-8551-7dcb-96aa-dfd9bc2c43af",
+              "target": "value",
+              "target_filter": {},
+              "via_property_id": null
+            }
+          ],
+          "is_grounded": true,
+          "name": "Postcode",
+          "skip_behaviour": "never",
+          "tool": "<model id>",
+          "tool_config": {
+            "dependencies": [],
+            "input_mode": "primary_and_extracted",
+            "llm_config": {
+              "stream_progress_updates": false,
+              "thinking_effort": "low"
+            },
+            "thinking_effort": "low"
+          },
+          "type": "text",
+          "visible_in_entity_sidebar": true
+        },
+        {
+          "description": "What is the address__street_line @<P019d7cae-8551-7dcb-96aa-dfd9bc2c43af>",
+          "enabled_skills": [],
+          "group": null,
+          "id": "019d7cd5-5f94-7343-9b26-804a953e8ad6",
+          "incomplete_collection_input_rows_behaviour": "never",
+          "inputs": [
+            {
+              "entities_filter": null,
+              "entity_id": null,
+              "hub_filters": null,
+              "property_id": "019d7cae-8551-7dcb-96aa-dfd9bc2c43af",
+              "target": "value",
+              "target_filter": {},
+              "via_property_id": null
+            }
+          ],
+          "is_grounded": true,
+          "name": "Street line",
+          "skip_behaviour": "never",
+          "tool": "<model id>",
+          "tool_config": {
+            "dependencies": [],
+            "input_mode": "primary_and_extracted",
+            "llm_config": {
+              "stream_progress_updates": false,
+              "thinking_effort": "low"
+            },
+            "thinking_effort": "low"
+          },
+          "type": "text",
+          "visible_in_entity_sidebar": true
+        },
+        {
+          "description": "What is the address__post_town @<P019d7cae-8551-7dcb-96aa-dfd9bc2c43af>",
+          "enabled_skills": [],
+          "group": null,
+          "id": "019d7cd6-1bca-7cd7-b416-e2dd850a9bb8",
+          "incomplete_collection_input_rows_behaviour": "never",
+          "inputs": [
+            {
+              "entities_filter": null,
+              "entity_id": null,
+              "hub_filters": null,
+              "property_id": "019d7cae-8551-7dcb-96aa-dfd9bc2c43af",
+              "target": "value",
+              "target_filter": {},
+              "via_property_id": null
+            }
+          ],
+          "is_grounded": true,
+          "name": "Town",
+          "skip_behaviour": "never",
+          "tool": "<model id>",
+          "tool_config": {
+            "dependencies": [],
+            "input_mode": "primary_and_extracted",
+            "llm_config": {
+              "stream_progress_updates": false,
+              "thinking_effort": "low"
+            },
+            "thinking_effort": "low"
+          },
+          "type": "text",
+          "visible_in_entity_sidebar": true
+        }
+      ],
+      "triggers": [],
+      "type": "regular",
+      "views": []
+    }
+  ]
+}

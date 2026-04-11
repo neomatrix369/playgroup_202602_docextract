@@ -1,0 +1,17 @@
+{
+  "dw-olmocr-2-7b-1025-fp8": [
+    5,
+    8,
+    10
+  ],
+  "dw-lightonocr-2-1b-bbox-soup": [
+    5,
+    8,
+    10
+  ],
+  "dw-deepseek-ocr-2": [
+    5,
+    8,
+    10
+  ]
+}

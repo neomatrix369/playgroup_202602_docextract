@@ -56,6 +56,28 @@ def _mod_tag(model_name):
     return "MM" if cfg and cfg.get("multimodal") else "text"
 
 
+def _shared_agent_prefix(model_names):
+    """If every name that contains `__` shares the same `agent__` prefix, return it; else ''."""
+    with_double = [n for n in model_names if "__" in n]
+    if not with_double:
+        return ""
+    first_pre = None
+    for n in with_double:
+        i = n.index("__")
+        pre = n[: i + 2]
+        if first_pre is None:
+            first_pre = pre
+        elif pre != first_pre:
+            return ""
+    return first_pre or ""
+
+
+def _display_model_name(model_name, prefix):
+    if prefix and model_name.startswith(prefix):
+        return model_name[len(prefix) :]
+    return model_name
+
+
 def get_all_items(filename):
     items = []
     with open(filename, 'r') as tsvfile:
@@ -227,6 +249,7 @@ if __name__ == "__main__":
     else:
         # Score all models — leaderboard ranked by F1
         results = score_all_models(expected_filename, verbose=False)
+        disp_prefix = _shared_agent_prefix(r["model_name"] for r in results)
         header = (f"{'Provider':<12} {'Model':<25} {'Mod':<6} {'Docs':>4}"
                   f"  {'F1':>5}  {'Prec':>5}  {'Recall':>6}"
                   f"  {'Fields':>14}  {'Time(s)':>9}  {'Cost($)':>9}")
@@ -240,7 +263,8 @@ if __name__ == "__main__":
             ft = r["fields_total"]
             ff = r["fields_found"]
             fields_str = f"{ff:.1f}/{ft:.0f} ({100*ff/ft:.0f}%)" if ft else "-"
-            print(f"{r['provider']:<12} {r['model_name']:<25} {_mod_tag(r['model_name']):<6} {r['docs']:>4}"
+            name_disp = _display_model_name(r["model_name"], disp_prefix)
+            print(f"{r['provider']:<12} {name_disp:<25} {_mod_tag(r['model_name']):<6} {r['docs']:>4}"
                   f"  {r['f1']:>5.3f}  {r['precision']:>5.3f}  {r['recall']:>6.3f}"
                   f"  {fields_str:>14}  {time_str:>9}  {cost_str:>9}")
         # Provider summary
@@ -268,7 +292,8 @@ if __name__ == "__main__":
             est_cost_count = sum(1 for m in active if m["cost_usd"] > 0 and m.get("estimated"))
             cost_prefix = "~" if est_cost_count == len(costs) and costs else ""
             avg_cost_str = f"{cost_prefix}{avg_cost:.4f}" if avg_cost else "-"
-            print(f"  {p:<12} {len(models):>4} {len(active):>6} {failed:>4}  {avg_f1:>6.3f}  {best['f1']:>7.3f}  {best['model_name']:<25}  {fields_str:>14}  {time_str:>9}  {avg_cost_str:>9}")
+            best_disp = _display_model_name(best["model_name"], disp_prefix)
+            print(f"  {p:<12} {len(models):>4} {len(active):>6} {failed:>4}  {avg_f1:>6.3f}  {best['f1']:>7.3f}  {best_disp:<25}  {fields_str:>14}  {time_str:>9}  {avg_cost_str:>9}")
 
         print(f"\n  ~ = estimated from config pricing x avg tokens")
         print(f"  Fail = models with F1=0 (extraction failed or no parseable output)")

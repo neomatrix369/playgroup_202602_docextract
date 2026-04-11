@@ -20,6 +20,8 @@ add_file_logger("llm_doubleword_calls.log", name_filter=__name__)
 load_dotenv()
 
 CHECKPOINT_FILE = "data/.doubleword_checkpoints.json"
+FAILED_ROWS_FILE = "data/.doubleword_failed_rows.json"
+UNAVAILABLE_MODELS_FILE = "data/.doubleword_unavailable_models.json"
 
 SYSTEM_MESSAGE = (
     "You are an expert at extracting information from UK charity financial documents. "
@@ -53,6 +55,55 @@ def remove_checkpoint_entry(model_short_name: str):
     cp = load_checkpoint()
     cp.pop(model_short_name, None)
     save_checkpoint(cp)
+
+
+# ── Failed rows persistence ─────────────────────────────────────────
+
+def load_failed_rows() -> dict:
+    """Return {model_short_name: [row_nums]} for rows that failed in the last completed batch."""
+    if os.path.exists(FAILED_ROWS_FILE):
+        with open(FAILED_ROWS_FILE) as f:
+            return json.load(f)
+    return {}
+
+
+def save_failed_rows(data: dict):
+    with open(FAILED_ROWS_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+
+
+def update_failed_rows_entry(model_short_name: str, row_nums: list):
+    fr = load_failed_rows()
+    fr[model_short_name] = row_nums
+    save_failed_rows(fr)
+
+
+def remove_failed_rows_entry(model_short_name: str):
+    fr = load_failed_rows()
+    fr.pop(model_short_name, None)
+    save_failed_rows(fr)
+
+
+# ── Unavailable models persistence ─────────────────────────────────
+
+def load_unavailable_models() -> dict:
+    """Return {model_short_name: reason} for models that are unavailable/permission-denied."""
+    if os.path.exists(UNAVAILABLE_MODELS_FILE):
+        with open(UNAVAILABLE_MODELS_FILE) as f:
+            return json.load(f)
+    return {}
+
+
+def mark_model_unavailable(model_short_name: str, reason: str):
+    """Record a model as unavailable so future runs skip it without re-attempting."""
+    data = load_unavailable_models()
+    data[model_short_name] = reason
+    with open(UNAVAILABLE_MODELS_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+    logger.warning(
+        "[Doubleword] Model '{}' marked unavailable: {} — recorded in {}",
+        model_short_name, reason, UNAVAILABLE_MODELS_FILE,
+    )
 
 
 # ── Batch operations ────────────────────────────────────────────────
@@ -120,20 +171,46 @@ async def submit_batch(
 
 
 async def poll_batch(client: AsyncOpenAI, batch_id: str):
-    """Check batch status. Returns (status, output_file_id, counts_dict).
+    """Check batch status. Returns (status, output_file_id, error_file_id, counts_dict).
 
+    error_file_id is the DW error file for requests that failed before processing
+    (e.g. context_length_exceeded). It is None when there are no such failures.
     The counts dict includes API-reported created_at/completed_at timestamps
     for accurate elapsed time calculation.
     """
     batch = await client.batches.retrieve(batch_id)
     counts = batch.request_counts
-    return batch.status, batch.output_file_id, {
+    return batch.status, batch.output_file_id, getattr(batch, "error_file_id", None), {
         "total": counts.total if counts else 0,
         "completed": counts.completed if counts else 0,
         "failed": counts.failed if counts else 0,
         "created_at": getattr(batch, "created_at", None),
         "completed_at": getattr(batch, "completed_at", None),
     }
+
+
+async def download_error_file(client: AsyncOpenAI, error_file_id: str) -> dict:
+    """Download the DW batch error file for requests that failed before processing.
+
+    Returns {row_num: error_message_str} for each failed request.
+    These are distinct from per-row errors in the output file — they represent
+    requests the server rejected outright (e.g. context_length_exceeded).
+    """
+    content = await client.files.content(error_file_id)
+    errors = {}
+    for line in content.text.strip().split("\n"):
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+            custom_id = entry.get("custom_id", "")
+            if custom_id.startswith("row_"):
+                row_num = int(custom_id.split("_", 1)[1])
+                error_msg = str(entry.get("error", entry))
+                errors[row_num] = error_msg
+        except (json.JSONDecodeError, ValueError):
+            logger.warning("[Doubleword] Could not parse error file line: {}", line[:200])
+    return errors
 
 
 async def download_results(client: AsyncOpenAI, output_file_id: str) -> dict[int, dict]:

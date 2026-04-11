@@ -31,6 +31,30 @@ log = get_logger("sync_dw")
 PRICING_URL = "https://docs.doubleword.ai/inference-api/model-pricing.md"
 CONFIG_PATH = "config_models_doubleword.py"
 
+# HuggingFace config.json — fallback source for context window when DW docs omit it
+HF_CONFIG_URL = "https://huggingface.co/{model_id}/resolve/main/config.json"
+CTX_DEFAULT = 262_000  # value used when DW page has no Max Total Tokens
+
+
+def _fetch_hf_ctx(model_id: str) -> int | None:
+    """Fetch max_position_embeddings from the model's HuggingFace config.json.
+
+    Returns the context window rounded to the nearest thousand, or None if the
+    request fails, the model is gated, or no suitable field is found.
+    """
+    url = HF_CONFIG_URL.format(model_id=model_id)
+    try:
+        resp = httpx.get(url, timeout=10, follow_redirects=True)
+        if resp.status_code != 200:
+            return None
+        cfg = resp.json()
+        val = cfg.get("max_position_embeddings") or cfg.get("seq_length") or cfg.get("n_positions")
+        if val:
+            return (int(val) // 1000) * 1000
+    except Exception:
+        pass
+    return None
+
 
 # Tier classification by combined price (High tier)
 def _classify_tier(price_in, price_out):
@@ -161,6 +185,63 @@ def _parse_markdown_table(markdown):
     return models
 
 
+_CTX_FROM_ERROR_RE = re.compile(
+    r"(?:maximum context length|max(?:imum)? (?:context|sequence) (?:length|size)|"
+    r"context_length|max_tokens|maximum tokens?)"
+    r"[^0-9]{0,30}(\d{3,7})\b",
+    re.IGNORECASE,
+)
+
+
+def extract_ctx_from_error(error_msg: str) -> int | None:
+    """Parse a DW/OpenAI batch error message for an explicit context-length limit.
+
+    Returns the limit in tokens (rounded to nearest thousand) or None.
+    Handles messages like:
+      "This model's maximum context length is 8192 tokens..."
+      "context_length_exceeded: max 32768"
+    """
+    m = _CTX_FROM_ERROR_RE.search(error_msg)
+    if m:
+        val = int(m.group(1))
+        if val >= 1_000:            # ignore small numbers like "400 tokens used"
+            return (val // 1000) * 1000
+    return None
+
+
+def update_model_ctx(model_short_name: str, new_ctx: int):
+    """Persist a corrected ctx value for one model into CONFIG_PATH.
+
+    Reads the existing config, updates that model's ctx field, and rewrites
+    the file. Skips if the value is unchanged. This is the self-healing path
+    triggered when DW error messages reveal the actual context limit.
+    """
+    existing = _load_existing_models()
+    entry = existing.get(model_short_name)
+    if entry is None:
+        log.warning("[Sync] update_model_ctx: '{}' not found in config, skipping", model_short_name)
+        return
+    if entry.get("ctx") == new_ctx:
+        return  # already correct
+
+    old_ctx = entry.get("ctx", "?")
+    log.info("[Sync] Auto-correcting ctx for '{}': {:,} → {:,} (from DW error message)",
+             model_short_name, old_ctx, new_ctx)
+    entry["ctx"] = new_ctx
+
+    # Rewrite config via the normal generation path so format stays consistent
+    models = _merge_with_existing([], existing)   # no fetched → preserve all
+    # Apply our correction directly (merge may reset to existing)
+    for m in models:
+        if m.get("short_name") == model_short_name or m.get("short_name", "").rstrip() == model_short_name:
+            m["ctx"] = new_ctx
+            break
+    config_text = _generate_config(models)
+    with open(CONFIG_PATH, "w") as f:
+        f.write(config_text)
+    log.info("[Sync] Config updated with corrected ctx for '{}'", model_short_name)
+
+
 def _load_existing_models():
     """Safely load the current DOUBLEWORD_MODELS dict from CONFIG_PATH.
 
@@ -212,10 +293,16 @@ def _merge_with_existing(fetched_models, existing_models):
         entry = dict(m)  # copy from fetched
         entry.pop("potentially_deprecated", None)   # clear stale flag
         entry.pop("first_noticed_missing", None)     # clear stale date
-        # Preserve manual overrides (e.g. extra_params) from the existing entry.
+        # Preserve manual overrides from the existing entry.
         existing = merged.get(short_name, {})
         if existing.get("extra_params"):
             entry["extra_params"] = existing["extra_params"]
+        # Preserve a non-default ctx from existing if the fetched value is still the
+        # fallback (neither DW docs nor HF provided a real value for this model).
+        if entry["ctx"] == CTX_DEFAULT and existing.get("ctx", CTX_DEFAULT) != CTX_DEFAULT:
+            entry["ctx"] = existing["ctx"]
+            log.info("[Sync] Preserved existing ctx {:,} for {} (no upstream source found)",
+                     entry["ctx"], short_name)
         merged[short_name] = entry
 
     # Flag anything in existing that's missing from the API response.
@@ -368,6 +455,20 @@ def sync(write=True):
         tag = "[VL]" if m["multimodal"] else "[text]"
         log.info("  {} {:28s}  ${:.2f} in / ${:.2f} out  {}",
                  tag, m["short_name"], m["price_in"], m["price_out"], m["model"])
+
+    # ── Enrich ctx from HuggingFace for models the DW page does not document ──
+    # When DW's pricing page omits Max Total Tokens we fall back to CTX_DEFAULT.
+    # For those models we try to fetch max_position_embeddings from HF config.json.
+    hf_enriched = 0
+    for m in fetched:
+        if m["ctx"] == CTX_DEFAULT:
+            hf_ctx = _fetch_hf_ctx(m["model"])
+            if hf_ctx:
+                log.info("[Sync] HF ctx for {} ({}): {:,}", m["short_name"], m["model"], hf_ctx)
+                m["ctx"] = hf_ctx
+                hf_enriched += 1
+    if hf_enriched:
+        log.info("[Sync] Enriched ctx for {}/{} model(s) from HuggingFace", hf_enriched, len(fetched))
 
     # ── Merge with existing config (augment-only) ─────────────────
     existing_models = _load_existing_models()
