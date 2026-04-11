@@ -1,6 +1,6 @@
 # UK Charity Document Extraction — Multi-Model Benchmark
 
-Extract structured fields from UK charity financial PDFs using LLMs via [OpenRouter](https://openrouter.ai/), the [Doubleword Batch API](https://docs.doubleword.ai/batches/getting-started-with-batched-api), or [V7 Go](https://docs.go.v7labs.com/) (agent/entity API), then score and rank the results across 52 benchmarked models (OpenRouter + Doubleword). V7 is an optional third backend for product-style runs (e.g. Doc Risk Auditor).
+Extract structured fields from UK charity financial PDFs using LLMs via [OpenRouter](https://openrouter.ai/), the [Doubleword Batch API](https://docs.doubleword.ai/batches/getting-started-with-batched-api), or [V7 Go](https://docs.go.v7labs.com/) (agent/entity API), then score and rank the results across every extracted run in `data/` (dozens of models across OpenRouter, Doubleword, and optional V7). V7 is an optional third backend for product-style runs (e.g. Doc Risk Auditor).
 
 **Jump to:** [Key Findings](#key-findings) | [Setup](#setup) | [Workflow](#end-to-end-workflow) | [Results](#results) | [Repo Reference](#whats-in-this-repo) | [Dataset](#dataset)
 
@@ -15,7 +15,7 @@ Extract structured fields from UK charity financial PDFs using LLMs via [OpenRou
 
 ## Key Findings
 
-> Last updated: 2026-03-31 — 52 models tested (40 OpenRouter, 12 Doubleword). Model pricing is now auto-synced from Doubleword's docs site at each run.
+> **Snapshot below:** 2026-03-31 — 52 models (40 OpenRouter, 12 Doubleword), before large V7 Go sweeps. The repo’s `data/` and `extraction_stats.csv` may list many more runs (including V7); run `python score.py` and open the [playground](which-models-extracted-playground.html) for current counts and rankings. Doubleword model pricing is auto-synced from their docs site at each `extractor.py` run.
 
 **Provider summary** (active = models with F1 > 0):
 
@@ -75,7 +75,7 @@ The key result files:
 | `data/extraction_stats.csv` | One row per model run: provider, tier, row counts, per-field hit rates, time, cost |
 | [which-models-extracted-playground.html](which-models-extracted-playground.html) | Interactive playground — open in browser for charts, heatmaps, and recommendations |
 
-The leaderboard printed by `score.py` is ranked by F1 and includes precision, recall, field counts, time, and cost:
+The leaderboard printed by `score.py` is ranked by F1 and includes precision, recall, field counts, time, and cost. For readability, the printed **Model** column (and the playground’s tables and chart labels) **shortens** ids when every model name that contains `__` shares the same `agent__` prefix — for example `v7-go-agent-v2__gpt4-1` is shown as `gpt4-1`. Names without `__`, or mixed `__` prefixes, stay full-length so rows stay distinct. **Canonical ids** (for filenames, `extraction_stats.csv`, and lookups) are always the full string.
 
 ```
 Provider     Model                     Mod    Docs     F1   Prec  Recall          Fields    Time(s)    Cost($)
@@ -86,7 +86,7 @@ doubleword   dw-qwen3.5-9b             text     11  0.927  0.974   0.885   75.2/
 ...
 ```
 
-> **To update results:** run `python extractor.py` to extract with any new/missing models, then `python score.py` to regenerate the leaderboard. Regenerate the playground HTML with `python playground.py`.
+> **To update results:** run `python extractor.py` to extract with any new/missing models, then `python score.py` to regenerate the leaderboard. Regenerate the playground HTML with `python playground.py` (or `uv run python playground.py`).
 
 ---
 
@@ -249,12 +249,12 @@ python score.py data/playgroup_dev_extracted__openrouter__gemini-2.0-flash.tsv
 | `extraction_and_prompt_example.py` | Simple single-model extraction loop, good for prompt experiments. |
 | `extractor.py` | Unified extraction runner. Auto-detects backend from registries (`DOUBLEWORD_MODELS`, `V7_MODELS`, `OPENROUTER_MODELS`). Auto-syncs Doubleword pricing at startup. Doubleword and V7 use async polling with checkpoint/resume; OpenRouter is sync per row. Graceful Ctrl-C preserves checkpoints. Doubleword: downloads DW error files for pre-processing rejections. Flags: `--completion-window`, `--all-doubleword`, `--all-openrouter`, `--all-v7`, `--v7-agent-template`, `--retry-failed`. |
 | `sync_doubleword_models.py` | Auto-syncs Doubleword model pricing from their [docs markdown endpoint](https://docs.doubleword.ai/inference-api/model-pricing.md). Regenerates `config_models_doubleword.py`. Skips save when nothing changed. Called by `extractor.py` at startup; can also run standalone. |
-| `score.py` | Scorer with F1/Precision/Recall. No args → ranked leaderboard; pass a filename → verbose field-by-field diff. |
+| `score.py` | Scorer with F1/Precision/Recall. No args → ranked leaderboard; pass a filename → verbose field-by-field diff. Leaderboard **Model** column uses the same short display rule as the playground when shared `agent__` prefixes apply (see [Results](#results)). |
 | `utils.py` | Shared helpers (`extract_from_triple_backticks`, `sanitize_error_message`). |
 | `config_models_openrouter.py` | OpenRouter model registry — 33 models organised by tier. |
 | `config_models_doubleword.py` | Doubleword model registry — 12 extraction models (auto-generated by `sync_doubleword_models.py`). |
 | `config_models_v7.py` | V7 Go model registry — short names (e.g. `v7-charity-extract`) mapped to display metadata; agent IDs and field slugs usually come from env (see “V7 Go” above). |
-| `playground.py` | Generates the interactive HTML playground from extraction results. |
+| `playground.py` | Generates `which-models-extracted-playground.html` from extraction results. Chart/table **labels** use short model names when safe (shared `agent__` prefix); embedded JSON keys stay full ids. |
 
 ### Model Tiers
 
@@ -313,7 +313,7 @@ Registry keys are typically prefixed with `v7-`. Each entry mirrors the shape us
 
 | File | Description |
 |---|---|
-| [which-models-extracted-playground.html](which-models-extracted-playground.html) | Interactive leaderboard — open in browser for rankings, field heatmap, document analysis, error breakdown, deep dive, recommendations, provider analysis, and project evolution |
+| [which-models-extracted-playground.html](which-models-extracted-playground.html) | Interactive leaderboard — open in browser for rankings, field heatmap, document analysis, error breakdown, deep dive, recommendations, provider analysis, and project evolution. Regenerate after scoring with `python playground.py`. |
 
 ### Utility Scripts (`utility/`)
 

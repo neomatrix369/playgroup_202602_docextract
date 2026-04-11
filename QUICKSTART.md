@@ -90,3 +90,5 @@ Head to [README.md](README.md) for the full end-to-end workflow. The key command
 - **Use `--v7-agent-template PATH`** together with any run that includes V7 models (e.g. `--all-v7`) to override `agent_template_json` with a Go export JSON for that run; see [README.md](README.md) examples
 
 The same applies to `score.py`: no args scores all models and prints a leaderboard; pass a filename for a verbose diff of one model.
+
+After scoring, regenerate the static playground with `python playground.py` or `uv run python playground.py` so [which-models-extracted-playground.html](which-models-extracted-playground.html) matches `data/`. Long V7-style ids such as `v7-go-agent-v2__gpt4-1` are shown in shortened form in the printed leaderboard and playground **where every `__`-suffixed id shares the same prefix**; filenames and `extraction_stats.csv` always use the full id (see [README — Results](README.md#results)).
