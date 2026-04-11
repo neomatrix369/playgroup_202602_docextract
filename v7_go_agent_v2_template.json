@@ -1,399 +1,353 @@
 {
+  "external_objects": {},
   "projects": [
     {
-      "id": "project_wza_9wroxXwV4hoB",
-      "name": "v7_go_agent_v2",
-      "type": "regular",
       "description": "Agent to process PDFs",
+      "id": "019d7cae-852c-7c5e-a07e-14ed6d7f81c9",
+      "main_view": {
+        "filters": [],
+        "id": "view_synced_from_api",
+        "num_pinned_properties": 0,
+        "property_ids": [
+          "019d7cae-8551-7dcb-96aa-dfd9bc2c43af",
+          "019d7cae-85d7-7d4f-88dc-20ad39eb8293",
+          "019d7ccc-e168-7c6f-ad5e-d2661182bd4f",
+          "019d7ccc-ff7f-75f2-938d-b577d579382c",
+          "019d7cd3-132f-770b-ad96-063c538d6ac0",
+          "019d7cd3-d2f5-7fdc-bc32-ad53a2a67fa1",
+          "019d7cd4-2470-7b18-9eff-97747c01abb6",
+          "019d7cd5-5f94-7343-9b26-804a953e8ad6",
+          "019d7cd6-1bca-7cd7-b416-e2dd850a9bb8"
+        ],
+        "property_layouts": [],
+        "property_options": [
+          {
+            "block_workers_edits": false,
+            "property_id": "019d7cae-8551-7dcb-96aa-dfd9bc2c43af"
+          },
+          {
+            "block_workers_edits": false,
+            "property_id": "019d7cae-85d7-7d4f-88dc-20ad39eb8293"
+          },
+          {
+            "block_workers_edits": false,
+            "property_id": "019d7ccc-e168-7c6f-ad5e-d2661182bd4f"
+          },
+          {
+            "block_workers_edits": false,
+            "property_id": "019d7ccc-ff7f-75f2-938d-b577d579382c"
+          },
+          {
+            "block_workers_edits": false,
+            "property_id": "019d7cd3-132f-770b-ad96-063c538d6ac0"
+          },
+          {
+            "block_workers_edits": false,
+            "property_id": "019d7cd3-d2f5-7fdc-bc32-ad53a2a67fa1"
+          },
+          {
+            "block_workers_edits": false,
+            "property_id": "019d7cd4-2470-7b18-9eff-97747c01abb6"
+          },
+          {
+            "block_workers_edits": false,
+            "property_id": "019d7cd5-5f94-7343-9b26-804a953e8ad6"
+          },
+          {
+            "block_workers_edits": false,
+            "property_id": "019d7cd6-1bca-7cd7-b416-e2dd850a9bb8"
+          }
+        ]
+      },
+      "name": "v7_go_agent_v2",
       "properties": [
         {
-          "id": "property_xQE6JTgfBhwpqc__",
-          "name": "File",
-          "type": "file",
           "description": null,
+          "enabled_skills": [],
           "group": null,
-          "tool": "manual",
+          "id": "019d7cae-8551-7dcb-96aa-dfd9bc2c43af",
+          "incomplete_collection_input_rows_behaviour": "never",
           "inputs": [],
           "is_grounded": false,
-          "tool_config": {
-            "input_mode": "primary_and_extracted"
-          },
-          "enabled_skills": [],
+          "name": "File",
           "skip_behaviour": "never",
-          "incomplete_collection_input_rows_behaviour": "never",
+          "tool": "manual",
+          "tool_config": {
+            "dependencies": [],
+            "input_mode": "primary_and_extracted",
+            "thinking_effort": "disabled"
+          },
+          "type": "file",
           "visible_in_entity_sidebar": true
         },
         {
-          "id": "property_rn-CqSypC6Aw0hT7",
+          "description": "What is the charity number @<P019d7cae-8551-7dcb-96aa-dfd9bc2c43af>",
+          "enabled_skills": [],
+          "group": null,
+          "id": "019d7cae-85d7-7d4f-88dc-20ad39eb8293",
+          "incomplete_collection_input_rows_behaviour": "never",
+          "inputs": [
+            {
+              "entities_filter": null,
+              "entity_id": null,
+              "hub_filters": null,
+              "property_id": "019d7cae-8551-7dcb-96aa-dfd9bc2c43af",
+              "target": "value",
+              "target_filter": {},
+              "via_property_id": null
+            }
+          ],
+          "is_grounded": true,
           "name": "Charity number",
-          "type": "text",
-          "description": "What is the charity number @<Pproperty_xQE6JTgfBhwpqc__>",
-          "group": null,
-          "tool": "gpt_5_4",
-          "inputs": [
-            {
-              "target": "value",
-              "entity_id": null,
-              "property_id": "property_xQE6JTgfBhwpqc__",
-              "via_property_id": null,
-              "entities_filter": null,
-              "hub_filters": null,
-              "target_filter": {}
-            }
-          ],
-          "is_grounded": true,
-          "tool_config": {
-            "llm_config": {
-              "thinking_effort": "low",
-              "stream_progress_updates": false
-            },
-            "input_mode": "primary_and_extracted"
-          },
-          "enabled_skills": [],
           "skip_behaviour": "never",
-          "incomplete_collection_input_rows_behaviour": "never",
+          "tool": "gpt_5_4",
+          "tool_config": {
+            "dependencies": [],
+            "input_mode": "primary_and_extracted",
+            "llm_config": {
+              "stream_progress_updates": false,
+              "thinking_effort": "low"
+            },
+            "thinking_effort": "low"
+          },
+          "type": "text",
           "visible_in_entity_sidebar": true
         },
         {
-          "id": "property_kJIBKAHnTfRpe3Dh",
+          "description": "What is the charity_name @<P019d7cae-8551-7dcb-96aa-dfd9bc2c43af>",
+          "enabled_skills": [],
+          "group": null,
+          "id": "019d7ccc-e168-7c6f-ad5e-d2661182bd4f",
+          "incomplete_collection_input_rows_behaviour": "never",
+          "inputs": [
+            {
+              "entities_filter": null,
+              "entity_id": null,
+              "hub_filters": null,
+              "property_id": "019d7cae-8551-7dcb-96aa-dfd9bc2c43af",
+              "target": "value",
+              "target_filter": {},
+              "via_property_id": null
+            }
+          ],
+          "is_grounded": true,
           "name": "Charity name",
-          "type": "text",
-          "description": "What is the charity_name @<Pproperty_xQE6JTgfBhwpqc__>",
-          "group": null,
-          "tool": "gpt_5_4",
-          "inputs": [
-            {
-              "target": "value",
-              "entity_id": null,
-              "property_id": "property_xQE6JTgfBhwpqc__",
-              "via_property_id": null,
-              "entities_filter": null,
-              "hub_filters": null,
-              "target_filter": {}
-            }
-          ],
-          "is_grounded": true,
-          "tool_config": {
-            "llm_config": {
-              "thinking_effort": "low",
-              "stream_progress_updates": false
-            },
-            "input_mode": "primary_and_extracted"
-          },
-          "enabled_skills": [],
           "skip_behaviour": "never",
-          "incomplete_collection_input_rows_behaviour": "never",
+          "tool": "gpt_5_4",
+          "tool_config": {
+            "dependencies": [],
+            "input_mode": "primary_and_extracted",
+            "llm_config": {
+              "stream_progress_updates": false,
+              "thinking_effort": "low"
+            },
+            "thinking_effort": "low"
+          },
+          "type": "text",
           "visible_in_entity_sidebar": true
         },
         {
-          "id": "property_2dJvbsGjeYo4AGkj",
+          "description": "What is the report_date @<P019d7cae-8551-7dcb-96aa-dfd9bc2c43af>",
+          "enabled_skills": [],
+          "group": null,
+          "id": "019d7ccc-ff7f-75f2-938d-b577d579382c",
+          "incomplete_collection_input_rows_behaviour": "never",
+          "inputs": [
+            {
+              "entities_filter": null,
+              "entity_id": null,
+              "hub_filters": null,
+              "property_id": "019d7cae-8551-7dcb-96aa-dfd9bc2c43af",
+              "target": "value",
+              "target_filter": {},
+              "via_property_id": null
+            }
+          ],
+          "is_grounded": true,
           "name": "Report date",
-          "type": "text",
-          "description": "What is the report_date @<Pproperty_xQE6JTgfBhwpqc__>",
-          "group": null,
-          "tool": "gpt_5_4",
-          "inputs": [
-            {
-              "target": "value",
-              "entity_id": null,
-              "property_id": "property_xQE6JTgfBhwpqc__",
-              "via_property_id": null,
-              "entities_filter": null,
-              "hub_filters": null,
-              "target_filter": {}
-            }
-          ],
-          "is_grounded": true,
-          "tool_config": {
-            "llm_config": {
-              "thinking_effort": "low",
-              "stream_progress_updates": false
-            },
-            "input_mode": "primary_and_extracted"
-          },
-          "enabled_skills": [],
           "skip_behaviour": "never",
-          "incomplete_collection_input_rows_behaviour": "never",
+          "tool": "gpt_5_4",
+          "tool_config": {
+            "dependencies": [],
+            "input_mode": "primary_and_extracted",
+            "llm_config": {
+              "stream_progress_updates": false,
+              "thinking_effort": "low"
+            },
+            "thinking_effort": "low"
+          },
+          "type": "text",
           "visible_in_entity_sidebar": true
         },
         {
-          "id": "property_jig9U2J7FX0FG6sy",
+          "description": "What is the income_annually in British pounds @<P019d7cae-8551-7dcb-96aa-dfd9bc2c43af>",
+          "enabled_skills": [],
+          "group": null,
+          "id": "019d7cd3-132f-770b-ad96-063c538d6ac0",
+          "incomplete_collection_input_rows_behaviour": "never",
+          "inputs": [
+            {
+              "entities_filter": null,
+              "entity_id": null,
+              "hub_filters": null,
+              "property_id": "019d7cae-8551-7dcb-96aa-dfd9bc2c43af",
+              "target": "value",
+              "target_filter": {},
+              "via_property_id": null
+            }
+          ],
+          "is_grounded": true,
           "name": "Income annually (GBP)",
-          "type": "text",
-          "description": "What is the income_annually in British pounds @<Pproperty_xQE6JTgfBhwpqc__>",
-          "group": null,
-          "tool": "gpt_5_4",
-          "inputs": [
-            {
-              "target": "value",
-              "entity_id": null,
-              "property_id": "property_xQE6JTgfBhwpqc__",
-              "via_property_id": null,
-              "entities_filter": null,
-              "hub_filters": null,
-              "target_filter": {}
-            }
-          ],
-          "is_grounded": true,
-          "tool_config": {
-            "llm_config": {
-              "thinking_effort": "low",
-              "stream_progress_updates": false
-            },
-            "input_mode": "primary_and_extracted"
-          },
-          "enabled_skills": [],
           "skip_behaviour": "never",
-          "incomplete_collection_input_rows_behaviour": "never",
+          "tool": "gpt_5_4",
+          "tool_config": {
+            "dependencies": [],
+            "input_mode": "primary_and_extracted",
+            "llm_config": {
+              "stream_progress_updates": false,
+              "thinking_effort": "low"
+            },
+            "thinking_effort": "low"
+          },
+          "type": "text",
           "visible_in_entity_sidebar": true
         },
         {
-          "id": "property_5t7pOQVuvX2T1C74",
+          "description": "What is the spending_annually in British pounds @<P019d7cae-8551-7dcb-96aa-dfd9bc2c43af>",
+          "enabled_skills": [],
+          "group": null,
+          "id": "019d7cd3-d2f5-7fdc-bc32-ad53a2a67fa1",
+          "incomplete_collection_input_rows_behaviour": "never",
+          "inputs": [
+            {
+              "entities_filter": null,
+              "entity_id": null,
+              "hub_filters": null,
+              "property_id": "019d7cae-8551-7dcb-96aa-dfd9bc2c43af",
+              "target": "value",
+              "target_filter": {},
+              "via_property_id": null
+            }
+          ],
+          "is_grounded": true,
           "name": "Spending annually (GBP) copy",
-          "type": "text",
-          "description": "What is the spending_annually in British pounds @<Pproperty_xQE6JTgfBhwpqc__>",
-          "group": null,
+          "skip_behaviour": "never",
           "tool": "gpt_5_4",
-          "inputs": [
-            {
-              "target": "value",
-              "entity_id": null,
-              "property_id": "property_xQE6JTgfBhwpqc__",
-              "via_property_id": null,
-              "entities_filter": null,
-              "hub_filters": null,
-              "target_filter": {}
-            }
-          ],
-          "is_grounded": true,
           "tool_config": {
+            "dependencies": [],
+            "input_mode": "primary_and_extracted",
             "llm_config": {
               "stream_progress_updates": false,
               "thinking_effort": "low"
             },
-            "input_mode": "primary_and_extracted"
+            "thinking_effort": "low"
           },
-          "enabled_skills": [],
-          "skip_behaviour": "never",
-          "incomplete_collection_input_rows_behaviour": "never",
+          "type": "text",
           "visible_in_entity_sidebar": true
         },
         {
-          "id": "property_Ef3nrdn-d46fGLvJ",
+          "description": "What is the address__postcode @<P019d7cae-8551-7dcb-96aa-dfd9bc2c43af>",
+          "enabled_skills": [],
+          "group": null,
+          "id": "019d7cd4-2470-7b18-9eff-97747c01abb6",
+          "incomplete_collection_input_rows_behaviour": "never",
+          "inputs": [
+            {
+              "entities_filter": null,
+              "entity_id": null,
+              "hub_filters": null,
+              "property_id": "019d7cae-8551-7dcb-96aa-dfd9bc2c43af",
+              "target": "value",
+              "target_filter": {},
+              "via_property_id": null
+            }
+          ],
+          "is_grounded": true,
           "name": "Postcode",
-          "type": "text",
-          "description": "What is the address__postcode @<Pproperty_xQE6JTgfBhwpqc__>",
-          "group": null,
+          "skip_behaviour": "never",
           "tool": "gpt_5_4",
-          "inputs": [
-            {
-              "target": "value",
-              "entity_id": null,
-              "property_id": "property_xQE6JTgfBhwpqc__",
-              "via_property_id": null,
-              "entities_filter": null,
-              "hub_filters": null,
-              "target_filter": {}
-            }
-          ],
-          "is_grounded": true,
           "tool_config": {
+            "dependencies": [],
+            "input_mode": "primary_and_extracted",
             "llm_config": {
               "stream_progress_updates": false,
               "thinking_effort": "low"
             },
-            "input_mode": "primary_and_extracted"
+            "thinking_effort": "low"
           },
-          "enabled_skills": [],
-          "skip_behaviour": "never",
-          "incomplete_collection_input_rows_behaviour": "never",
+          "type": "text",
           "visible_in_entity_sidebar": true
         },
         {
-          "id": "property_PBZ2GV1s35SJvhAj",
+          "description": "What is the address__street_line @<P019d7cae-8551-7dcb-96aa-dfd9bc2c43af>",
+          "enabled_skills": [],
+          "group": null,
+          "id": "019d7cd5-5f94-7343-9b26-804a953e8ad6",
+          "incomplete_collection_input_rows_behaviour": "never",
+          "inputs": [
+            {
+              "entities_filter": null,
+              "entity_id": null,
+              "hub_filters": null,
+              "property_id": "019d7cae-8551-7dcb-96aa-dfd9bc2c43af",
+              "target": "value",
+              "target_filter": {},
+              "via_property_id": null
+            }
+          ],
+          "is_grounded": true,
           "name": "Street line",
-          "type": "text",
-          "description": "What is the address__street_line @<Pproperty_xQE6JTgfBhwpqc__>",
-          "group": null,
+          "skip_behaviour": "never",
           "tool": "gpt_5_4",
-          "inputs": [
-            {
-              "target": "value",
-              "entity_id": null,
-              "property_id": "property_xQE6JTgfBhwpqc__",
-              "via_property_id": null,
-              "entities_filter": null,
-              "hub_filters": null,
-              "target_filter": {}
-            }
-          ],
-          "is_grounded": true,
           "tool_config": {
+            "dependencies": [],
+            "input_mode": "primary_and_extracted",
             "llm_config": {
               "stream_progress_updates": false,
               "thinking_effort": "low"
             },
-            "input_mode": "primary_and_extracted"
+            "thinking_effort": "low"
           },
-          "enabled_skills": [],
-          "skip_behaviour": "never",
-          "incomplete_collection_input_rows_behaviour": "never",
+          "type": "text",
           "visible_in_entity_sidebar": true
         },
         {
-          "id": "property_8Dyk136czPlgHzGH",
-          "name": "Town",
-          "type": "text",
-          "description": "What is the address__post_town @<Pproperty_xQE6JTgfBhwpqc__>",
+          "description": "What is the address__post_town @<P019d7cae-8551-7dcb-96aa-dfd9bc2c43af>",
+          "enabled_skills": [],
           "group": null,
-          "tool": "gpt_5_4",
+          "id": "019d7cd6-1bca-7cd7-b416-e2dd850a9bb8",
+          "incomplete_collection_input_rows_behaviour": "never",
           "inputs": [
             {
-              "target": "value",
-              "entity_id": null,
-              "property_id": "property_xQE6JTgfBhwpqc__",
-              "via_property_id": null,
               "entities_filter": null,
+              "entity_id": null,
               "hub_filters": null,
-              "target_filter": {}
+              "property_id": "019d7cae-8551-7dcb-96aa-dfd9bc2c43af",
+              "target": "value",
+              "target_filter": {},
+              "via_property_id": null
             }
           ],
           "is_grounded": true,
-          "tool_config": {
-            "llm_config": {
-              "thinking_effort": "low",
-              "stream_progress_updates": false
-            },
-            "input_mode": "primary_and_extracted"
-          },
-          "enabled_skills": [],
+          "name": "Town",
           "skip_behaviour": "never",
-          "incomplete_collection_input_rows_behaviour": "never",
+          "tool": "gpt_5_4",
+          "tool_config": {
+            "dependencies": [],
+            "input_mode": "primary_and_extracted",
+            "llm_config": {
+              "stream_progress_updates": false,
+              "thinking_effort": "low"
+            },
+            "thinking_effort": "low"
+          },
+          "type": "text",
           "visible_in_entity_sidebar": true
         }
       ],
-      "views": [],
       "triggers": [],
-      "main_view": {
-        "id": "view_E6HMpqvdG98g84tv",
-        "filters": [],
-        "property_ids": [
-          "property_xQE6JTgfBhwpqc__",
-          "property_rn-CqSypC6Aw0hT7",
-          "property_kJIBKAHnTfRpe3Dh",
-          "property_2dJvbsGjeYo4AGkj",
-          "property_jig9U2J7FX0FG6sy",
-          "property_5t7pOQVuvX2T1C74",
-          "property_Ef3nrdn-d46fGLvJ",
-          "property_PBZ2GV1s35SJvhAj",
-          "property_8Dyk136czPlgHzGH"
-        ],
-        "property_layouts": [
-          {
-            "x": 0,
-            "y": 12,
-            "width": 4,
-            "property_id": "property_PBZ2GV1s35SJvhAj",
-            "height": 4
-          },
-          {
-            "x": 0,
-            "y": 8,
-            "width": 4,
-            "property_id": "property_Ef3nrdn-d46fGLvJ",
-            "height": 4
-          },
-          {
-            "x": 8,
-            "y": 0,
-            "width": 4,
-            "property_id": "property_xQE6JTgfBhwpqc__",
-            "height": 4
-          },
-          {
-            "x": 0,
-            "y": 4,
-            "width": 4,
-            "property_id": "property_rn-CqSypC6Aw0hT7",
-            "height": 4
-          },
-          {
-            "x": 0,
-            "y": 0,
-            "width": 4,
-            "property_id": "property_kJIBKAHnTfRpe3Dh",
-            "height": 4
-          },
-          {
-            "x": 4,
-            "y": 0,
-            "width": 4,
-            "property_id": "property_2dJvbsGjeYo4AGkj",
-            "height": 4
-          },
-          {
-            "x": 4,
-            "y": 4,
-            "width": 4,
-            "property_id": "property_jig9U2J7FX0FG6sy",
-            "height": 4
-          },
-          {
-            "x": 8,
-            "y": 4,
-            "width": 4,
-            "property_id": "property_5t7pOQVuvX2T1C74",
-            "height": 4
-          },
-          {
-            "x": 4,
-            "y": 8,
-            "width": 4,
-            "property_id": "property_8Dyk136czPlgHzGH",
-            "height": 4
-          }
-        ],
-        "num_pinned_properties": 0,
-        "property_options": [
-          {
-            "property_id": "property_xQE6JTgfBhwpqc__",
-            "block_workers_edits": false
-          },
-          {
-            "property_id": "property_rn-CqSypC6Aw0hT7",
-            "block_workers_edits": false
-          },
-          {
-            "property_id": "property_kJIBKAHnTfRpe3Dh",
-            "block_workers_edits": false
-          },
-          {
-            "property_id": "property_2dJvbsGjeYo4AGkj",
-            "block_workers_edits": false
-          },
-          {
-            "property_id": "property_jig9U2J7FX0FG6sy",
-            "block_workers_edits": false
-          },
-          {
-            "property_id": "property_5t7pOQVuvX2T1C74",
-            "block_workers_edits": false
-          },
-          {
-            "property_id": "property_Ef3nrdn-d46fGLvJ",
-            "block_workers_edits": false
-          },
-          {
-            "property_id": "property_PBZ2GV1s35SJvhAj",
-            "block_workers_edits": false
-          },
-          {
-            "property_id": "property_8Dyk136czPlgHzGH",
-            "block_workers_edits": false
-          }
-        ]
-      }
+      "type": "regular",
+      "views": []
     }
-  ],
-  "external_objects": {}
+  ]
 }

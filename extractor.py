@@ -342,6 +342,37 @@ def _v7_model_cfg_for_run(model_short_name: str, agent_template_json_override: s
     return cfg
 
 
+def _v7_sync_templates_when_all_v7(
+    v7_models: list[str], agent_template_override: str | None
+) -> None:
+    """``--all-v7`` only: refresh each distinct ``agent_template_json`` from the V7 API (idempotent).
+
+    Writes e.g. ``v7_go_agent_v2_template.json`` before submit so Go Agent v2 runs do not require a
+    pre-checked-in export. Per-PDF property gaps are handled in ``llm_v7`` (preflight + optional auto-ensure).
+    """
+    import sync_v7_go_agent_template as sync_tpl
+
+    seen: set[str] = set()
+    for model_short_name in v7_models:
+        cfg = _v7_model_cfg_for_run(model_short_name, agent_template_override)
+        rel = cfg.get("agent_template_json")
+        if not rel:
+            continue
+        out = _resolve_v7_agent_template_cli_path(str(rel))
+        if out in seen:
+            continue
+        seen.add(out)
+        changed = sync_tpl.sync_v7_go_agent_template_to_path(out, validate_parse=True)
+        import llm_v7
+
+        llm_v7.invalidate_go_agent_template_cache(out)
+        log.info(
+            "[V7] --all-v7: synced agent template {} ({})",
+            out,
+            "wrote or updated" if changed else "unchanged",
+        )
+
+
 def _log_v7_skipped_marked_unavailable(model_short_name: str, reason: str, model_cfg: dict) -> None:
     """Log expanded context when a model is skipped because it is listed in .v7_unavailable_models.json."""
     import llm_v7
@@ -1551,7 +1582,8 @@ async def main():
     group.add_argument("--all-openrouter", action="store_true",
                        help="Run only OpenRouter models")
     group.add_argument("--all-v7", action="store_true",
-                       help="Run only V7 Go models (see config_models_v7.py)")
+                       help="Run only V7 Go models; refresh agent_template_json from the API before submit, "
+                            "then use preflight + auto-ensure for missing properties per Go Agent v2 run")
     parser.add_argument(
         "--v7-agent-template",
         metavar="PATH",
@@ -1563,8 +1595,10 @@ async def main():
 
     if args.v7_agent_template:
         _v7_t = _resolve_v7_agent_template_cli_path(args.v7_agent_template)
-        if not os.path.isfile(_v7_t):
-            parser.error(f"--v7-agent-template: not a file: {_v7_t}")
+        if not os.path.isfile(_v7_t) and not args.all_v7:
+            parser.error(
+                f"--v7-agent-template: not a file: {_v7_t} (omit the flag or use --all-v7 to sync from the API first)"
+            )
         args.v7_agent_template = _v7_t
 
     # Announce potentially_deprecated models (informational — they still run)
@@ -1651,16 +1685,35 @@ async def main():
 
     if v7_models:
         log.info("-" * 60)
-        if args.retry_failed:
-            log.info("V7 retry-failed ({} model(s) to check)", len(v7_models))
-            log.info("-" * 60)
-            v7_statuses = await _retry_failed_rows_v7(v7_models, args.v7_agent_template) or {}
+        if args.all_v7:
+            try:
+                _v7_sync_templates_when_all_v7(v7_models, args.v7_agent_template)
+            except Exception as e:
+                log.error("[V7] --all-v7 template sync failed: {}", e)
+                for model_short_name in v7_models:
+                    all_statuses[("v7", model_short_name)] = "failed"
+            else:
+                if args.retry_failed:
+                    log.info("V7 retry-failed ({} model(s) to check)", len(v7_models))
+                    log.info("-" * 60)
+                    v7_statuses = await _retry_failed_rows_v7(v7_models, args.v7_agent_template) or {}
+                else:
+                    log.info("Starting V7 ({} models)", len(v7_models))
+                    log.info("-" * 60)
+                    v7_statuses = await _run_all_v7(v7_models, args.v7_agent_template) or {}
+                for model_short_name in v7_models:
+                    all_statuses[("v7", model_short_name)] = v7_statuses.get(model_short_name, "unknown")
         else:
-            log.info("Starting V7 ({} models)", len(v7_models))
-            log.info("-" * 60)
-            v7_statuses = await _run_all_v7(v7_models, args.v7_agent_template) or {}
-        for model_short_name in v7_models:
-            all_statuses[("v7", model_short_name)] = v7_statuses.get(model_short_name, "unknown")
+            if args.retry_failed:
+                log.info("V7 retry-failed ({} model(s) to check)", len(v7_models))
+                log.info("-" * 60)
+                v7_statuses = await _retry_failed_rows_v7(v7_models, args.v7_agent_template) or {}
+            else:
+                log.info("Starting V7 ({} models)", len(v7_models))
+                log.info("-" * 60)
+                v7_statuses = await _run_all_v7(v7_models, args.v7_agent_template) or {}
+            for model_short_name in v7_models:
+                all_statuses[("v7", model_short_name)] = v7_statuses.get(model_short_name, "unknown")
 
     # Final summary
     _print_run_summary(all_statuses)

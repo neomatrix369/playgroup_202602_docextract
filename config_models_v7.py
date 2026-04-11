@@ -5,8 +5,9 @@
 #   - If multimodal: True — a **file** property whose slug matches file_field_slug / V7_GO_FILE_FIELD_SLUG
 #     (PDFs are resolved as V7_GO_PDF_DIR / <pdf_filename from TSV>; see llm_v7.py upload flow)
 #   - An output property (text / JSON) the agent fills with the same JSON shape as other backends
-#   - Go Agent v2: export the project JSON (e.g. v7_go_agent_v2_template.json), set agent_template_json on
-#     the model entry, multimodal True. llm_v7 creates empty entities, uploads PDFs to the File property, and
+#   - Go Agent v2: set agent_template_json (e.g. v7_go_agent_v2_template.json) and multimodal True.
+#     ``extractor.py --all-v7`` syncs that JSON from the API before submit; llm_v7 can auto-ensure missing
+#     properties and re-sync per run. llm_v7 creates empty entities, uploads PDFs to the File property, and
 #     merges tool-backed fields into one JSON object (property names mapped in llm_v7._V7_GO_AGENT_V2_PROPERTY_NAME_TO_KEY).
 #   - If the project is a collection (child) agent, set V7_GO_PARENT_ENTITY_ID (or parent_entity_id below)
 #

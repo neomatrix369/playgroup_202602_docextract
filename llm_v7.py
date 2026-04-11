@@ -29,6 +29,13 @@ Environment (see also config_models_v7.py per-model overrides):
   V7_GO_BASE_URL          — default https://go.v7labs.com (OpenAPI server in official docs).
                             STUB: v7-go-cli sometimes uses https://api.go.v7labs.com — try either if you see DNS/404 errors.
   V7_GO_DEBUG_HTTP        — if 1/true: log each entity GET (field statuses); noisy during polling.
+  V7_GO_PROPERTY_PREFLIGHT — if 1/true (default for Go Agent v2): before creating PDF entities, verify every
+                            property in ``agent_template_json`` exists on the live agent (GET properties).
+                            Set to 0/false to skip (faster, no extra API round-trip).
+  V7_GO_PROPERTY_PREFLIGHT_EACH_PDF — if 1/true: run that check before **each** PDF row (iterative scans);
+                            default 0 = once per batch (``submit_batch``) or per ``extract_one_row_async`` call.
+  V7_GO_AUTO_ENSURE_PROPERTIES — if 1/true (default): when preflight fails, POST missing properties from the
+                            template, re-sync ``agent_template_json`` from the API, then retry preflight once.
 
 STUB points are marked inline: token accounting and advanced error taxonomy.
 
@@ -85,6 +92,93 @@ _V7_GO_AGENT_V2_PROPERTY_NAME_TO_KEY: dict[str, str] = {
 
 _GO_AGENT_TEMPLATE_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 
+
+def invalidate_go_agent_template_cache(template_path: str | None = None) -> None:
+    """Drop cached parsed template so the next ``load_go_agent_v2_specs`` reads disk again."""
+    global _GO_AGENT_TEMPLATE_CACHE
+    if template_path is None:
+        _GO_AGENT_TEMPLATE_CACHE.clear()
+        return
+    want = os.path.abspath(template_path)
+    for k in list(_GO_AGENT_TEMPLATE_CACHE.keys()):
+        if os.path.abspath(k) == want:
+            _GO_AGENT_TEMPLATE_CACHE.pop(k, None)
+
+
+# Go Agent v2: optional list-properties preflight (see V7_GO_PROPERTY_PREFLIGHT*)
+_GO_V2_PROPERTY_PREFLIGHT_LOCK = asyncio.Lock()
+_GO_V2_PROPERTY_PREFLIGHT_DONE: set[tuple[str, str, str]] = set()
+
+
+def _env_truthy(name: str, default: str = "1") -> bool:
+    v = (os.getenv(name, default) or "").strip().lower()
+    return v in ("1", "true", "yes", "on")
+
+
+def _run_go_v2_property_preflight_sync(
+    template_abs: str, workspace_id: str, agent_id: str
+) -> None:
+    import v7_go_ensure
+
+    base = os.getenv("V7_GO_BASE_URL", "https://go.v7labs.com").rstrip("/")
+    key = _env_api_key()
+    if not key:
+        raise ValueError("V7_GO_API_KEY (or V7_API_KEY) is required for V7_GO_PROPERTY_PREFLIGHT")
+    with httpx.Client(
+        base_url=base,
+        headers={"X-API-KEY": key, "Accept": "application/json"},
+        timeout=httpx.Timeout(120.0, connect=30.0),
+    ) as c:
+        try:
+            v7_go_ensure.preflight_template_against_remote(
+                template_abs, c, workspace_id, agent_id
+            )
+        except v7_go_ensure.V7GoPreflightError:
+            if not _env_truthy("V7_GO_AUTO_ENSURE_PROPERTIES", "1"):
+                raise
+            logger.warning(
+                "[V7] Go Agent v2 preflight failed (template vs agent); auto-ensuring properties from {!r}",
+                template_abs,
+            )
+            rc = v7_go_ensure.ensure_properties(
+                c, workspace_id, agent_id, template_abs, dry_run=False
+            )
+            if rc != 0:
+                raise RuntimeError(
+                    f"v7_go_ensure.ensure_properties failed with exit code {rc} — fix the agent or template"
+                )
+            import sync_v7_go_agent_template as sync_tpl
+
+            sync_tpl.sync_v7_go_agent_template_to_path(
+                template_abs, validate_parse=True
+            )
+            invalidate_go_agent_template_cache(template_abs)
+            v7_go_ensure.preflight_template_against_remote(
+                template_abs, c, workspace_id, agent_id
+            )
+
+
+async def _maybe_preflight_go_v2_properties(model_cfg: dict[str, Any]) -> None:
+    """Verify template properties exist on the agent (Go Agent v2 only). No-op if disabled or no template."""
+    if not _env_truthy("V7_GO_PROPERTY_PREFLIGHT", "1"):
+        return
+    rel = model_cfg.get("agent_template_json")
+    if not rel:
+        return
+    path = _resolve_template_path(str(rel))
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"V7 property preflight: agent_template_json not found: {path!r}")
+    ws = _resolve_workspace_id(model_cfg)
+    agent = _resolve_agent_id(model_cfg)
+    key = (os.path.abspath(path), ws, agent)
+    each_pdf = _env_truthy("V7_GO_PROPERTY_PREFLIGHT_EACH_PDF", "0")
+    async with _GO_V2_PROPERTY_PREFLIGHT_LOCK:
+        if not each_pdf and key in _GO_V2_PROPERTY_PREFLIGHT_DONE:
+            return
+        await asyncio.to_thread(_run_go_v2_property_preflight_sync, path, ws, agent)
+        if not each_pdf:
+            _GO_V2_PROPERTY_PREFLIGHT_DONE.add(key)
+
 # Same conservative truncation heuristic as extractor uses for Doubleword rows
 _PROMPT_OVERHEAD_TOKENS = 500
 _CHARS_PER_TOKEN = 3
@@ -97,6 +191,21 @@ _V7_PROPERTY_UUID_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 )
 _V7_PROPERTY_EXPORT_ID_RE = re.compile(r"^property_[A-Za-z0-9_-]+$")
+
+
+def _v7_property_display_name_to_entity_field_slug(name: str) -> str:
+    """Map a V7 property display ``name`` to the kebab-case key used in entity ``fields`` JSON.
+
+    REST paths accept property UUIDs, but entity GET responses key ``fields`` by slug (e.g.
+    ``charity-number``), not by id. Export templates only carry ``id`` + ``name`` for tool fields.
+    """
+    s = str(name).strip().lower()
+    if not s:
+        return ""
+    s = re.sub(r"\(([^)]+)\)", r" \1 ", s)
+    s = re.sub(r"[^a-z0-9]+", "-", s)
+    s = re.sub(r"-+", "-", s).strip("-")
+    return s
 
 
 def _normalize_v7_property_id_or_slug(s: str) -> str:
@@ -240,8 +349,9 @@ def _resolve_template_path(template_filename: str) -> str:
 def parse_go_agent_export_for_v2(template: dict[str, Any]) -> dict[str, Any]:
     """Read a V7 Go project export JSON (e.g. v7_go_agent_v2_template.json).
 
-    Returns { "file_property_id": str, "v2_output_specs": [ {"slug": id, "field_key": str}, ... ] }.
-    Export ``id`` strings are normalized to satisfy OpenAPI PropertyIdOrSlug (lowercase slug or UUID).
+    Returns ``file_property_id`` and ``v2_output_specs`` with ``lookup_keys`` (uuid + name-derived slug)
+    so entity ``fields`` can be resolved: API paths accept property UUIDs, but entity JSON keys fields
+    by display-name slugs unless a nested field ``id`` matches the property uuid.
     """
     projects = template.get("projects") or []
     if not projects:
@@ -263,7 +373,26 @@ def parse_go_agent_export_for_v2(template: dict[str, Any]) -> dict[str, Any]:
             continue
         key = _V7_GO_AGENT_V2_PROPERTY_NAME_TO_KEY.get(name)
         if key:
-            specs.append({"slug": _normalize_v7_property_id_or_slug(str(pid)), "field_key": key})
+            pid_norm = _normalize_v7_property_id_or_slug(str(pid))
+            name_slug = _v7_property_display_name_to_entity_field_slug(name)
+            lookup_keys = [pid_norm]
+            if name_slug and name_slug not in lookup_keys:
+                lookup_keys.append(name_slug)
+            tpl_slug = prop.get("slug")
+            if tpl_slug and str(tpl_slug).strip():
+                try:
+                    sk = _normalize_v7_property_id_or_slug(str(tpl_slug))
+                    if sk not in lookup_keys:
+                        lookup_keys.insert(1, sk)
+                except ValueError:
+                    pass
+            specs.append(
+                {
+                    "field_key": key,
+                    "property_id": pid_norm,
+                    "lookup_keys": lookup_keys,
+                }
+            )
             continue
         if ptype == "text" and tool and str(tool) != "manual":
             unmapped_tool_text.append(f"{name!r} ({pid})")
@@ -628,6 +757,35 @@ def _entity_fields_get(fields: dict[str, Any], key: str) -> Any:
     return None
 
 
+def _go_v2_resolve_field_object(fields: dict[str, Any], spec: dict[str, Any]) -> Any | None:
+    """Find the field blob for one Go Agent v2 output spec (uuid key, slug keys, or nested ``id``)."""
+    for lk in spec.get("lookup_keys") or ():
+        fo = _entity_fields_get(fields, str(lk))
+        if fo is not None:
+            return fo
+    pid = str(spec.get("property_id") or spec.get("slug") or "").strip().lower()
+    if pid and _V7_PROPERTY_UUID_RE.match(pid):
+        for fo in fields.values():
+            if isinstance(fo, dict):
+                fid = str(fo.get("id") or "").strip().lower()
+                if fid == pid:
+                    return fo
+    fk = spec.get("field_key")
+    if fk:
+        for display_name, dk in _V7_GO_AGENT_V2_PROPERTY_NAME_TO_KEY.items():
+            if dk == fk:
+                ns = _v7_property_display_name_to_entity_field_slug(display_name)
+                if ns:
+                    fo = _entity_fields_get(fields, ns)
+                    if fo is not None:
+                        return fo
+                break
+    leg = spec.get("slug")
+    if leg and not spec.get("lookup_keys"):
+        return _entity_fields_get(fields, str(leg))
+    return None
+
+
 def _field_blob(field_obj: Any) -> tuple[str, str | None, str | None]:
     """Return (status, text_value_or_none, error_message_or_none) for a field object from entity JSON."""
     if not isinstance(field_obj, dict):
@@ -841,11 +999,14 @@ def _v2_row_status(
     any_pending = False
 
     for spec in v2_specs:
-        slug = spec["slug"]
         field_key = spec["field_key"]
-        fo = _entity_fields_get(fields, slug)
+        fo = _go_v2_resolve_field_object(fields, spec)
         if fo is None:
-            row_errors.append(f"missing property {slug!r}")
+            ref = spec.get("property_id") or spec.get("slug")
+            tried = spec.get("lookup_keys") or ([spec["slug"]] if spec.get("slug") else [])
+            row_errors.append(
+                f"missing property for {field_key!r} (id={ref!r}; tried keys {tried!r})"
+            )
             continue
         st, val, err = _field_blob(fo)
         if st in ("error", "failed", "cancelled"):
@@ -937,7 +1098,7 @@ async def _build_v2_results_from_entities(
     ws = entry["workspace_id"]
     agent = entry["agent_id"]
     entity_map: dict[str, str] = entry["entity_ids"]
-    v2_specs: list[dict[str, str]] = entry["v2_output_specs"]
+    v2_specs: list[dict[str, Any]] = entry["v2_output_specs"]
     results: dict[int, dict[str, Any]] = {}
 
     for row_key, entity_id in entity_map.items():
@@ -1007,6 +1168,11 @@ async def submit_batch(
                 f"V7 model {model_short_name!r} uses agent_template_json (Go Agent v2); "
                 "set multimodal=True — each row must supply a PDF filename (OCR text is not sent)."
             )
+        if not _env_truthy("V7_GO_PROPERTY_PREFLIGHT_EACH_PDF", "0"):
+            await _maybe_preflight_go_v2_properties(model_cfg)
+            go_v2 = load_go_agent_v2_specs(model_cfg)
+            if not go_v2:
+                raise RuntimeError("Go Agent v2 template missing after property preflight")
         file_slug, file_src = _resolve_go_v2_file_field_pair(model_cfg, go_v2)
         v2_output_specs = go_v2["v2_output_specs"]
         logger.debug("[V7] Go Agent v2 file property for upload: {!r} (source={})", file_slug, file_src)
@@ -1028,7 +1194,14 @@ async def submit_batch(
     entity_ids: dict[str, str] = {}
 
     async def _create_one(row_num: int, pdf_filename: str, text_combined: str) -> None:
+        nonlocal file_slug, v2_output_specs
         if go_v2:
+            if _env_truthy("V7_GO_PROPERTY_PREFLIGHT_EACH_PDF", "0"):
+                await _maybe_preflight_go_v2_properties(model_cfg)
+                gv2 = load_go_agent_v2_specs(model_cfg)
+                if gv2:
+                    file_slug, _fsrc = _resolve_go_v2_file_field_pair(model_cfg, gv2)
+                    v2_output_specs = gv2["v2_output_specs"]
             pdf_path = os.path.join(pdf_dir, pdf_filename)
             if not os.path.isfile(pdf_path):
                 raise FileNotFoundError(
@@ -1203,6 +1376,13 @@ async def extract_one_row_async(
             pdf_path = os.path.join(_resolve_pdf_dir(), pdf_basename)
             if not os.path.isfile(pdf_path):
                 return {"error": f"PDF not found: {pdf_path}", "raw": {}}
+            try:
+                await _maybe_preflight_go_v2_properties(model_cfg)
+            except Exception as e:
+                return {"error": f"property preflight failed: {e}", "raw": {}}
+            go_v2 = load_go_agent_v2_specs(model_cfg)
+            if not go_v2:
+                return {"error": "Go Agent v2 template missing after preflight", "raw": {}}
             data = await _post_entity(
                 client, ws, agent, {}, wait_for_slugs=None, parent_entity_id=parent_eid
             )

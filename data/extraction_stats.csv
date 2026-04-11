@@ -19,3 +19,4 @@ datetime,provider,model_short_name,model_full_name,tier,multimodal,price_in,pric
 2026-03-29 02:12:15,Doubleword,dw-deepseek-ocr-2,deepseek-ai/DeepSeek-OCR-2,ultra_cheap,False,0.08,0.08,262000,11,0,11,14113,43876,3453,0.003786,1283.0,0.000344,0,0,0,0,0,0,0,0,c2b12480-6079-4dab-a7bd-de1ad1f3fa5b
 2026-03-29 02:12:15,Doubleword,dw-olmocr-2-7b-1025-fp8,allenai/olmOCR-2-7B-1025-FP8,ultra_cheap,False,0.15,0.15,262000,11,8,3,32214,49696,1128,0.007624,2928.55,0.000693,8,8,8,8,8,8,8,8,8575b4b8-784a-47b3-8833-e467bc711091
 2026-03-31 18:50:16,Doubleword,dw-lightonocr-2-1b-bbox-soup,lightonai/LightOnOCR-2-1B-bbox-soup,ultra_cheap,False,0.08,0.08,262000,11,1,10,117,49696,35480,0.006814,10.64,0.000619,1,1,1,1,1,1,1,1,f175829b-4416-4adf-b89f-1d4850a0a9c1
+2026-04-11 16:53:48,V7,v7-go-agent-v2,V7 Go — v7_go_agent_v2 (PDF + per-property tools),v7,True,0.0,0.0,262000,11,0,11,5.89,0,0,0.0,0.54,0.0,0,0,0,0,0,0,0,0,1ee2f84f-0cda-4820-b546-c16d5c2e4195
