@@ -51,7 +51,7 @@ V7_GO_AGENT_ID=your-agent-uuid
 # V7_GO_PARENT_ENTITY_ID=…       # collection agents only — parent *entity* id, not project/agent id
 ```
 
-The OpenRouter key is required for OpenRouter models. The Doubleword key is only needed for `DOUBLEWORD_MODELS` entries (e.g. `dw-qwen3.5-9b`). The V7 variables are only needed for `V7_MODELS` entries. For V7, read [README.md](README.md) — **V7 Go (optional backend)** — especially **File property for Go Agent v2** and **V7_GO_PARENT_ENTITY_ID** if you use `agent_template_json` or child projects. A compact V7-only checklist is in [docs/v7-go.md](docs/v7-go.md).
+The OpenRouter key is required for OpenRouter models. The Doubleword key is only needed for `DOUBLEWORD_MODELS` entries (e.g. `dw-qwen3.5-9b`). The V7 variables are only needed for `V7_MODELS` entries. **Registry sizes (for mental model):** ~33 OpenRouter models, 12 Doubleword extraction models (pricing auto-synced on each `extractor.py` run), 32 optional V7 keys — see [README — Key Findings](README.md#key-findings) and [Auto-Sync Pricing](README.md#auto-sync-pricing). For V7 setup detail, read [README.md](README.md) — **V7 Go (optional backend)** — especially **File property for Go Agent v2** and **V7_GO_PARENT_ENTITY_ID** if you use `agent_template_json` or child projects. A compact V7-only checklist is in [docs/v7-go.md](docs/v7-go.md).
 
 ---
 
@@ -113,4 +113,4 @@ Head to [README.md](README.md) for the full end-to-end workflow. The key command
 
 The same applies to `score.py`: no args scores all models and prints a leaderboard; pass a filename for a verbose diff of one model.
 
-After scoring, regenerate the static playground with `python playground.py` or `uv run python playground.py` so [which-models-extracted-playground.html](which-models-extracted-playground.html) matches `data/`. Long V7-style ids such as `v7-go-agent-v2__gpt4-1` are shown in shortened form in the printed leaderboard and playground **where every `__`-suffixed id shares the same prefix**; filenames and `extraction_stats.csv` always use the full id (see [README — Results](README.md#results)).
+After scoring, regenerate the static playground with `python playground.py` or `uv run python playground.py` so [which-models-extracted-playground.html](which-models-extracted-playground.html) embeds the same results as `data/` (all providers, including V7). Long V7-style ids such as `v7-go-agent-v2__gpt4-1` are shown in shortened form in the printed leaderboard and playground **where every `__`-suffixed id shares the same prefix**; filenames and `extraction_stats.csv` always use the full id (see [README — Results](README.md#results)). When you change `data/`, update the README **Key Findings** provider table from the **Provider summary** block at the end of `python score.py` if you want the doc to stay in sync.

@@ -51,9 +51,10 @@ def load_model_meta() -> dict:
     try:
         from config_models_openrouter import OPENROUTER_MODELS
         from config_models_doubleword import DOUBLEWORD_MODELS
+        from config_models_v7 import V7_MODELS
     except ImportError:
         return {}
-    all_models = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS}
+    all_models = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS, **V7_MODELS}
     meta = {}
     for short_name, cfg in all_models.items():
         if not isinstance(cfg, dict):
@@ -70,6 +71,11 @@ def load_model_meta() -> dict:
             "ctx":        cfg.get("ctx"),
             "notes":      cfg.get("notes", ""),
         }
+    # TSV filenames use __ where V7 registry keys use / (e.g. v7-go-agent-v2__gpt4-1)
+    for short_name, block in list(meta.items()):
+        if short_name.startswith("v7-") and "/" in short_name:
+            alias = short_name.replace("/", "__", 1)
+            meta.setdefault(alias, block)
     return meta
 
 
@@ -161,7 +167,8 @@ def load_extraction_stats() -> dict:
         try:
             from config_models_openrouter import OPENROUTER_MODELS
             from config_models_doubleword import DOUBLEWORD_MODELS
-            all_models = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS}
+            from config_models_v7 import V7_MODELS
+            all_models = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS, **V7_MODELS}
         except ImportError:
             all_models = {}
         for model_name, cfg in all_models.items():
@@ -401,6 +408,7 @@ tr:hover td{background:var(--surface2)}
 .badge-orange{background:#ffedd5;color:#9a3412}
 .badge-red{background:#fee2e2;color:#991b1b}
 .badge-gray{background:#f1f5f9;color:#475569}
+.badge-v7{background:#ede9fe;color:#5b21b6}
 .heatmap{overflow-x:auto}
 .heatmap table td,.heatmap table th{padding:5px 6px;text-align:center;font-size:12px;white-space:nowrap}
 .heatmap table th{font-size:11px;background:var(--surface2)}
@@ -735,12 +743,12 @@ function modelDisplayName(m){
   const p = sharedModelDisplayPrefix()
   return p && m.startsWith(p) ? m.slice(p.length) : m
 }
-const TIER_ORDER = ['free','ultra-cheap','great-value','premium']
+const TIER_ORDER = ['free','ultra-cheap','great-value','premium','v7']
 function tierLabel(t){
-  return {'free':'Free','ultra-cheap':'Ultra-cheap','great-value':'Great Value','premium':'Premium'}[t]||t
+  return {'free':'Free','ultra-cheap':'Ultra-cheap','great-value':'Great Value','premium':'Premium','v7':'V7 Go'}[t]||t
 }
 function tierBadgeCls(t){
-  return {'free':'badge-gray','ultra-cheap':'badge-blue','great-value':'badge-green','premium':'badge-yellow'}[t]||'badge-gray'
+  return {'free':'badge-gray','ultra-cheap':'badge-blue','great-value':'badge-green','premium':'badge-yellow','v7':'badge-v7'}[t]||'badge-gray'
 }
 function costTierBadge(m){
   const t = RAW.model_meta?.[m]?.tier || 'unknown'
@@ -748,12 +756,15 @@ function costTierBadge(m){
 }
 function providerLabel(m){
   const p = RAW.model_providers?.[m] || 'unknown'
-  return p.charAt(0).toUpperCase() + p.slice(1)
+  return p === 'v7' ? 'V7 Go' : (p.charAt(0).toUpperCase() + p.slice(1))
+}
+function providerChartLabel(p){
+  return p === 'v7' ? 'V7 Go' : (p.charAt(0).toUpperCase() + p.slice(1))
 }
 function providerBadge(m){
   const p = RAW.model_providers?.[m] || 'unknown'
-  const cls = {'openrouter':'badge-blue','doubleword':'badge-yellow'}[p]||'badge-gray'
-  const label = p.charAt(0).toUpperCase() + p.slice(1)
+  const cls = {'openrouter':'badge-blue','doubleword':'badge-yellow','v7':'badge-v7'}[p]||'badge-gray'
+  const label = p === 'v7' ? 'V7 Go' : (p.charAt(0).toUpperCase() + p.slice(1))
   return `<span class="badge ${cls}">${label}</span>`
 }
 function allProviders(){
@@ -812,7 +823,7 @@ function renderRankings(){
   const provSel = document.getElementById('rank-provider')
   providers.forEach(p=>{
     const opt = document.createElement('option')
-    opt.value = p; opt.text = p.charAt(0).toUpperCase()+p.slice(1)
+    opt.value = p; opt.text = p === 'v7' ? 'V7 Go' : (p.charAt(0).toUpperCase() + p.slice(1))
     provSel.appendChild(opt)
   })
   renderRankTable()
@@ -1423,6 +1434,7 @@ function renderProviderAnalysis(){
   const totalActive = activeModels().length
   const dwCount = mods.filter(m=>(RAW.model_providers?.[m]||'')==='doubleword').length
   const orCount = mods.filter(m=>(RAW.model_providers?.[m]||'')==='openrouter').length
+  const v7Count = mods.filter(m=>(RAW.model_providers?.[m]||'')==='v7').length
   document.getElementById('provider-stats-bar').innerHTML = `
     <div class="stat-card"><div class="val">${providers.length}</div><div class="lbl">Providers</div></div>
     <div class="stat-card"><div class="val">${totalConfigured}</div><div class="lbl">Models configured</div></div>
@@ -1430,6 +1442,7 @@ function renderProviderAnalysis(){
     <div class="stat-card"><div class="val">${totalActive}</div><div class="lbl">Active (F1 > 0)</div></div>
     <div class="stat-card"><div class="val">${orCount}</div><div class="lbl">OpenRouter</div></div>
     <div class="stat-card"><div class="val">${dwCount}</div><div class="lbl">Doubleword</div></div>
+    <div class="stat-card"><div class="val">${v7Count}</div><div class="lbl">V7 Go</div></div>
   `
 
   // Provider F1 comparison chart
@@ -1446,7 +1459,7 @@ function renderProviderAnalysis(){
   chartProviderF1 = new Chart(ctx1,{
     type:'bar',
     data:{
-      labels: provData.map(d=>d.p.charAt(0).toUpperCase()+d.p.slice(1)),
+      labels: provData.map(d=>providerChartLabel(d.p)),
       datasets:[
         {label:'Avg F1', data:provData.map(d=>+(d.avg*100).toFixed(1)), backgroundColor:'rgba(99,102,241,0.6)', borderRadius:4},
         {label:'Best F1', data:provData.map(d=>+(d.best*100).toFixed(1)), backgroundColor:'rgba(16,185,129,0.6)', borderRadius:4}
@@ -1460,8 +1473,8 @@ function renderProviderAnalysis(){
   })
 
   // Tier distribution chart
-  const tierColors = {'free':'#94a3b8','ultra-cheap':'#3b82f6','great-value':'#10b981','premium':'#f59e0b'}
-  const tierLabels = ['free','ultra-cheap','great-value','premium']
+  const tierColors = {'free':'#94a3b8','ultra-cheap':'#3b82f6','great-value':'#10b981','premium':'#f59e0b','v7':'#8b5cf6'}
+  const tierLabels = ['free','ultra-cheap','great-value','premium','v7']
   const datasets = tierLabels.map(t=>({
     label: tierLabel(t),
     data: providers.map(p=>{
@@ -1474,7 +1487,7 @@ function renderProviderAnalysis(){
   if(chartProviderTiers) chartProviderTiers.destroy()
   chartProviderTiers = new Chart(ctx2,{
     type:'bar',
-    data:{labels: providers.map(p=>p.charAt(0).toUpperCase()+p.slice(1)), datasets},
+    data:{labels: providers.map(p=>providerChartLabel(p)), datasets},
     options:{
       responsive:true, maintainAspectRatio:false,
       plugins:{legend:{position:'top'}},
@@ -1537,7 +1550,7 @@ function renderProviderAnalysis(){
   const catSel = document.getElementById('catalog-provider')
   providers.forEach(p=>{
     const opt = document.createElement('option')
-    opt.value = p; opt.text = p.charAt(0).toUpperCase()+p.slice(1)
+    opt.value = p; opt.text = p === 'v7' ? 'V7 Go' : (p.charAt(0).toUpperCase() + p.slice(1))
     catSel.appendChild(opt)
   })
   renderModelCatalog()
@@ -1594,6 +1607,7 @@ function renderEvolution(){
     {phase:'Extended Results', commits:'5d92ce5', detail:'Ran extractions for 8 additional models (claude-3.5-haiku, command-r-plus, gemma-3-27b-free, etc.). Added extraction_stats.csv with per-model timing and cost data.', icon:'📊'},
     {phase:'Cost & Speed Tracking', commits:'5b13d98, f640b10', detail:'Added time and cost columns to the scoring leaderboard and playground. Reads actual elapsed time and API cost from extraction stats. Estimates costs for models without stats using config pricing. Added Project Evolution tab.', icon:'💰'},
     {phase:'Doubleword Batch API', commits:'05ed52c, 2777ca6', detail:'Added Doubleword as a second provider with batch API extraction pipeline. Created config_models_doubleword.py with 8 models (Qwen3, GPT-OSS). Updated pricing from official Doubleword docs.', icon:'🔗'},
+    {phase:'V7 Go backend', commits:'—', detail:'Optional third provider: entity + PDF upload via llm_v7.py, 32 registry keys in config_models_v7.py, outputs playgroup_dev_extracted__v7__*.tsv. score.py and the playground treat v7 like OpenRouter/Doubleword (F1 from TSVs; time/cost from extraction_stats when present).', icon:'🟣'},
     {phase:'Unified Multi-Provider Extractor', commits:'777f280, cffb225, e707ad2', detail:'Combined separate OpenRouter/Doubleword extractors into a single unified extractor.py with auto-detected backend. Renamed legacy files with provider suffixes (config_models_openrouter.py, llm_openrouter_calls.log).', icon:'⚙️'},
     {phase:'Provider-Aware Pipeline', commits:'7297e92, 5cb5fef', detail:'Added provider name to all prints, logs, filenames, and CSV columns. Defaults to running all providers. Added --all-openrouter flag for OpenRouter-only runs. Updated docs for the multi-provider workflow.', icon:'🏷️'},
     {phase:'Doubleword Extraction Results', commits:'c7d5a37', detail:'Ran extraction for 7 Doubleword models (dw-qwen3.5-9b, dw-qwen3.5-35b, dw-qwen3-14b, dw-gpt-oss-20b, dw-qwen3-vl-30b, dw-qwen3-vl-235b, dw-qwen3.5-397b). Added checkpoint/resume and parallel batch submission for Doubleword pipeline.', icon:'📊'},
@@ -1629,7 +1643,7 @@ function renderEvolution(){
       <tr><td style="font-weight:600">Documents in corpus</td><td>${RAW.doc_names.length} charity PDFs (UK, 100+ pages each)</td></tr>
       <tr><td style="font-weight:600">Fields extracted per doc</td><td>${RAW.fields.length} (identity, financial, address)</td></tr>
       <tr><td style="font-weight:600">Models configured</td><td>${allModels().length} total, ${active.length} functional, ${failed} failed (F1=0)</td></tr>
-      <tr><td style="font-weight:600">API providers</td><td>${allProviders().map(p=>p.charAt(0).toUpperCase()+p.slice(1)).join(', ')} (${allProviders().length} providers)</td></tr>
+      <tr><td style="font-weight:600">API providers</td><td>${allProviders().map(p=>providerChartLabel(p)).join(', ')} (${allProviders().length} providers)</td></tr>
       <tr><td style="font-weight:600">Total field comparisons</td><td>${totalExtractions} expected values scored</td></tr>
       <tr><td style="font-weight:600">Best model (F1)</td><td><strong>${modelDisplayName(bestModelF1)}</strong> at F1=${f1Score(bestModelF1).toFixed(3)}</td></tr>
       <tr><td style="font-weight:600">Average F1</td><td>${avgF1.toFixed(3)} across ${active.length} functional models</td></tr>

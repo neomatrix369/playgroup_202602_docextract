@@ -9,25 +9,28 @@ Extract structured fields from UK charity financial PDFs using LLMs via [OpenRou
 > - **Playgroup attendees** — start with [QUICKSTART.md](QUICKSTART.md), then follow the [Workflow](#end-to-end-workflow) section below.
 > - **Curious explorers** — read the [Key Findings](#key-findings) and open the [interactive playground](which-models-extracted-playground.html) to browse results without running any code.
 > - **Contributors / extenders** — see [Repo Reference](#whats-in-this-repo) for the full file map and how pieces connect.
-> - **Doubleword team** — see [Key Findings](#key-findings) for benchmark results, the [Doubleword Batch API](#doubleword-batch-api-configmodelsdoublewordpy) tier table, and note the [timing and cost](#doubleword-batch-api--timing-and-cost) details.
+> - **Doubleword team** — see [Key Findings](#key-findings) for benchmark results, the [Doubleword Batch API](#doubleword-batch-api-configmodelsdoublewordpy) tier table, and note the [timing and cost](#doubleword-batch-api--timing-and-cost) details. V7 rows show up in the same `score.py` / playground outputs once `data/playgroup_dev_extracted__v7__*.tsv` exist — see [V7 Go — Timing and cost](#v7-go--timing-and-cost) and [pricing](#auto-sync-pricing) below.
 > - **V7 Go users** — see [V7 Go (optional backend)](#v7-go-optional-backend), the [V7 registry](#v7-registry) table, and the focused guide [docs/v7-go.md](docs/v7-go.md).
 
 ---
 
 ## Key Findings
 
-> **Snapshot below:** 2026-03-31 — 52 models (40 OpenRouter, 12 Doubleword), before large V7 Go sweeps. The repo’s `data/` and `extraction_stats.csv` may list many more runs (including V7); run `python score.py` and open the [playground](which-models-extracted-playground.html) for current counts and rankings. Doubleword model pricing is auto-synced from their docs site at each `extractor.py` run.
+> **Provider aggregates below** match `python score.py` over every `data/playgroup_dev_extracted__*__.tsv` present on **2026-04-11** (85 scored runs: 40 OpenRouter, 12 Doubleword, 33 V7). **Registries:** ~33 OpenRouter keys, 12 Doubleword models (auto-synced pricing), 32 V7 keys — see `config_models_*.py`. Refresh numbers and [which-models-extracted-playground.html](which-models-extracted-playground.html) after new extractions: `python score.py` (check the printed **Provider summary**), then `python playground.py`.
 
-**V7 Go** is a third extraction backend (optional). It does not appear in the numeric summary tables below because those rows are historically OpenRouter + Doubleword only. Any completed V7 run produces `data/playgroup_dev_extracted__v7__*.tsv` files and is picked up automatically by `python score.py` and `python playground.py` alongside the other providers.
+**V7 Go** is a third extraction backend (optional). Completed runs write `data/playgroup_dev_extracted__v7__*.tsv`; `python score.py` and the playground score them like OpenRouter and Doubleword.
 
-**Provider summary** (active = models with F1 > 0):
+**Provider summary** (active = models with F1 > 0; same math as the tail of `python score.py`):
 
 | Provider | Models | Active | Failed | Avg F1 | Best F1 | Best Model | Avg Fields | Avg Time(s) | Avg Cost($) |
 |----------|--------|--------|--------|--------|---------|------------|------------|-------------|-------------|
 | Doubleword | 12 | 10 | 2 | 0.775 | 0.927 | dw-qwen3.5-9b | 60.0/85 (71%) | 5,336.2 | 0.0216 |
-| OpenRouter | 40 | 27 | 13 | 0.753 | 0.946 | gemini-3-pro | 56.0/85 (66%) | 2,029.7 | 0.0922 |
+| OpenRouter | 40 | 27 | 13 | 0.753 | 0.946 | gemini-3-pro | 56.0/85 (66%) | 3,612.8 | 0.0922 |
+| V7 Go | 33 | 33 | 0 | 0.833 | 0.852 | v7-go-agent-v2__gpt4-1† | 62.8/85 (74%) | 123.8 | 0.0000 |
 
-Doubleword has a higher average F1 (0.872 vs 0.753) and a much lower failure rate (11% vs 32%), though OpenRouter's best model (`gemini-3-pro`) holds the overall top score. OpenRouter's average is dragged down by free-tier models that universally failed on this task. Doubleword's average cost per active model ($0.03) is ~3.6× cheaper than OpenRouter's ($0.09).
+† Leaderboard / playground may show **`gpt4-1`** when every `v7-go-agent-v2__*` model shares that prefix (short display rule). **V7 cost** stays **0** in these aggregates until you set `price_in` / `price_out` in `config_models_v7.py`; **`batch_id`** in CSV is synthetic — see [V7 Go — Timing and cost](#v7-go--timing-and-cost).
+
+Doubleword’s snapshot **average** F1 among active models (0.775) edges OpenRouter’s (0.753); OpenRouter still has the highest **single-model** F1 (`gemini-3-pro`, 0.946). **V7** in this dataset averages **0.833** F1 with **no** failed (F1=0) runs among the 33 scored files. OpenRouter’s average is dragged down by free-tier failures; Doubleword’s average cost per active model (~$0.022) is lower than OpenRouter’s (~$0.092). V7 dollar totals stay at zero until pricing is mirrored into config (see [Auto-Sync Pricing](#auto-sync-pricing)).
 
 **Top 5 models by F1 score:**
 
@@ -39,6 +42,8 @@ Doubleword has a higher average F1 (0.872 vs 0.753) and a much lower failure rat
 | 4 | gemini-3-flash | OpenRouter | 0.926 | 0.962 | 0.893 | 76/85 (89%) |
 | 5 | gemini-2.5-flash | OpenRouter | 0.922 | 0.962 | 0.885 | 75/85 (88%) |
 
+*(No V7 model in the global top five on 2026-04-11; best V7 run is **v7-go-agent-v2__gpt4-1** at F1 **0.852**, ranked just below the OpenRouter / Doubleword leaders — run `python score.py` for the full sort.)*
+
 **Takeaways:**
 
 - **Doubleword's cheapest model topped the value chart.** `dw-qwen3.5-9b` (ultra_cheap tier, $0.04/M input) ranked 3rd overall at 0.927 F1, outperforming premium models like `mistral-large` and `claude-3.5-haiku`.
@@ -46,6 +51,7 @@ Doubleword has a higher average F1 (0.872 vs 0.753) and a much lower failure rat
 - **Free-tier models universally failed** on this task — all 14 zero-score models are either free-tier or had context/format issues. This includes `llama-3.3-70b-free`, `gemma-3-27b-free`, `gemma-3n-free`, and others.
 - **Precision is consistently high across scoring models** (0.96–0.97), meaning when models extract a field, they're usually correct. The differentiator is recall — whether they find all fields.
 - **The hardest fields** are `income_annually_in_british_pounds` and `spending_annually_in_british_pounds` — even top models miss these on some documents.
+- **V7 Go** uses the same field schema and scorer; quality depends on your deployed agent and template. Use `--all-v7` or a single `v7-*` key, then compare F1 side-by-side with OpenRouter and Doubleword in `score.py` and the playground.
 
 For the full interactive breakdown (field heatmaps, per-document analysis, error patterns, provider comparisons), open the **[Model Extraction Playground](which-models-extracted-playground.html)** locally in a browser. It has 8 tabs: Rankings, Field Heatmap, Document Analysis, Error Breakdown, Deep Dive, Recommendations, Provider Analysis, and Project Evolution.
 
@@ -53,9 +59,21 @@ For the full interactive breakdown (field heatmaps, per-document analysis, error
 
 Doubleword batch stats (elapsed time, tokens, cost) were backfilled by querying batch metadata via `batches.list()`. The pipeline now uses API-reported `created_at`/`completed_at` timestamps for accurate elapsed time and stores `batch_id` for traceability. Per-request cost is computed from token counts and config pricing. The only model without stats is `dw-qwen3.5-397b`, which returned empty results.
 
-### Auto-Sync Pricing
+<a id="v7-go--timing-and-cost"></a>
 
-Model pricing is automatically synced from Doubleword's [agent-friendly docs endpoint](https://docs.doubleword.ai/inference-api/model-pricing.md) (`llms.txt` enabled) at the start of each `extractor.py` run via `sync_doubleword_models.py`. This means `config_models_doubleword.py` is auto-generated — no manual edits needed. If nothing has changed, the sync is skipped silently.
+### V7 Go — Timing and cost
+
+V7 runs are **async** with **checkpoints** and **resume** (`data/.v7_checkpoints.json`), similar in spirit to Doubleword batch polling. There is no Doubleword-style `batches.list()` backfill: elapsed time is measured around this client’s create → upload (when applicable) → poll loop. **Token counts are not returned** on the entity API path used here, so cost in `extraction_stats.csv` is derived only from optional `price_in` / `price_out` on each `V7_MODELS` entry (often leaving **$0**). The **`batch_id`** column stores a **synthetic** identifier for the run checkpoint map, not a Doubleword batch id. Failed rows and unavailable models are tracked in `data/.v7_failed_rows.json` and `data/.v7_unavailable_models.json` (parallel to Doubleword’s `data/.doubleword_*` files).
+
+<a id="auto-sync-pricing"></a>
+
+### Auto-Sync Pricing (Doubleword) and other registries
+
+**Doubleword** — Model pricing is automatically synced from Doubleword's [agent-friendly docs endpoint](https://docs.doubleword.ai/inference-api/model-pricing.md) (`llms.txt` enabled) at the start of each `extractor.py` run via `sync_doubleword_models.py`. This means `config_models_doubleword.py` is auto-generated — no manual edits needed. If nothing has changed, the sync is skipped silently.
+
+**OpenRouter** — The ~33 models and their per-token pricing live in `config_models_openrouter.py` and are **maintained manually** in this repo; `extractor.py` does not fetch them from a remote pricing API.
+
+**V7 Go** — Same as OpenRouter: **no auto-sync**. All **32** entries are hand-maintained in `config_models_v7.py`. Until you set realistic `price_in` / `price_out`, leaderboard **Cost($)** for V7 will usually read **0** even though V7 may bill you in their product UI.
 
 ### V7 Go — quick pointers
 
@@ -87,7 +105,7 @@ The key result files:
 
 | File | What it shows |
 |---|---|
-| `data/extraction_stats.csv` | One row per model run: provider, tier, row counts, per-field hit rates, time, cost |
+| `data/extraction_stats.csv` | One row per model run: `provider` is `openrouter`, `doubleword`, or `v7`; tier, row counts, per-field hit rates, wall-clock time, cost. Doubleword rows include real `batch_id`; V7 rows use a **synthetic** `batch_id` (checkpoint map), not a Doubleword batch. |
 | [which-models-extracted-playground.html](which-models-extracted-playground.html) | Interactive playground — open in browser for charts, heatmaps, and recommendations |
 
 The leaderboard printed by `score.py` is ranked by F1 and includes precision, recall, field counts, time, and cost. For readability, the printed **Model** column (and the playground’s tables and chart labels) **shortens** ids when every model name that contains `__` shares the same `agent__` prefix — for example `v7-go-agent-v2__gpt4-1` is shown as `gpt4-1`. Names without `__`, or mixed `__` prefixes, stay full-length so rows stay distinct. **Canonical ids** (for filenames, `extraction_stats.csv`, and lookups) are always the full string.
@@ -98,8 +116,11 @@ Provider     Model                     Mod    Docs     F1   Prec  Recall        
 openrouter   gemini-3-pro              MM       11  0.946  0.975   0.918   78.1/85 (92%)    ~2273.3    ~0.3780
 openrouter   qwen3-235b                text     11  0.937  0.975   0.902   76.7/85 (90%)    ~2273.3    ~0.0258
 doubleword   dw-qwen3.5-9b             text     11  0.927  0.974   0.885   75.2/85 (88%)      353.0     0.0354
+v7           v7-go-agent-v2__claude-sonnet MM   11    …      …       …       …               …          …
 ...
 ```
+
+*(Example `v7` row: F1 / time / cost come from your runs; cost often prints as `0` until you set pricing in `config_models_v7.py` — see [V7 Go — Timing and cost](#v7-go--timing-and-cost).)*
 
 > **To update results:** run `python extractor.py` to extract with any new/missing models, then `python score.py` to regenerate the leaderboard. Regenerate the playground HTML with `python playground.py` (or `uv run python playground.py`).
 
@@ -185,7 +206,7 @@ python extractor.py v7-go-agent-v2/claude-sonnet --retry-failed
 
 **`--v7-agent-template PATH`** — Optional. Path to a Go Agent v2 **project export JSON**. For every V7 model in that run, it sets `agent_template_json` to this file, overriding the value in `config_models_v7.py`. Use with `--all-v7`, explicit `v7-*` model names, or `--retry-failed` whenever V7 models are included. Relative paths resolve from the **repository root** (same rule as filenames in config). If the run has no V7 models, the flag is ignored with a warning.
 
-Each run auto-syncs Doubleword model pricing first, then prints a per-provider plan (which models will run, skip, or resume) and executes extraction. Ctrl-C during Doubleword or V7 polling triggers a graceful shutdown — checkpoints are preserved and jobs resume on next run. On completion it prints a combined summary with completed/skipped/interrupted/failed counts. When a Doubleword batch completes with partial failures, the DW error file is automatically downloaded and the per-row rejection reasons (e.g. `context_length_exceeded`) are logged to the console and recorded. Use `--retry-failed` on a subsequent run to re-submit only those rows and merge the results back into the existing output file (Doubleword and V7 each maintain their own failed-row manifests). If a model is unavailable (e.g. `PermissionDenied` on submit), it is automatically recorded in the provider-specific unavailable-models file and skipped on future runs. For V7, skips also log a **resolved settings snapshot** (workspace, agent, file-field source, mode) and **actionable hints** derived from the stored failure reason (e.g. file-upload 404, DNS, parent entity mix-ups).
+Each run auto-syncs **Doubleword** model pricing first (OpenRouter and V7 config files are unchanged by that step), then prints a per-provider plan (which models will run, skip, or resume) and executes extraction. Ctrl-C during Doubleword or V7 polling triggers a graceful shutdown — checkpoints are preserved and jobs resume on next run. On completion it prints a combined summary with completed/skipped/interrupted/failed counts. When a Doubleword batch completes with partial failures, the DW error file is automatically downloaded and the per-row rejection reasons (e.g. `context_length_exceeded`) are logged to the console and recorded. Use `--retry-failed` on a subsequent run to re-submit only those rows and merge the results back into the existing output file (Doubleword and V7 each maintain their own failed-row manifests). If a model is unavailable (e.g. `PermissionDenied` on submit), it is automatically recorded in the provider-specific unavailable-models file and skipped on future runs. For V7, skips also log a **resolved settings snapshot** (workspace, agent, file-field source, mode) and **actionable hints** derived from the stored failure reason (e.g. file-upload 404, DNS, parent entity mix-ups).
 
 **Output and state files**
 
@@ -194,7 +215,7 @@ Each run auto-syncs Doubleword model pricing first, then prints a per-provider p
 | `data/playgroup_dev_extracted__openrouter__<model>.tsv` | OpenRouter extraction output |
 | `data/playgroup_dev_extracted__doubleword__<model>.tsv` | Doubleword batch output |
 | `data/playgroup_dev_extracted__v7__<model>.tsv` | V7 Go entity-run output |
-| `data/extraction_stats.csv` | Cumulative run stats (provider, row counts, fields, time, cost, `batch_id` where applicable) |
+| `data/extraction_stats.csv` | Cumulative run stats: `provider` ∈ {`openrouter`, `doubleword`, `v7`}, row counts, fields, time, cost; `batch_id` is the Doubleword batch id or a **V7 synthetic** id (see [V7 Go — Timing and cost](#v7-go--timing-and-cost)) |
 | `data/extraction_call_log.csv` | Per-row call log |
 | `data/.doubleword_checkpoints.json` | Doubleword batch resume state |
 | `data/.doubleword_failed_rows.json` | Failed row indices for `--retry-failed` (Doubleword) |
@@ -254,7 +275,7 @@ If your agent lives in a **different** project than the JSON export, set `file_f
 
 Failed submit paths record the model in `data/.v7_unavailable_models.json` with a reason string. Later runs skip that model and log **resolved settings** (no secrets) plus **hints** (file-upload 404, workspace/agent unset, DNS, parent entity vs project id). To retry after fixing configuration, remove that model’s entry from the file or delete the file, then re-run.
 
-Token usage is not returned by this API path in the client; costs in stats may be zero until you add pricing manually in the config.
+See [V7 Go — Timing and cost](#v7-go--timing-and-cost) in Key Findings for tokens, wall-clock, and `batch_id`; costs in stats stay at zero until you set pricing in `config_models_v7.py`.
 
 ### 4. Score and rank all models
 
@@ -346,9 +367,9 @@ To list keys from the shell: `python -c "from config_models_v7 import V7_MODELS;
 | `playgroup_dev_in.tsv` | Input: 11 PDFs × 6 columns (filename, keys, 3 OCR text variants, combined text) |
 | `playgroup_dev_expected.tsv` | Ground truth field values |
 | `pdf_names.txt` | PDF filenames in row order |
-| `playgroup_dev_extracted__<provider>__<model>.tsv` | Per-model extraction output (`openrouter`, `doubleword`, or `v7`) |
-| `extraction_stats.csv` | Cumulative run stats: provider, model, row counts, per-field hit rates, time, cost, `batch_id` (Doubleword batch id or V7 synthetic id) |
-| `extraction_call_log.csv` | Per-row call log: provider, model, row, status, elapsed time, tokens, cost |
+| `playgroup_dev_extracted__<provider>__<model>.tsv` | Per-model extraction output: `openrouter`, `doubleword`, or `v7` (`v7` filenames use `__` instead of `/` in the model segment) |
+| `extraction_stats.csv` | Cumulative run stats: `provider` ∈ {`openrouter`, `doubleword`, `v7`}, model id, row counts, per-field hit rates, wall-clock time, cost; `batch_id` = Doubleword batch id or **V7 synthetic** id |
+| `extraction_call_log.csv` | Per-row call log: provider, model, row, status, elapsed time, tokens, cost (token/cost columns depend on backend; V7 often has no token counts from the API) |
 | `.doubleword_checkpoints.json` | Doubleword batch checkpoint: maps model → batch_id for resume on cancel/re-run |
 | `.doubleword_failed_rows.json` | Failed-row index (Doubleword); consumed by `--retry-failed` |
 | `.doubleword_unavailable_models.json` | Doubleword models that failed to submit; skipped on future runs |
