@@ -39,7 +39,7 @@ Create a `.env` file in the project root:
 OPENROUTER_API_KEY=sk-or-v1-...
 DOUBLEWORD_API_KEY=your-doubleword-api-key-here   # optional, for Doubleword batch extraction
 
-# Optional — V7 Go (only if you run models from config_models_v7.py, e.g. v7-charity-extract)
+# Optional — V7 Go (only if you run models from config_models_v7.py, e.g. v7-go-agent-v2/claude-sonnet)
 V7_GO_API_KEY=your-v7-go-api-key
 V7_GO_WORKSPACE_ID=your-workspace-uuid
 V7_GO_AGENT_ID=your-agent-uuid
@@ -51,7 +51,7 @@ V7_GO_AGENT_ID=your-agent-uuid
 # V7_GO_PARENT_ENTITY_ID=…       # collection agents only — parent *entity* id, not project/agent id
 ```
 
-The OpenRouter key is required for OpenRouter models. The Doubleword key is only needed for `DOUBLEWORD_MODELS` entries (e.g. `dw-qwen3.5-9b`). The V7 variables are only needed for `V7_MODELS` entries. For V7, read [README.md](README.md) — **V7 Go (optional backend)** — especially **File property for Go Agent v2** and **V7_GO_PARENT_ENTITY_ID** if you use `agent_template_json` or child projects.
+The OpenRouter key is required for OpenRouter models. The Doubleword key is only needed for `DOUBLEWORD_MODELS` entries (e.g. `dw-qwen3.5-9b`). The V7 variables are only needed for `V7_MODELS` entries. For V7, read [README.md](README.md) — **V7 Go (optional backend)** — especially **File property for Go Agent v2** and **V7_GO_PARENT_ENTITY_ID** if you use `agent_template_json` or child projects. A compact V7-only checklist is in [docs/v7-go.md](docs/v7-go.md).
 
 ---
 
@@ -77,6 +77,27 @@ If you see the JSON block, you're ready.
 
 ---
 
+## 4. Optional — V7 Go (no OpenRouter substitute)
+
+There is no tiny `llm_v7.py` “one-shot” smoke script in this repo; V7 is exercised through **`extractor.py`** against your real workspace and agent.
+
+**Checklist**
+
+1. Fill in `V7_GO_API_KEY` (or `V7_API_KEY`), `V7_GO_WORKSPACE_ID`, and `V7_GO_AGENT_ID` in `.env`.
+2. Ensure your Go project matches the expected **Go Agent v2** shape (or adjust `v7_go_agent_v2_template.json` — refresh from the API with `python sync_v7_go_agent_template.py` after property changes in the V7 UI).
+3. Run a single registry key (slashes are fine in most shells):
+
+   ```bash
+   python extractor.py v7-go-agent-v2/claude-sonnet
+   ```
+
+4. Output path: `data/playgroup_dev_extracted__v7__v7-go-agent-v2__claude-sonnet.tsv` (`/` in the model key → `__` in the filename).
+5. Score it like any other provider: `python score.py` (all models) or pass that `.tsv` path for a verbose diff.
+
+If submit fails, check console hints and `data/.v7_unavailable_models.json`. Full behaviour, flags (`--all-v7`, `--v7-agent-template`, `--retry-failed`), and the env table are in [README.md — V7 Go](README.md#v7-go-optional-backend).
+
+---
+
 ## Next Steps
 
 Head to [README.md](README.md) for the full end-to-end workflow. The key commands follow a consistent pattern:
@@ -86,8 +107,9 @@ Head to [README.md](README.md) for the full end-to-end workflow. The key command
 - **Pass no args** → run all models from every registry (OpenRouter, Doubleword, and V7 if any are defined); already-completed runs are skipped (idempotent)
 - **Use `--all-openrouter`** → run only OpenRouter models
 - **Use `--all-doubleword`** → run only Doubleword batch models
-- **Use `--all-v7`** → run only V7 Go models from `config_models_v7.py`
+- **Use `--all-v7`** → run only V7 Go models from `config_models_v7.py` (32 keys as of `config_models_v7.py`; check with `python -c "from config_models_v7 import V7_MODELS; print(len(V7_MODELS))"`)
 - **Use `--v7-agent-template PATH`** together with any run that includes V7 models (e.g. `--all-v7`) to override `agent_template_json` with a Go export JSON for that run; see [README.md](README.md) examples
+- **V7 summary doc** → [docs/v7-go.md](docs/v7-go.md)
 
 The same applies to `score.py`: no args scores all models and prints a leaderboard; pass a filename for a verbose diff of one model.
 
