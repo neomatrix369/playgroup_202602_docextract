@@ -2,6 +2,8 @@
 > Machine-readable reference. Distilled from docs.doubleword.ai, www.doubleword.ai, and github.com/doublewordai.
 > Last updated: 2026-03-31
 
+**See also:** this repo’s third extraction backend is **V7 Go** — [docs/v7-go.md](v7-go.md) and [README.md — V7 Go](../README.md#v7-go-optional-backend).
+
 ---
 
 ## 1. What is Doubleword?
