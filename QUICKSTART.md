@@ -47,9 +47,11 @@ V7_GO_AGENT_ID=your-agent-uuid
 # V7_GO_INPUT_FIELD_SLUG=document-text
 # V7_GO_OUTPUT_FIELD_SLUG=extracted-json
 # V7_GO_BASE_URL=https://go.v7labs.com
+# V7_GO_FILE_FIELD_SLUG=…        # multimodal / file upload; for Go Agent v2 often omit (see README)
+# V7_GO_PARENT_ENTITY_ID=…       # collection agents only — parent *entity* id, not project/agent id
 ```
 
-The OpenRouter key is required for OpenRouter models. The Doubleword key is only needed for `DOUBLEWORD_MODELS` entries (e.g. `dw-qwen3.5-9b`). The V7 variables are only needed for `V7_MODELS` entries (see [README.md](README.md) — V7 Go section).
+The OpenRouter key is required for OpenRouter models. The Doubleword key is only needed for `DOUBLEWORD_MODELS` entries (e.g. `dw-qwen3.5-9b`). The V7 variables are only needed for `V7_MODELS` entries. For V7, read [README.md](README.md) — **V7 Go (optional backend)** — especially **File property for Go Agent v2** and **V7_GO_PARENT_ENTITY_ID** if you use `agent_template_json` or child projects.
 
 ---
 
@@ -85,5 +87,6 @@ Head to [README.md](README.md) for the full end-to-end workflow. The key command
 - **Use `--all-openrouter`** → run only OpenRouter models
 - **Use `--all-doubleword`** → run only Doubleword batch models
 - **Use `--all-v7`** → run only V7 Go models from `config_models_v7.py`
+- **Use `--v7-agent-template PATH`** together with any run that includes V7 models (e.g. `--all-v7`) to override `agent_template_json` with a Go export JSON for that run; see [README.md](README.md) examples
 
 The same applies to `score.py`: no args scores all models and prints a leaderboard; pass a filename for a verbose diff of one model.

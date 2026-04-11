@@ -13,9 +13,13 @@ Environment (see also config_models_v7.py per-model overrides):
   V7_GO_WORKSPACE_ID      — workspace UUID
   V7_GO_AGENT_ID          — agent / project UUID
   V7_GO_INPUT_FIELD_SLUG  — property slug for pasted OCR text (default: document-text)
-  V7_GO_FILE_FIELD_SLUG   — property slug for PDF upload when multimodal (default: document-pdf).
-                            For Go Agent v2 (agent_template_json), set this if your live project's File
-                            field slug/id differs from the template export (avoids start_file_upload 404).
+  V7_GO_FILE_FIELD_SLUG   — property slug/id for PDF upload when multimodal (default: document-pdf for
+                            single-output agents only). For Go Agent v2, omit this unless you need to
+                            override: the code uses the File property id from agent_template_json. The
+                            legacy default document-pdf is not applied as an override when the template
+                            defines a different File property (avoids start_file_upload 404). If your
+                            V7_GO_AGENT_ID is a different project than the JSON export, set this or
+                            file_field_slug to the File property id copied from the V7 UI.
   Go Agent v2 (multi-field): set agent_template_json in config_models_v7 to v7_go_agent_v2_template.json
   export — creates empty entities, uploads PDF to the File property, polls all tool fields, and merges
   values into one JSON blob for the extractor (see _V7_GO_AGENT_V2_PROPERTY_NAME_TO_KEY).
@@ -86,7 +90,8 @@ _PROMPT_OVERHEAD_TOKENS = 500
 _CHARS_PER_TOKEN = 3
 
 # V7 OpenAPI PropertyIdOrSlug: UUID (lowercase hex) OR slug ^[a-z_-][a-z0-9_-]*$
-# Project exports use mixed-case ``property_*`` ids; preserve casing — some deployments 404 if lowercased.
+# Project JSON exports use mixed-case ``property_*`` ids; path segments must be lowercased to match the API
+# (otherwise start_file_upload returns 400 Invalid format).
 _V7_PROPERTY_SLUG_RE = re.compile(r"^[a-z_-][a-z0-9_-]*$")
 _V7_PROPERTY_UUID_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
@@ -103,7 +108,12 @@ def _normalize_v7_property_id_or_slug(s: str) -> str:
     if _V7_PROPERTY_UUID_RE.match(lowered):
         return lowered
     if _V7_PROPERTY_EXPORT_ID_RE.match(t):
-        return t
+        low = t.lower()
+        if _V7_PROPERTY_SLUG_RE.match(low):
+            return low
+        raise ValueError(
+            f"invalid V7 export property id {t!r}: lowercased form {low!r} is not a valid PropertyIdOrSlug"
+        )
     if _V7_PROPERTY_SLUG_RE.match(t):
         return t
     if _V7_PROPERTY_SLUG_RE.match(lowered):
@@ -138,24 +148,54 @@ def _resolve_output_slug(model_cfg: dict) -> str:
     return _normalize_v7_property_id_or_slug(str(s))
 
 
+_LEGACY_MULTIMODAL_FILE_SLUG_DEFAULT = "document-pdf"
+
+
 def _resolve_file_field_slug(model_cfg: dict) -> str:
-    s = model_cfg.get("file_field_slug") or os.getenv("V7_GO_FILE_FIELD_SLUG", "document-pdf")
+    s = model_cfg.get("file_field_slug") or os.getenv(
+        "V7_GO_FILE_FIELD_SLUG", _LEGACY_MULTIMODAL_FILE_SLUG_DEFAULT
+    )
     return _normalize_v7_property_id_or_slug(str(s))
 
 
-def _resolve_go_v2_file_property(model_cfg: dict, go_v2: dict) -> str:
-    """File property for PDF upload: env / per-model slug overrides template export id.
+def _resolve_go_v2_file_field_pair(model_cfg: dict, go_v2: dict) -> tuple[str, str]:
+    """Return (file property id/slug for upload, short source label for operator logs).
 
-    Template ``file_property_id`` only matches the project that produced the JSON; if
-    ``V7_GO_AGENT_ID`` points elsewhere, set ``V7_GO_FILE_FIELD_SLUG`` or ``file_field_slug``.
+    Precedence: per-model ``file_field_slug`` → ``V7_GO_FILE_FIELD_SLUG`` (unless it is only the
+    legacy default *document-pdf* while the template names a different File property) →
+    ``file_property_id`` parsed from ``agent_template_json``.
+
+    Rationale: many .env files set ``V7_GO_FILE_FIELD_SLUG=document-pdf`` for non-v2 models; for
+    Go Agent v2 the bundled export uses ids like ``property_…``, so treating *document-pdf* as a
+    universal override causes start_file_upload 404.
     """
-    env_slug = (os.getenv("V7_GO_FILE_FIELD_SLUG") or "").strip()
-    if env_slug:
-        return _normalize_v7_property_id_or_slug(env_slug)
     cfg = model_cfg.get("file_field_slug")
     if cfg is not None and str(cfg).strip():
-        return _normalize_v7_property_id_or_slug(str(cfg))
-    return go_v2["file_property_id"]
+        return (
+            _normalize_v7_property_id_or_slug(str(cfg)),
+            "file_field_slug (config_models_v7)",
+        )
+    env_raw = (os.getenv("V7_GO_FILE_FIELD_SLUG") or "").strip()
+    if env_raw:
+        norm = _normalize_v7_property_id_or_slug(env_raw)
+        tpl_id = go_v2["file_property_id"]
+        if norm == _LEGACY_MULTIMODAL_FILE_SLUG_DEFAULT and tpl_id != norm:
+            logger.warning(
+                "[V7] V7_GO_FILE_FIELD_SLUG={!r} is the legacy multimodal default; for Go Agent v2 "
+                "the File property from agent_template_json is usually {!r}. Using the template id. "
+                "If uploads still 404, your V7_GO_AGENT_ID project may differ from the export — set "
+                "file_field_slug on the model or V7_GO_FILE_FIELD_SLUG to the File property id from "
+                "the V7 UI for this agent.",
+                env_raw,
+                tpl_id,
+            )
+            return (tpl_id, "agent_template_json (legacy default env ignored)")
+        return (norm, "V7_GO_FILE_FIELD_SLUG")
+    return (go_v2["file_property_id"], "agent_template_json")
+
+
+def _resolve_go_v2_file_property(model_cfg: dict, go_v2: dict) -> str:
+    return _resolve_go_v2_file_field_pair(model_cfg, go_v2)[0]
 
 
 def _resolve_pdf_dir() -> str:
@@ -164,10 +204,26 @@ def _resolve_pdf_dir() -> str:
 
 
 def _resolve_parent_entity_id(model_cfg: dict) -> str | None:
-    """Collection projects require parent_entity_id on create; standalone agents omit it."""
+    """Collection projects require parent_entity_id on create; standalone agents omit it.
+
+    ``parent_entity_id`` must be an *entity* UUID from the *parent* project. A common mistake is
+    copying ``V7_GO_AGENT_ID`` (the project id) into ``V7_GO_PARENT_ENTITY_ID``, which breaks
+    entity create (often HTTP 500).
+    """
     p = model_cfg.get("parent_entity_id") or os.getenv("V7_GO_PARENT_ENTITY_ID", "")
     p = str(p).strip()
-    return p or None
+    if not p:
+        return None
+    agent = str(model_cfg.get("agent_id") or os.getenv("V7_GO_AGENT_ID", "") or "").strip()
+    if agent and p == agent:
+        logger.warning(
+            "[V7] parent_entity_id equals agent/project id {!r} — that is not a valid parent entity. "
+            "Unset V7_GO_PARENT_ENTITY_ID for standalone agents; for collection agents use an entity id "
+            "from the parent project (V7 UI). Ignoring parent_entity_id.",
+            p,
+        )
+        return None
+    return p
 
 
 def _package_dir() -> str:
@@ -246,6 +302,94 @@ def load_go_agent_v2_specs(model_cfg: dict) -> dict[str, Any] | None:
         raise ValueError("V7 template root must be a JSON object")
     _GO_AGENT_TEMPLATE_CACHE[path] = (mtime, data)
     return parse_go_agent_export_for_v2(data)
+
+
+def resolved_v7_settings_for_log(model_cfg: dict[str, Any]) -> dict[str, Any]:
+    """Resolved workspace, agent, and property slugs for operator logs (no API keys)."""
+    ws = _resolve_workspace_id(model_cfg)
+    agent = _resolve_agent_id(model_cfg)
+    base = os.getenv("V7_GO_BASE_URL", "https://go.v7labs.com").rstrip("/")
+    out: dict[str, Any] = {
+        "V7_GO_BASE_URL": base,
+        "workspace_id": ws or "(unset — V7_GO_WORKSPACE_ID or workspace_id in model config)",
+        "agent_id": agent or "(unset — V7_GO_AGENT_ID or agent_id in model config)",
+        "multimodal": bool(model_cfg.get("multimodal")),
+        "model": model_cfg.get("model", ""),
+    }
+    raw_template = model_cfg.get("agent_template_json")
+    if raw_template:
+        out["agent_template_json"] = str(raw_template)
+        try:
+            go_v2 = load_go_agent_v2_specs(model_cfg)
+        except Exception as e:
+            out["go_agent_v2_load_error"] = str(e)[:400]
+            go_v2 = None
+        if go_v2:
+            out["mode"] = "go_agent_v2"
+            try:
+                slug, src = _resolve_go_v2_file_field_pair(model_cfg, go_v2)
+                out["file_field_for_upload"] = slug
+                out["file_field_source"] = src
+            except Exception as e:
+                out["file_field_for_upload"] = f"(resolve error: {e})"
+            out["v2_output_field_keys"] = [s["field_key"] for s in go_v2["v2_output_specs"]]
+        else:
+            out["mode"] = "go_agent_v2_template_missing_or_invalid"
+    else:
+        out["agent_template_json"] = "(none)"
+        out["mode"] = "single_output_field"
+        try:
+            out["input_field_slug"] = _resolve_input_slug(model_cfg)
+            out["output_field_slug"] = _resolve_output_slug(model_cfg)
+            if model_cfg.get("multimodal"):
+                out["file_field_slug"] = _resolve_file_field_slug(model_cfg)
+        except Exception as e:
+            out["slug_resolve_error"] = str(e)[:400]
+    pe = _resolve_parent_entity_id(model_cfg)
+    if pe:
+        out["parent_entity_id"] = pe
+    env_f = (os.getenv("V7_GO_FILE_FIELD_SLUG") or "").strip()
+    if env_f:
+        out["env_V7_GO_FILE_FIELD_SLUG"] = env_f
+    return out
+
+
+def hints_for_v7_unavailable_reason(
+    model_short_name: str, reason: str, _model_cfg: dict[str, Any]
+) -> list[str]:
+    """Short actionable lines to log after a skip based on the stored failure reason."""
+    lines: list[str] = []
+    r = reason.lower()
+    if "start_file_upload" in r and "invalid format" in r:
+        lines.append(
+            "start_file_upload 400 Invalid format: V7 expects property path segments as lowercase UUID or "
+            "slug (^[a-z_-][a-z0-9_-]*$). Export ids like property_xAbC… are normalized to lowercase in "
+            "llm_v7 — upgrade/re-run; if it persists, check V7_GO_FILE_FIELD_SLUG matches the UI slug."
+        )
+    elif "start_file_upload" in r or ("404" in reason and "not_found" in r):
+        lines.append(
+            "start_file_upload 404: the File property id in the URL does not exist on this project. "
+            "For Go Agent v2, omit V7_GO_FILE_FIELD_SLUG (or remove document-pdf) so the template "
+            "export id is used, unless your V7_GO_AGENT_ID is a different project — then copy the File "
+            "property id from the V7 UI into V7_GO_FILE_FIELD_SLUG or file_field_slug in config_models_v7.py."
+        )
+    if "must be set" in r and ("workspace" in r or "agent" in r):
+        lines.append("Set V7_GO_WORKSPACE_ID and V7_GO_AGENT_ID (or per-model workspace_id / agent_id).")
+    if "nodename nor servname" in r or "errno 8" in r:
+        lines.append(
+            "DNS failed for V7_GO_BASE_URL: use https://go.v7labs.com (code default). "
+            "https://api.go.v7labs.com often does not resolve; unset V7_GO_BASE_URL or fix the host."
+        )
+    if "internal_server_error" in r and "entities" in r:
+        lines.append(
+            "POST /entities 500: check V7_GO_PARENT_ENTITY_ID — it must be a parent *entity* UUID, "
+            "not the same as V7_GO_AGENT_ID (project id). Leave it unset for standalone agents."
+        )
+    lines.append(
+        f"To retry after fixing config, remove the {model_short_name!r} entry from {UNAVAILABLE_MODELS_FILE} "
+        "(or delete the file), then re-run."
+    )
+    return lines
 
 
 def _v7_error_detail_from_response(response: httpx.Response) -> str:
@@ -521,7 +665,9 @@ async def _post_entity(
 ) -> dict[str, Any]:
     """POST /api/workspaces/{ws}/projects/{agent}/entities — optional wait_for (blocking, ≤~45s each).
 
-    ``fields`` is the JSON ``fields`` object (may be empty for file-only Go Agent v2 flows).
+    ``fields`` is the JSON ``fields`` object. When empty (Go Agent v2 file-first flow), the ``fields``
+    key is omitted from the body so the payload matches V7's documented empty entity (``{}``);
+    sending ``{"fields": {}}`` can trigger a 500 on some API versions.
     For collection (child) projects, pass parent_entity_id (see V7 Go API / env V7_GO_PARENT_ENTITY_ID).
     """
     params: dict[str, Any] = {}
@@ -529,13 +675,16 @@ async def _post_entity(
         # httpx repeats query keys for wait_for[]=a&wait_for[]=b
         params = [("wait_for[]", s) for s in wait_for_slugs]
     url = f"/api/workspaces/{workspace_id}/projects/{agent_id}/entities"
-    payload: dict[str, Any] = {"fields": fields}
+    payload: dict[str, Any] = {}
+    if fields:
+        payload["fields"] = fields
     if parent_entity_id:
         payload["parent_entity_id"] = parent_entity_id
     r = await client.post(url, json=payload, params=params)
     if r.is_error:
+        _fields_log = f"keys={list(fields.keys())!r}" if fields else "omitted (empty)"
         _v7_log_http_error(
-            f"entity_create (fields keys={list(fields.keys())!r})",
+            f"entity_create (fields {_fields_log})",
             r,
         )
         detail = _v7_error_detail_from_response(r)
@@ -858,9 +1007,9 @@ async def submit_batch(
                 f"V7 model {model_short_name!r} uses agent_template_json (Go Agent v2); "
                 "set multimodal=True — each row must supply a PDF filename (OCR text is not sent)."
             )
-        file_slug = _resolve_go_v2_file_property(model_cfg, go_v2)
+        file_slug, file_src = _resolve_go_v2_file_field_pair(model_cfg, go_v2)
         v2_output_specs = go_v2["v2_output_specs"]
-        logger.debug("[V7] Go Agent v2 file property for upload: {!r}", file_slug)
+        logger.debug("[V7] Go Agent v2 file property for upload: {!r} (source={})", file_slug, file_src)
         in_slug = ""
         out_slug = None
     else:
@@ -1062,7 +1211,12 @@ async def extract_one_row_async(
                 return {"error": "entity create returned no id", "raw": data}
             try:
                 await _upload_pdf_to_entity_field(
-                    client, ws, agent, str(eid), _resolve_go_v2_file_property(model_cfg, go_v2), pdf_path
+                    client,
+                    ws,
+                    agent,
+                    str(eid),
+                    _resolve_go_v2_file_field_pair(model_cfg, go_v2)[0],
+                    pdf_path,
                 )
             except httpx.HTTPStatusError as e:
                 return {"error": _v7_error_detail_from_response(e.response), "raw": data}

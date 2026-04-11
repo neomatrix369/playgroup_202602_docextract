@@ -26,7 +26,9 @@ V7_MODELS = {
         "notes": (
             "Set V7_GO_WORKSPACE_ID + V7_GO_AGENT_ID to your deployed project. "
             "Re-export agent_template_json from that same project (property ids are per-project), "
-            "or set V7_GO_FILE_FIELD_SLUG / file_field_slug to your File field's slug or id from the UI."
+            "or set file_field_slug / V7_GO_FILE_FIELD_SLUG to your File property id from the UI. "
+            "Do not set V7_GO_FILE_FIELD_SLUG=document-pdf for v2 unless that slug exists on the agent "
+            "(the template File id is used when that env value would override incorrectly)."
         ),
         "agent_template_json": "v7_go_agent_v2_template.json",
         # Registry-only for non-v2 models; v2 PDF property = template unless overridden (see notes).

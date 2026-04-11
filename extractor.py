@@ -342,6 +342,20 @@ def _v7_model_cfg_for_run(model_short_name: str, agent_template_json_override: s
     return cfg
 
 
+def _log_v7_skipped_marked_unavailable(model_short_name: str, reason: str, model_cfg: dict) -> None:
+    """Log expanded context when a model is skipped because it is listed in .v7_unavailable_models.json."""
+    import llm_v7
+
+    log.warning("[V7] Skipping {} — marked unavailable: {}", model_short_name, reason)
+    try:
+        ctx = llm_v7.resolved_v7_settings_for_log(model_cfg)
+        log.warning("[V7]   Resolved settings (no secrets):\n{}", json.dumps(ctx, indent=2, default=str))
+    except Exception as e:
+        log.warning("[V7]   (could not build settings snapshot: {})", e)
+    for hint in llm_v7.hints_for_v7_unavailable_reason(model_short_name, reason, model_cfg):
+        log.warning("[V7]   Hint: {}", hint)
+
+
 def _load_input_rows():
     """Load all input rows from the TSV. Returns list of (row_num, pdf_filename, text_combined)."""
     csv.field_size_limit(10 * 1024 * 1024)
@@ -898,7 +912,11 @@ async def _retry_failed_rows_v7(models_to_retry, v7_agent_template: str | None =
             statuses[model_short_name] = "skipped"
             continue
         if model_short_name in unavailable:
-            log.warning("[V7 Retry] Skipping '{}' — unavailable: {}", model_short_name, unavailable[model_short_name])
+            _log_v7_skipped_marked_unavailable(
+                model_short_name,
+                unavailable[model_short_name],
+                _v7_model_cfg_for_run(model_short_name, v7_agent_template),
+            )
             statuses[model_short_name] = "skipped"
             continue
         failed_row_nums = failed_manifest.get(model_short_name)
@@ -1247,7 +1265,11 @@ async def _run_all_v7(models_to_run, v7_agent_template: str | None = None):
         out_filename = f"data/playgroup_dev_extracted__v7__{model_short_name}.tsv"
 
         if model_short_name in unavailable:
-            log.warning("[V7] Skipping {} — marked unavailable: {}", model_short_name, unavailable[model_short_name])
+            _log_v7_skipped_marked_unavailable(
+                model_short_name,
+                unavailable[model_short_name],
+                model_cfg,
+            )
             statuses[model_short_name] = "skipped"
             continue
 

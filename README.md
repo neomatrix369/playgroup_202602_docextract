@@ -140,6 +140,12 @@ python extractor.py --all-openrouter
 # All V7 Go models only (see config_models_v7.py and llm_v7.py)
 python extractor.py --all-v7
 
+# All V7 models using a specific Go Agent v2 export JSON for this run (overrides per-model agent_template_json in config)
+python extractor.py --all-v7 --v7-agent-template path/to/your_project_export.json
+
+# Same template override when retrying failed V7 rows
+python extractor.py --all-v7 --v7-agent-template ./v7_go_agent_v2_template.json --retry-failed
+
 # One Doubleword model (registry key dw-*)
 python extractor.py dw-qwen3-vl-30b
 
@@ -162,7 +168,9 @@ python extractor.py dw-olmocr-2-7b-1025-fp8 dw-lightonocr-2-1b-bbox-soup --retry
 python extractor.py v7-charity-extract --retry-failed
 ```
 
-Each run auto-syncs Doubleword model pricing first, then prints a per-provider plan (which models will run, skip, or resume) and executes extraction. Ctrl-C during Doubleword or V7 polling triggers a graceful shutdown — checkpoints are preserved and jobs resume on next run. On completion it prints a combined summary with completed/skipped/interrupted/failed counts. When a Doubleword batch completes with partial failures, the DW error file is automatically downloaded and the per-row rejection reasons (e.g. `context_length_exceeded`) are logged to the console and recorded. Use `--retry-failed` on a subsequent run to re-submit only those rows and merge the results back into the existing output file (Doubleword and V7 each maintain their own failed-row manifests). If a model is unavailable (e.g. `PermissionDenied` on submit), it is automatically recorded in the provider-specific unavailable-models file and skipped on future runs.
+**`--v7-agent-template PATH`** — Optional. Path to a Go Agent v2 **project export JSON**. For every V7 model in that run, it sets `agent_template_json` to this file, overriding the value in `config_models_v7.py`. Use with `--all-v7`, explicit `v7-*` model names, or `--retry-failed` whenever V7 models are included. Relative paths resolve from the **repository root** (same rule as filenames in config). If the run has no V7 models, the flag is ignored with a warning.
+
+Each run auto-syncs Doubleword model pricing first, then prints a per-provider plan (which models will run, skip, or resume) and executes extraction. Ctrl-C during Doubleword or V7 polling triggers a graceful shutdown — checkpoints are preserved and jobs resume on next run. On completion it prints a combined summary with completed/skipped/interrupted/failed counts. When a Doubleword batch completes with partial failures, the DW error file is automatically downloaded and the per-row rejection reasons (e.g. `context_length_exceeded`) are logged to the console and recorded. Use `--retry-failed` on a subsequent run to re-submit only those rows and merge the results back into the existing output file (Doubleword and V7 each maintain their own failed-row manifests). If a model is unavailable (e.g. `PermissionDenied` on submit), it is automatically recorded in the provider-specific unavailable-models file and skipped on future runs. For V7, skips also log a **resolved settings snapshot** (workspace, agent, file-field source, mode) and **actionable hints** derived from the stored failure reason (e.g. file-upload 404, DNS, parent entity mix-ups).
 
 **Output and state files**
 
@@ -178,11 +186,11 @@ Each run auto-syncs Doubleword model pricing first, then prints a per-provider p
 | `data/.doubleword_unavailable_models.json` | Doubleword models that failed on submit |
 | `data/.v7_checkpoints.json` | V7 synthetic batch / entity map for resume |
 | `data/.v7_failed_rows.json` | Failed row indices for `--retry-failed` (V7) |
-| `data/.v7_unavailable_models.json` | V7 models that failed on submit |
+| `data/.v7_unavailable_models.json` | V7 models that failed on submit; delete an entry (or the file) to retry after fixing config |
 
 ### V7 Go (optional backend)
 
-V7 runs use `llm_v7.py`: each input row creates a **entity** on your agent with the combined prompt + OCR text in an input field; the pipeline polls until an **output** field contains the model response (same JSON shape as other backends). Configure the agent in [V7 Go](https://go.v7labs.com); API overview: [Create Entities Programmatically](https://docs.go.v7labs.com/reference/create-entities-programmatically).
+V7 runs use `llm_v7.py`: each input row creates an **entity** on your agent with the combined prompt + OCR text in an input field (single-output agents), or follows the **Go Agent v2** flow (empty entity, PDF upload, then polling tool-backed output fields — see below). Configure the agent in [V7 Go](https://go.v7labs.com); API overview: [Create Entities Programmatically](https://docs.go.v7labs.com/reference/create-entities-programmatically).
 
 Set in `.env` (or override per model in `config_models_v7.py`):
 
@@ -191,9 +199,29 @@ Set in `.env` (or override per model in `config_models_v7.py`):
 | `V7_GO_API_KEY` or `V7_API_KEY` | API key (`X-API-KEY` header) |
 | `V7_GO_WORKSPACE_ID` | Workspace UUID |
 | `V7_GO_AGENT_ID` | Agent (project) UUID |
-| `V7_GO_INPUT_FIELD_SLUG` | Input property slug (default `document-text`) |
-| `V7_GO_OUTPUT_FIELD_SLUG` | Output property slug to read (default `extracted-json`) |
-| `V7_GO_BASE_URL` | API base (default `https://go.v7labs.com`; some tools use `https://api.go.v7labs.com`) |
+| `V7_GO_INPUT_FIELD_SLUG` | Input property slug (default `document-text`; single-output / non–v2-template agents) |
+| `V7_GO_OUTPUT_FIELD_SLUG` | Output property slug to read (default `extracted-json`; single-output agents) |
+| `V7_GO_FILE_FIELD_SLUG` | File property **slug or id** for multimodal PDF upload. For **single-output** multimodal agents, default is `document-pdf` if unset. For **Go Agent v2** (`agent_template_json` set), prefer **omitting** this so the File property id from the template export is used — see [File property for Go Agent v2](#file-property-for-go-agent-v2). |
+| `V7_GO_PARENT_ENTITY_ID` | For **collection (child)** projects only: parent **entity** UUID from the parent project — **not** the same as `V7_GO_AGENT_ID` (project id). Omit for standalone agents. If env equals the agent id, the client logs a warning and ignores it (avoids broken `POST /entities`). |
+| `V7_GO_BASE_URL` | API base (default `https://go.v7labs.com`). Prefer this host; `https://api.go.v7labs.com` often fails DNS — unset a bad `V7_GO_BASE_URL` rather than guessing. |
+
+**Go Agent v2** — Set `agent_template_json` on the model entry (e.g. `v7_go_agent_v2_template.json`) and `multimodal: True`. The runner creates entities with **no** `fields` key when the payload is empty (matches V7’s empty-entity shape); sending `{"fields": {}}` could return HTTP 500 on some API versions. It uploads each PDF to the resolved File property, then polls output tool fields and merges them into one JSON object (property names mapped in `llm_v7._V7_GO_AGENT_V2_PROPERTY_NAME_TO_KEY`).
+
+#### File property for Go Agent v2
+
+Property ids in a template JSON export are **per-project**. If `V7_GO_AGENT_ID` matches the project that produced the export, the File property id embedded in `agent_template_json` is usually correct.
+
+**Precedence** for which File property receives the PDF:
+
+1. Per-model `file_field_slug` in `config_models_v7.py` (if set).
+2. `V7_GO_FILE_FIELD_SLUG` — **unless** it is exactly the legacy default `document-pdf` while the template names a **different** File property id (e.g. `property_…`). In that case the client **ignores** the env value and uses the template id (many `.env` files set `document-pdf` for non-v2 models; applying it blindly to v2 caused `start_file_upload` 404).
+3. Otherwise the File property id parsed from `agent_template_json`.
+
+If your agent lives in a **different** project than the JSON export, set `file_field_slug` or `V7_GO_FILE_FIELD_SLUG` to the File property **id** copied from the V7 UI for **that** agent. Do not set `V7_GO_FILE_FIELD_SLUG=document-pdf` for v2 unless that slug actually exists on the agent.
+
+#### Unavailable models and retries
+
+Failed submit paths record the model in `data/.v7_unavailable_models.json` with a reason string. Later runs skip that model and log **resolved settings** (no secrets) plus **hints** (file-upload 404, workspace/agent unset, DNS, parent entity vs project id). To retry after fixing configuration, remove that model’s entry from the file or delete the file, then re-run.
 
 Token usage is not returned by this API path in the client; costs in stats may be zero until you add pricing manually in the config.
 
@@ -217,9 +245,9 @@ python score.py data/playgroup_dev_extracted__openrouter__gemini-2.0-flash.tsv
 |---|---|
 | `llm_openrouter.py` | LLM client for OpenRouter (synchronous). Run directly for a smoke test. |
 | `llm_doubleword.py` | LLM client for Doubleword Batch API (async, direct batch management with checkpoint/resume). |
-| `llm_v7.py` | LLM client for [V7 Go](https://docs.go.v7labs.com/) (async HTTP: create entity per row, poll until output field ready). Same orchestration hooks as `llm_doubleword.py` (`submit_batch`, `poll_batch`, `download_results`, checkpoints). |
+| `llm_v7.py` | LLM client for [V7 Go](https://docs.go.v7labs.com/) (async HTTP: create entity per row, poll until output field ready; Go Agent v2: empty entity body, PDF upload, multi-field merge). Resolves file field and parent entity with guardrails; logs diagnostics for unavailable-model skips. Same orchestration hooks as `llm_doubleword.py` (`submit_batch`, `poll_batch`, `download_results`, checkpoints). |
 | `extraction_and_prompt_example.py` | Simple single-model extraction loop, good for prompt experiments. |
-| `extractor.py` | Unified extraction runner. Auto-detects backend from registries (`DOUBLEWORD_MODELS`, `V7_MODELS`, `OPENROUTER_MODELS`). Auto-syncs Doubleword pricing at startup. Doubleword and V7 use async polling with checkpoint/resume; OpenRouter is sync per row. Graceful Ctrl-C preserves checkpoints. Doubleword: downloads DW error files for pre-processing rejections. Flags: `--completion-window`, `--all-doubleword`, `--all-openrouter`, `--all-v7`, `--retry-failed`. |
+| `extractor.py` | Unified extraction runner. Auto-detects backend from registries (`DOUBLEWORD_MODELS`, `V7_MODELS`, `OPENROUTER_MODELS`). Auto-syncs Doubleword pricing at startup. Doubleword and V7 use async polling with checkpoint/resume; OpenRouter is sync per row. Graceful Ctrl-C preserves checkpoints. Doubleword: downloads DW error files for pre-processing rejections. Flags: `--completion-window`, `--all-doubleword`, `--all-openrouter`, `--all-v7`, `--v7-agent-template`, `--retry-failed`. |
 | `sync_doubleword_models.py` | Auto-syncs Doubleword model pricing from their [docs markdown endpoint](https://docs.doubleword.ai/inference-api/model-pricing.md). Regenerates `config_models_doubleword.py`. Skips save when nothing changed. Called by `extractor.py` at startup; can also run standalone. |
 | `score.py` | Scorer with F1/Precision/Recall. No args → ranked leaderboard; pass a filename → verbose field-by-field diff. |
 | `utils.py` | Shared helpers (`extract_from_triple_backticks`, `sanitize_error_message`). |
@@ -278,7 +306,7 @@ Registry keys are typically prefixed with `v7-`. Each entry mirrors the shape us
 | `.doubleword_unavailable_models.json` | Doubleword models that failed to submit; skipped on future runs |
 | `.v7_checkpoints.json` | V7 checkpoint: maps model → entity ids / synthetic batch id for resume |
 | `.v7_failed_rows.json` | Failed-row index (V7); consumed by `--retry-failed` |
-| `.v7_unavailable_models.json` | V7 models that failed to submit; skipped on future runs |
+| `.v7_unavailable_models.json` | V7 models that failed to submit; skipped on future runs with expanded log hints |
 | `*.pdf` | 11 UK charity financial PDFs (≤ 200 pages each) |
 
 ### Visualisations
