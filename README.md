@@ -1,6 +1,6 @@
 # UK Charity Document Extraction — Multi-Model Benchmark
 
-Extract structured fields from UK charity financial PDFs using LLMs via [OpenRouter](https://openrouter.ai/) or the [Doubleword Batch API](https://docs.doubleword.ai/batches/getting-started-with-batched-api), then score and rank the results across 52 models.
+Extract structured fields from UK charity financial PDFs using LLMs via [OpenRouter](https://openrouter.ai/), the [Doubleword Batch API](https://docs.doubleword.ai/batches/getting-started-with-batched-api), or [V7 Go](https://docs.go.v7labs.com/) (agent/entity API), then score and rank the results across 52 benchmarked models (OpenRouter + Doubleword). V7 is an optional third backend for product-style runs (e.g. Doc Risk Auditor).
 
 **Jump to:** [Key Findings](#key-findings) | [Setup](#setup) | [Workflow](#end-to-end-workflow) | [Results](#results) | [Repo Reference](#whats-in-this-repo) | [Dataset](#dataset)
 
@@ -122,7 +122,7 @@ Reads `data/playgroup_dev_in.tsv`, sends each row to `claude-3.5-haiku`, and pri
 
 ### 3. Run extraction across one or more models
 
-Pass one or more model names as arguments, or omit to run all models. The backend is auto-detected: `dw-*` models use the Doubleword Batch API (async, parallel), all others use OpenRouter (sync, sequential). Runs are idempotent — if the output file already exists for a model, that model is skipped.
+Pass one or more model names as arguments, or omit to run all registered models. The backend is **auto-detected from the model registries** in `config_models_*.py`: keys in `DOUBLEWORD_MODELS` use the Doubleword Batch API (async), keys in `V7_MODELS` use the V7 Go entity API (async), and keys in `OPENROUTER_MODELS` use OpenRouter (sync). Runs are idempotent — if the output file already exists for a model, that model is skipped.
 
 ```bash
 # One OpenRouter model
@@ -137,11 +137,17 @@ python extractor.py
 # All OpenRouter models only
 python extractor.py --all-openrouter
 
-# One Doubleword model (auto-detected by dw- prefix)
+# All V7 Go models only (see config_models_v7.py and llm_v7.py)
+python extractor.py --all-v7
+
+# One Doubleword model (registry key dw-*)
 python extractor.py dw-qwen3-vl-30b
 
-# Mix both backends in one command
-python extractor.py gemini-2.0-flash dw-qwen3-14b
+# One V7 model (registry key v7-* — requires agent + env; see README “V7 Go” below)
+python extractor.py v7-charity-extract
+
+# Mix backends in one command
+python extractor.py gemini-2.0-flash dw-qwen3-14b v7-charity-extract
 
 # All Doubleword models with 24h window (cheapest)
 python extractor.py --all-doubleword --completion-window 24h
@@ -151,9 +157,45 @@ python extractor.py --retry-failed
 
 # Retry failed rows for specific Doubleword models only
 python extractor.py dw-olmocr-2-7b-1025-fp8 dw-lightonocr-2-1b-bbox-soup --retry-failed
+
+# Retry failed rows for a V7 model (uses data/.v7_failed_rows.json)
+python extractor.py v7-charity-extract --retry-failed
 ```
 
-Each run auto-syncs Doubleword model pricing first, then prints a per-provider plan (which models will run, skip, or resume) and executes extraction. Ctrl-C during Doubleword polling triggers a graceful shutdown — checkpoints are preserved and batches resume on next run. On completion it prints a combined summary with completed/skipped/interrupted/failed counts. When a Doubleword batch completes with partial failures, the DW error file is automatically downloaded and the per-row rejection reasons (e.g. `context_length_exceeded`) are logged to the console and recorded. Use `--retry-failed` on a subsequent run to re-submit only those rows and merge the results back into the existing output file. If a model is unavailable (e.g. `PermissionDenied` on submit), it is automatically recorded in `.doubleword_unavailable_models.json` and skipped on all future runs — both normal and `--retry-failed`. Output files: `data/playgroup_dev_extracted__<provider>__<model-name>.tsv`, `data/extraction_stats.csv` (provider, row counts, per-field hit rates, time and cost), `data/extraction_call_log.csv` (per-row details), `data/.doubleword_failed_rows.json` (failed row index per model, consumed by `--retry-failed`), and `data/.doubleword_unavailable_models.json` (models that errored on submit, auto-skipped).
+Each run auto-syncs Doubleword model pricing first, then prints a per-provider plan (which models will run, skip, or resume) and executes extraction. Ctrl-C during Doubleword or V7 polling triggers a graceful shutdown — checkpoints are preserved and jobs resume on next run. On completion it prints a combined summary with completed/skipped/interrupted/failed counts. When a Doubleword batch completes with partial failures, the DW error file is automatically downloaded and the per-row rejection reasons (e.g. `context_length_exceeded`) are logged to the console and recorded. Use `--retry-failed` on a subsequent run to re-submit only those rows and merge the results back into the existing output file (Doubleword and V7 each maintain their own failed-row manifests). If a model is unavailable (e.g. `PermissionDenied` on submit), it is automatically recorded in the provider-specific unavailable-models file and skipped on future runs.
+
+**Output and state files**
+
+| Pattern | Purpose |
+|--------|---------|
+| `data/playgroup_dev_extracted__openrouter__<model>.tsv` | OpenRouter extraction output |
+| `data/playgroup_dev_extracted__doubleword__<model>.tsv` | Doubleword batch output |
+| `data/playgroup_dev_extracted__v7__<model>.tsv` | V7 Go entity-run output |
+| `data/extraction_stats.csv` | Cumulative run stats (provider, row counts, fields, time, cost, `batch_id` where applicable) |
+| `data/extraction_call_log.csv` | Per-row call log |
+| `data/.doubleword_checkpoints.json` | Doubleword batch resume state |
+| `data/.doubleword_failed_rows.json` | Failed row indices for `--retry-failed` (Doubleword) |
+| `data/.doubleword_unavailable_models.json` | Doubleword models that failed on submit |
+| `data/.v7_checkpoints.json` | V7 synthetic batch / entity map for resume |
+| `data/.v7_failed_rows.json` | Failed row indices for `--retry-failed` (V7) |
+| `data/.v7_unavailable_models.json` | V7 models that failed on submit |
+
+### V7 Go (optional backend)
+
+V7 runs use `llm_v7.py`: each input row creates a **entity** on your agent with the combined prompt + OCR text in an input field; the pipeline polls until an **output** field contains the model response (same JSON shape as other backends). Configure the agent in [V7 Go](https://go.v7labs.com); API overview: [Create Entities Programmatically](https://docs.go.v7labs.com/reference/create-entities-programmatically).
+
+Set in `.env` (or override per model in `config_models_v7.py`):
+
+| Variable | Purpose |
+|----------|---------|
+| `V7_GO_API_KEY` or `V7_API_KEY` | API key (`X-API-KEY` header) |
+| `V7_GO_WORKSPACE_ID` | Workspace UUID |
+| `V7_GO_AGENT_ID` | Agent (project) UUID |
+| `V7_GO_INPUT_FIELD_SLUG` | Input property slug (default `document-text`) |
+| `V7_GO_OUTPUT_FIELD_SLUG` | Output property slug to read (default `extracted-json`) |
+| `V7_GO_BASE_URL` | API base (default `https://go.v7labs.com`; some tools use `https://api.go.v7labs.com`) |
+
+Token usage is not returned by this API path in the client; costs in stats may be zero until you add pricing manually in the config.
 
 ### 4. Score and rank all models
 
@@ -175,13 +217,15 @@ python score.py data/playgroup_dev_extracted__openrouter__gemini-2.0-flash.tsv
 |---|---|
 | `llm_openrouter.py` | LLM client for OpenRouter (synchronous). Run directly for a smoke test. |
 | `llm_doubleword.py` | LLM client for Doubleword Batch API (async, direct batch management with checkpoint/resume). |
+| `llm_v7.py` | LLM client for [V7 Go](https://docs.go.v7labs.com/) (async HTTP: create entity per row, poll until output field ready). Same orchestration hooks as `llm_doubleword.py` (`submit_batch`, `poll_batch`, `download_results`, checkpoints). |
 | `extraction_and_prompt_example.py` | Simple single-model extraction loop, good for prompt experiments. |
-| `extractor.py` | Unified extraction runner. Auto-detects backend from model prefix (`dw-*` → Doubleword batch, others → OpenRouter). Auto-syncs Doubleword pricing at startup. Doubleword models are submitted in parallel and polled with checkpoint/resume. Graceful Ctrl-C preserves checkpoints. Downloads DW error files for pre-processing rejections (e.g. context overflow). Supports `--completion-window`, `--all-doubleword`, `--all-openrouter`, and `--retry-failed` flags. |
+| `extractor.py` | Unified extraction runner. Auto-detects backend from registries (`DOUBLEWORD_MODELS`, `V7_MODELS`, `OPENROUTER_MODELS`). Auto-syncs Doubleword pricing at startup. Doubleword and V7 use async polling with checkpoint/resume; OpenRouter is sync per row. Graceful Ctrl-C preserves checkpoints. Doubleword: downloads DW error files for pre-processing rejections. Flags: `--completion-window`, `--all-doubleword`, `--all-openrouter`, `--all-v7`, `--retry-failed`. |
 | `sync_doubleword_models.py` | Auto-syncs Doubleword model pricing from their [docs markdown endpoint](https://docs.doubleword.ai/inference-api/model-pricing.md). Regenerates `config_models_doubleword.py`. Skips save when nothing changed. Called by `extractor.py` at startup; can also run standalone. |
 | `score.py` | Scorer with F1/Precision/Recall. No args → ranked leaderboard; pass a filename → verbose field-by-field diff. |
 | `utils.py` | Shared helpers (`extract_from_triple_backticks`, `sanitize_error_message`). |
 | `config_models_openrouter.py` | OpenRouter model registry — 33 models organised by tier. |
 | `config_models_doubleword.py` | Doubleword model registry — 12 extraction models (auto-generated by `sync_doubleword_models.py`). |
+| `config_models_v7.py` | V7 Go model registry — short names (e.g. `v7-charity-extract`) mapped to display metadata; agent IDs and field slugs usually come from env (see “V7 Go” above). |
 | `playground.py` | Generates the interactive HTML playground from extraction results. |
 
 ### Model Tiers
@@ -208,6 +252,17 @@ Prefixed with `dw-`. Auto-generated by `sync_doubleword_models.py` from the [Dou
 
 Each model entry includes: model ID, `multimodal` flag, supported modalities, context length, and notes.
 
+#### V7 Go (`config_models_v7.py`)
+
+Registry keys are typically prefixed with `v7-`. Each entry mirrors the shape used by other configs (`model`, `multimodal`, `tier`, `ctx`, pricing keys). Agent connection is via environment variables or optional per-model `workspace_id`, `agent_id`, `input_field_slug`, and `output_field_slug`. See **V7 Go (optional backend)** under the workflow section.
+
+### Frontend (Doc Risk Auditor prototype)
+
+| Path | Purpose |
+|------|---------|
+| `web/src/components/DocRiskResultsPanel.tsx` | React + TypeScript panel: extracted fields, risk flags, approve / review / reject actions (no UI libraries). |
+| `web/src/components/DocRiskResultsPanel.css` | Styles (IBM Plex–oriented dark theme). Wire into a Vite app when you scaffold the full UI. |
+
 ### Data (`data/`)
 
 | File | Description |
@@ -215,12 +270,15 @@ Each model entry includes: model ID, `multimodal` flag, supported modalities, co
 | `playgroup_dev_in.tsv` | Input: 11 PDFs × 6 columns (filename, keys, 3 OCR text variants, combined text) |
 | `playgroup_dev_expected.tsv` | Ground truth field values |
 | `pdf_names.txt` | PDF filenames in row order |
-| `playgroup_dev_extracted__<provider>__<model>.tsv` | Per-model extraction output (one file per run) |
-| `extraction_stats.csv` | Cumulative run stats: provider, model, row counts, per-field hit rates, time, cost, batch_id (Doubleword) |
+| `playgroup_dev_extracted__<provider>__<model>.tsv` | Per-model extraction output (`openrouter`, `doubleword`, or `v7`) |
+| `extraction_stats.csv` | Cumulative run stats: provider, model, row counts, per-field hit rates, time, cost, `batch_id` (Doubleword batch id or V7 synthetic id) |
 | `extraction_call_log.csv` | Per-row call log: provider, model, row, status, elapsed time, tokens, cost |
 | `.doubleword_checkpoints.json` | Doubleword batch checkpoint: maps model → batch_id for resume on cancel/re-run |
-| `.doubleword_failed_rows.json` | Failed-row index: maps model → list of row indices that errored in last completed batch; consumed by `--retry-failed` |
-| `.doubleword_unavailable_models.json` | Models that failed to submit (e.g. PermissionDenied); automatically skipped on all future runs |
+| `.doubleword_failed_rows.json` | Failed-row index (Doubleword); consumed by `--retry-failed` |
+| `.doubleword_unavailable_models.json` | Doubleword models that failed to submit; skipped on future runs |
+| `.v7_checkpoints.json` | V7 checkpoint: maps model → entity ids / synthetic batch id for resume |
+| `.v7_failed_rows.json` | Failed-row index (V7); consumed by `--retry-failed` |
+| `.v7_unavailable_models.json` | V7 models that failed to submit; skipped on future runs |
 | `*.pdf` | 11 UK charity financial PDFs (≤ 200 pages each) |
 
 ### Visualisations

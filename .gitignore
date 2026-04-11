@@ -6,6 +6,9 @@ brief.md
 playgroup_email.txt
 
 data/.doubleword_checkpoints.json
+data/.v7_checkpoints.json
+data/.v7_failed_rows.json
+data/.v7_unavailable_models.json
 
 .claude/
 .playwright-mcp/

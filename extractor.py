@@ -1,7 +1,7 @@
-"""Unified extraction orchestrator — supports OpenRouter (sync) and Doubleword Batch API (async).
+"""Unified extraction orchestrator — OpenRouter (sync), Doubleword Batch API (async), V7 Go (async).
 
-Backend is auto-detected from model prefix: dw-* models use Doubleword, all others use OpenRouter.
-Doubleword batches are submitted in parallel and polled with checkpoint/resume support.
+Backend is auto-detected from model registry: Doubleword (dw-*), V7 Go (v7-*), else OpenRouter.
+Doubleword and V7 runs use checkpoint/resume; V7 maps each TSV row to a V7 entity (see llm_v7.py).
 """
 
 import argparse
@@ -15,6 +15,7 @@ from datetime import datetime
 import llm_openrouter
 from config_models_doubleword import DOUBLEWORD_MODELS
 from config_models_openrouter import OPENROUTER_MODELS
+from config_models_v7 import V7_MODELS
 from utils import get_logger, sanitize_error_message
 
 log = get_logger("extractor")
@@ -69,7 +70,7 @@ The raw text from the document follows:
 ADDRESS_FIELDS = {"address__postcode", "address__post_town", "address__street_line"}
 NUMERIC_FIELDS = {"income_annually_in_british_pounds", "spending_annually_in_british_pounds"}
 
-ALL_MODELS = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS}
+ALL_MODELS = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS, **V7_MODELS}
 
 
 def _mod_tag(multimodal):
@@ -289,6 +290,7 @@ def _run_openrouter(model_short_name):
 # ═══════════════════════════════════════════════════════════════════
 
 DOUBLEWORD_POLL_INTERVAL = 10  # seconds between poll cycles
+V7_POLL_INTERVAL = 5  # V7 entity polling (lighter than DW batch file generation)
 
 
 _PROMPT_OVERHEAD_TOKENS = 500   # system + user prompt template + JSON response budget
@@ -316,6 +318,28 @@ def _truncate_rows_to_ctx(rows, model_cfg) -> list:
         else:
             truncated.append((row_num, pdf_filename, text_combined))
     return truncated
+
+
+def _v7_submit_rows(rows, model_cfg):
+    """Rows passed to V7 submit_batch: PDF path skips OCR truncation (multimodal)."""
+    if model_cfg.get("multimodal"):
+        return rows
+    return _truncate_rows_to_ctx(rows, model_cfg)
+
+
+def _resolve_v7_agent_template_cli_path(path: str) -> str:
+    """Match llm_v7._resolve_template_path: cwd-relative names resolve against this repo root."""
+    p = path.strip()
+    if os.path.isabs(p):
+        return p
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), p)
+
+
+def _v7_model_cfg_for_run(model_short_name: str, agent_template_json_override: str | None) -> dict:
+    cfg = dict(V7_MODELS[model_short_name])
+    if agent_template_json_override is not None:
+        cfg["agent_template_json"] = agent_template_json_override
+    return cfg
 
 
 def _load_input_rows():
@@ -439,6 +463,100 @@ def _write_doubleword_results(model_short_name, results, rows, elapsed_secs, bat
         llm_doubleword.remove_failed_rows_entry(model_short_name)
 
 
+def _write_v7_results(model_short_name, results, rows, elapsed_secs, batch_id=""):
+    """Write V7 entity results to TSV, per-row call logs, and model stats (mirrors _write_doubleword_results)."""
+    import llm_v7
+
+    model_cfg = V7_MODELS[model_short_name]
+    model = model_cfg["model"]
+    multimodal = model_cfg["multimodal"]
+    price_in = model_cfg.get("price_in", 0)
+    price_out = model_cfg.get("price_out", 0)
+    out_filename = f"data/playgroup_dev_extracted__v7__{model_short_name}.tsv"
+    tmp_filename = out_filename + ".tmp"
+
+    rows_with_values = 0
+    rows_empty = 0
+    rows_error = 0
+    field_counts = {}
+    total_prompt_tokens = 0
+    total_completion_tokens = 0
+    total_cost_usd = 0.0
+
+    with open(tmp_filename, "w") as outfile:
+        for row_num, pdf_filename, _text in rows:
+            result = results.get(row_num)
+            call_log_base = {
+                "datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "provider": "V7",
+                "model_short_name": model_short_name,
+                "model_full_name": model,
+                "tier": model_cfg.get("tier", ""),
+                "multimodal": multimodal,
+                "row_num": row_num,
+                "pdf_filename": pdf_filename,
+            }
+
+            if result is None or "error" in result:
+                error_msg = (result or {}).get("error", "No result returned")[:500]
+                outfile.write(f"error={error_msg}\n")
+                rows_empty += 1
+                rows_error += 1
+                log.error("  [V7] {} row {} -> ERROR: {}", model_short_name, row_num, error_msg[:200])
+                _append_call_log({**call_log_base, "status": "error", "elapsed_secs": 0,
+                                  "prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0,
+                                  "fields_extracted": 0, "error": error_msg[:500]})
+                continue
+
+            fields = _parse_llm_response(result["text"])
+            line = _row_to_tsv_line(fields)
+            outfile.write(line + "\n")
+
+            prompt_tokens = result.get("prompt_tokens", 0)
+            completion_tokens = result.get("completion_tokens", 0)
+            row_cost = (prompt_tokens * price_in + completion_tokens * price_out) / 1_000_000
+            total_prompt_tokens += prompt_tokens
+            total_completion_tokens += completion_tokens
+            total_cost_usd += row_cost
+
+            if fields:
+                rows_with_values += 1
+                log.info("  [V7] {} row {} -> {}  [${:.6f}]", model_short_name, row_num, line[:100], row_cost)
+                for key in fields:
+                    field_counts[key] = field_counts.get(key, 0) + 1
+            else:
+                rows_empty += 1
+                log.warning("  [V7] {} row {} -> (no values extracted)", model_short_name, row_num)
+
+            _append_call_log({**call_log_base, "status": "ok" if fields else "empty",
+                              "elapsed_secs": 0, "prompt_tokens": prompt_tokens,
+                              "completion_tokens": completion_tokens,
+                              "cost_usd": round(row_cost, 6),
+                              "fields_extracted": len(fields), "error": ""})
+
+    os.replace(tmp_filename, out_filename)
+
+    _print_summary("V7", model_short_name, multimodal, rows_with_values, rows_empty, field_counts,
+                   elapsed_secs, total_prompt_tokens, total_completion_tokens, total_cost_usd,
+                   rows_error=rows_error)
+    _append_stats("V7", model_short_name, model_cfg,
+                  rows_with_values + rows_empty, rows_with_values, rows_empty, field_counts,
+                  elapsed_secs, total_prompt_tokens, total_completion_tokens, total_cost_usd,
+                  batch_id=batch_id)
+
+    failed_row_nums = [
+        row_num for row_num, _pdf, _text in rows
+        if results.get(row_num) is None or "error" in results.get(row_num, {})
+    ]
+    if failed_row_nums:
+        llm_v7.update_failed_rows_entry(model_short_name, failed_row_nums)
+        if len(failed_row_nums) == len(rows):
+            sample_error = (results.get(rows[0][0]) or {}).get("error", "")
+            log.warning("[V7] All {} rows failed for '{}' — sample: {}", len(rows), model_short_name, sample_error[:200])
+    else:
+        llm_v7.remove_failed_rows_entry(model_short_name)
+
+
 def _merge_doubleword_results(model_short_name, new_results, rows):
     """Merge retry results into an existing output TSV for a Doubleword model.
 
@@ -517,6 +635,80 @@ def _merge_doubleword_results(model_short_name, new_results, rows):
         llm_doubleword.remove_failed_rows_entry(model_short_name)
 
     log.info("[Doubleword] {} retry: {} row(s) fixed, {} still failing",
+             model_short_name, rows_fixed, len(still_failed))
+    return rows_fixed, len(still_failed)
+
+
+def _merge_v7_results(model_short_name, new_results, rows):
+    """Merge V7 retry results into an existing output TSV (same positional contract as Doubleword)."""
+    import llm_v7
+
+    model_cfg = V7_MODELS[model_short_name]
+    model = model_cfg["model"]
+    multimodal = model_cfg["multimodal"]
+    price_in = model_cfg.get("price_in", 0)
+    price_out = model_cfg.get("price_out", 0)
+    out_filename = f"data/playgroup_dev_extracted__v7__{model_short_name}.tsv"
+    tmp_filename = out_filename + ".tmp"
+
+    with open(out_filename) as f:
+        lines = f.read().splitlines()
+
+    rows_fixed = 0
+    still_failed = []
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    for row_num, pdf_filename, _text in rows:
+        if row_num not in new_results:
+            continue
+        result = new_results[row_num]
+        call_log_base = {
+            "datetime": now,
+            "provider": "V7",
+            "model_short_name": model_short_name,
+            "model_full_name": model,
+            "tier": model_cfg.get("tier", ""),
+            "multimodal": multimodal,
+            "row_num": row_num,
+            "pdf_filename": pdf_filename,
+        }
+        if "error" in result:
+            error_msg = result["error"][:500]
+            lines[row_num] = f"error={error_msg}"
+            still_failed.append(row_num)
+            log.error("  [V7] {} row {} retry -> ERROR: {}", model_short_name, row_num, error_msg[:200])
+            _append_call_log({**call_log_base, "status": "error", "elapsed_secs": 0,
+                              "prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0,
+                              "fields_extracted": 0, "error": error_msg})
+        else:
+            fields = _parse_llm_response(result["text"])
+            line = _row_to_tsv_line(fields)
+            lines[row_num] = line
+            prompt_tokens = result.get("prompt_tokens", 0)
+            completion_tokens = result.get("completion_tokens", 0)
+            row_cost = (prompt_tokens * price_in + completion_tokens * price_out) / 1_000_000
+            status = "ok" if fields else "empty"
+            if fields:
+                rows_fixed += 1
+                log.info("  [V7] {} row {} FIXED -> {}  [${:.6f}]",
+                         model_short_name, row_num, line[:100], row_cost)
+            else:
+                still_failed.append(row_num)
+                log.warning("  [V7] {} row {} retry: still no values extracted", model_short_name, row_num)
+            _append_call_log({**call_log_base, "status": status, "elapsed_secs": 0,
+                              "prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens,
+                              "cost_usd": round(row_cost, 6), "fields_extracted": len(fields), "error": ""})
+
+    with open(tmp_filename, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    os.replace(tmp_filename, out_filename)
+
+    if still_failed:
+        llm_v7.update_failed_rows_entry(model_short_name, still_failed)
+    else:
+        llm_v7.remove_failed_rows_entry(model_short_name)
+
+    log.info("[V7] {} retry: {} row(s) fixed, {} still failing",
              model_short_name, rows_fixed, len(still_failed))
     return rows_fixed, len(still_failed)
 
@@ -684,6 +876,109 @@ async def _retry_failed_rows_doubleword(models_to_retry, completion_window="1h")
     await client.close()
     if not interrupted:
         log.info("[Retry] Done: {}", {m: s for m, s in statuses.items() if s != "skipped"})
+    return statuses
+
+
+async def _retry_failed_rows_v7(models_to_retry, v7_agent_template: str | None = None):
+    """Re-submit failed rows for V7 models and merge into existing TSVs (Doubleword-shaped flow)."""
+    import llm_v7
+
+    all_rows = _load_input_rows()
+    failed_manifest = llm_v7.load_failed_rows()
+    client = llm_v7.create_client()
+    statuses = {}
+
+    pending = {}
+    row_subsets = {}
+    unavailable = llm_v7.load_unavailable_models()
+
+    for model_short_name in models_to_retry:
+        if model_short_name not in V7_MODELS:
+            log.warning("[V7 Retry] '{}' not in V7_MODELS, skipping", model_short_name)
+            statuses[model_short_name] = "skipped"
+            continue
+        if model_short_name in unavailable:
+            log.warning("[V7 Retry] Skipping '{}' — unavailable: {}", model_short_name, unavailable[model_short_name])
+            statuses[model_short_name] = "skipped"
+            continue
+        failed_row_nums = failed_manifest.get(model_short_name)
+        if not failed_row_nums:
+            log.info("[V7 Retry] No failed rows for '{}', skipping", model_short_name)
+            statuses[model_short_name] = "skipped"
+            continue
+        out_filename = f"data/playgroup_dev_extracted__v7__{model_short_name}.tsv"
+        if not os.path.exists(out_filename):
+            log.warning("[V7 Retry] No output for '{}' — run full extraction first", model_short_name)
+            statuses[model_short_name] = "skipped"
+            continue
+
+        failed_set = set(failed_row_nums)
+        subset = [(rn, pdf, text) for rn, pdf, text in all_rows if rn in failed_set]
+        row_subsets[model_short_name] = subset
+        model_cfg = _v7_model_cfg_for_run(model_short_name, v7_agent_template)
+        log.info("[V7 Retry] Submitting {} failed row(s) for '{}' ({})",
+                 len(subset), model_short_name, model_cfg["model"])
+        try:
+            batch_id = await llm_v7.submit_batch(
+                client, model_short_name, model_cfg["model"],
+                PROMPT_TEMPLATE, _v7_submit_rows(subset, model_cfg),
+                extra_params=model_cfg.get("extra_params"),
+                model_cfg=model_cfg,
+            )
+        except Exception as e:
+            reason = str(e)
+            log.error("[V7 Retry] Submit failed for '{}': {}", model_short_name, reason)
+            llm_v7.mark_model_unavailable(model_short_name, reason)
+            statuses[model_short_name] = "skipped"
+            continue
+        pending[model_short_name] = batch_id
+        log.info("[V7 Retry] Submitted {}: batch {}", model_short_name, batch_id)
+
+    if not pending:
+        log.info("[V7 Retry] Nothing to retry")
+        await client.aclose()
+        return statuses
+
+    log.info("[V7 Retry] Polling {} batch(es)...", len(pending))
+    interrupted = False
+    try:
+        while pending:
+            await asyncio.sleep(V7_POLL_INTERVAL)
+            done = []
+            for model_short_name, batch_id in pending.items():
+                try:
+                    status, output_file_id, _err_fid, counts = await llm_v7.poll_batch(client, batch_id)
+                except Exception as e:
+                    log.error("[V7 Retry][{}] Poll error: {}", model_short_name, e)
+                    continue
+                log.debug("[V7 Retry] {} {}/{}", model_short_name, counts.get("completed"), counts.get("total"))
+                if status == "completed":
+                    new_results = await llm_v7.download_results(client, output_file_id)
+                    rows_fixed, still_failed = _merge_v7_results(
+                        model_short_name, new_results, row_subsets[model_short_name]
+                    )
+                    llm_v7.remove_checkpoint_entry(model_short_name)
+                    done.append(model_short_name)
+                    if still_failed == 0:
+                        statuses[model_short_name] = "fixed"
+                    elif rows_fixed > 0:
+                        statuses[model_short_name] = "partial"
+                    else:
+                        statuses[model_short_name] = "still_failed"
+                elif status == "failed":
+                    llm_v7.remove_checkpoint_entry(model_short_name)
+                    done.append(model_short_name)
+                    statuses[model_short_name] = "failed"
+            for m in done:
+                del pending[m]
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        interrupted = True
+        for model_short_name in pending:
+            statuses[model_short_name] = "interrupted"
+
+    await client.aclose()
+    if not interrupted:
+        log.info("[V7 Retry] Done: {}", {m: s for m, s in statuses.items() if s != "skipped"})
     return statuses
 
 
@@ -930,6 +1225,188 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
     return statuses
 
 
+async def _run_all_v7(models_to_run, v7_agent_template: str | None = None):
+    """Submit V7 entity jobs for each model, poll until outputs settle (checkpoint/resume like Doubleword)."""
+    import time
+    import llm_v7
+
+    rows = _load_input_rows()
+    checkpoint = llm_v7.load_checkpoint()
+    unavailable = llm_v7.load_unavailable_models()
+    client = llm_v7.create_client()
+    statuses = {}
+
+    pending = {}
+    submitted_at = {}
+    to_submit = []
+    to_resume = []
+
+    for model_short_name in models_to_run:
+        model_cfg = _v7_model_cfg_for_run(model_short_name, v7_agent_template)
+        multimodal = model_cfg["multimodal"]
+        out_filename = f"data/playgroup_dev_extracted__v7__{model_short_name}.tsv"
+
+        if model_short_name in unavailable:
+            log.warning("[V7] Skipping {} — marked unavailable: {}", model_short_name, unavailable[model_short_name])
+            statuses[model_short_name] = "skipped"
+            continue
+
+        if os.path.exists(out_filename):
+            log.warning("[V7] Skipping {} {}: {} already exists", model_short_name, _mod_tag(multimodal), out_filename)
+            statuses[model_short_name] = "skipped"
+            continue
+
+        if model_short_name in checkpoint:
+            to_resume.append(model_short_name)
+        else:
+            to_submit.append(model_short_name)
+
+    for model_short_name in to_submit:
+        model_cfg = _v7_model_cfg_for_run(model_short_name, v7_agent_template)
+        multimodal = model_cfg["multimodal"]
+        log.info("[V7] Submitting {} ({}) {}, {} rows",
+                 model_short_name, model_cfg["model"], _mod_tag(multimodal), len(rows))
+        try:
+            batch_id = await llm_v7.submit_batch(
+                client, model_short_name, model_cfg["model"],
+                PROMPT_TEMPLATE, _v7_submit_rows(rows, model_cfg),
+                extra_params=model_cfg.get("extra_params"),
+                model_cfg=model_cfg,
+            )
+        except Exception as e:
+            reason = str(e)
+            log.error("[V7] Failed to submit '{}': {} — skipping", model_short_name, reason)
+            llm_v7.mark_model_unavailable(model_short_name, reason)
+            statuses[model_short_name] = "skipped"
+            continue
+        log.info("[V7] Submitted {}: batch {}", model_short_name, batch_id)
+        pending[model_short_name] = batch_id
+        submitted_at[model_short_name] = time.time()
+
+    resumed_pending = {}
+    for model_short_name in to_resume:
+        model_cfg = _v7_model_cfg_for_run(model_short_name, v7_agent_template)
+        multimodal = model_cfg["multimodal"]
+        cp_entry = checkpoint[model_short_name]
+        batch_id = cp_entry["batch_id"]
+        try:
+            status, _, _err_fid, counts = await llm_v7.poll_batch(client, batch_id)
+        except Exception as e:
+            log.warning("[V7] Batch {} for {} poll failed ({}), resubmitting", batch_id, model_short_name, e)
+            llm_v7.remove_checkpoint_entry(model_short_name)
+            log.info("[V7] Submitting {} ({}) {}, {} rows",
+                     model_short_name, model_cfg["model"], _mod_tag(multimodal), len(rows))
+            try:
+                batch_id = await llm_v7.submit_batch(
+                    client, model_short_name, model_cfg["model"],
+                    PROMPT_TEMPLATE, _v7_submit_rows(rows, model_cfg),
+                    extra_params=model_cfg.get("extra_params"),
+                    model_cfg=model_cfg,
+                )
+            except Exception as sub_e:
+                reason = str(sub_e)
+                log.error("[V7] Failed to resubmit '{}': {} — skipping", model_short_name, reason)
+                llm_v7.mark_model_unavailable(model_short_name, reason)
+                statuses[model_short_name] = "skipped"
+                continue
+            pending[model_short_name] = batch_id
+            submitted_at[model_short_name] = time.time()
+            continue
+
+        if status in ("completed", "in_progress"):
+            log.info("[V7] Resuming {} {}: batch {} ({}, {}/{})",
+                     model_short_name, _mod_tag(multimodal), batch_id, status, counts["completed"], counts["total"])
+            resumed_pending[model_short_name] = batch_id
+            submitted_at[model_short_name] = cp_entry.get("submitted_at", time.time())
+        else:
+            log.warning("[V7] Batch {} for {} is {}, resubmitting", batch_id, model_short_name, status)
+            llm_v7.remove_checkpoint_entry(model_short_name)
+            model_cfg = _v7_model_cfg_for_run(model_short_name, v7_agent_template)
+            multimodal = model_cfg["multimodal"]
+            log.info("[V7] Submitting {} ({}) {}, {} rows",
+                     model_short_name, model_cfg["model"], _mod_tag(multimodal), len(rows))
+            try:
+                batch_id = await llm_v7.submit_batch(
+                    client, model_short_name, model_cfg["model"],
+                    PROMPT_TEMPLATE, _v7_submit_rows(rows, model_cfg),
+                    extra_params=model_cfg.get("extra_params"),
+                    model_cfg=model_cfg,
+                )
+            except Exception as sub_e:
+                reason = str(sub_e)
+                log.error("[V7] Failed to resubmit '{}': {} — skipping", model_short_name, reason)
+                llm_v7.mark_model_unavailable(model_short_name, reason)
+                statuses[model_short_name] = "skipped"
+                continue
+            pending[model_short_name] = batch_id
+            submitted_at[model_short_name] = time.time()
+
+    pending = {**resumed_pending, **pending}
+
+    if not pending:
+        log.info("[V7] All models already complete, nothing to do")
+        await client.aclose()
+        return statuses
+
+    total_models = len(pending)
+    completed_models = 0
+    failed_models = 0
+    log.info("[V7] Polling {} job(s)... (Ctrl-C stops gracefully)", total_models)
+
+    interrupted = False
+    try:
+        while pending:
+            await asyncio.sleep(V7_POLL_INTERVAL)
+            done = []
+            poll_summary = []
+
+            for model_short_name, batch_id in pending.items():
+                try:
+                    status, output_file_id, _err_fid, counts = await llm_v7.poll_batch(client, batch_id)
+                except Exception as e:
+                    log.error("[{}] Poll error: {}", model_short_name, e)
+                    poll_summary.append(f"{model_short_name}:error")
+                    continue
+
+                poll_summary.append(f"{model_short_name}:{counts['completed']}/{counts['total']}")
+
+                if status == "completed":
+                    api_created = counts.get("created_at")
+                    api_completed = counts.get("completed_at")
+                    if api_created and api_completed:
+                        elapsed = float(api_completed) - float(api_created)
+                    else:
+                        elapsed = time.time() - submitted_at[model_short_name]
+                    results = await llm_v7.download_results(client, output_file_id)
+                    _write_v7_results(model_short_name, results, rows, elapsed, batch_id=batch_id)
+                    llm_v7.remove_checkpoint_entry(model_short_name)
+                    done.append(model_short_name)
+                    completed_models += 1
+                    statuses[model_short_name] = "completed"
+                elif status == "failed":
+                    llm_v7.remove_checkpoint_entry(model_short_name)
+                    done.append(model_short_name)
+                    failed_models += 1
+                    statuses[model_short_name] = "failed"
+
+            for m in done:
+                del pending[m]
+
+            remaining = len(pending)
+            log.debug("[V7 Polling] {} pending  |  {}", remaining, "  ".join(poll_summary))
+
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        interrupted = True
+        log.warning("Interrupted — V7 checkpoints saved; re-run to resume")
+        for model_short_name in pending:
+            statuses[model_short_name] = "interrupted"
+
+    await client.aclose()
+    if not interrupted:
+        log.info("[V7] All jobs settled ({} succeeded, {} failed)", completed_models, failed_models)
+    return statuses
+
+
 # ═══════════════════════════════════════════════════════════════════
 #  Run summary
 # ═══════════════════════════════════════════════════════════════════
@@ -994,12 +1471,14 @@ def _print_run_summary(all_statuses):
 # ═══════════════════════════════════════════════════════════════════
 
 def _resolve_model(model_short_name):
-    """Return backend string ('doubleword' or 'openrouter') or exit with error.
+    """Return backend string ('doubleword', 'v7', or 'openrouter') or exit with error.
 
     potentially_deprecated models are NOT skipped — they still run normally.
     Only a manually set 'deprecated': True flag would retire a model (if that
     logic is ever added in future).
     """
+    if model_short_name in V7_MODELS:
+        return "v7"
     if model_short_name in DOUBLEWORD_MODELS:
         cfg = DOUBLEWORD_MODELS[model_short_name]
         if cfg.get("potentially_deprecated"):
@@ -1014,9 +1493,11 @@ def _resolve_model(model_short_name):
         return "openrouter"
     available_or = ", ".join(f"{k}{_mod_tag(OPENROUTER_MODELS[k]['multimodal'])}" for k in OPENROUTER_MODELS)
     available_dw = ", ".join(f"{k}{_mod_tag(DOUBLEWORD_MODELS[k]['multimodal'])}" for k in DOUBLEWORD_MODELS)
+    available_v7 = ", ".join(f"{k}{_mod_tag(V7_MODELS[k]['multimodal'])}" for k in V7_MODELS)
     log.error("Unknown model '{}'.", model_short_name)
     log.error("  OpenRouter models: {}", available_or)
     log.error("  Doubleword models: {}", available_dw)
+    log.error("  V7 Go models: {}", available_v7)
     sys.exit(1)
 
 
@@ -1030,24 +1511,39 @@ async def main():
     importlib.reload(_cfg_dw)
     global DOUBLEWORD_MODELS, ALL_MODELS
     DOUBLEWORD_MODELS = _cfg_dw.DOUBLEWORD_MODELS
-    ALL_MODELS = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS}
+    ALL_MODELS = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS, **V7_MODELS}
 
     parser = argparse.ArgumentParser(
-        description="Extract charity data using OpenRouter or Doubleword Batch API. "
-                    "Backend is auto-detected: dw-* models use Doubleword, others use OpenRouter."
+        description="Extract charity data via OpenRouter, Doubleword Batch API, or V7 Go agents. "
+                    "Backend is auto-detected from model registry keys (see config_models_*.py)."
     )
     parser.add_argument("models", nargs="*",
                         help="Model short names to run (default: all models from both providers)")
     parser.add_argument("--completion-window", default="1h", choices=["1h", "24h"],
                         help="Doubleword batch completion window (default: 1h)")
     parser.add_argument("--retry-failed", action="store_true",
-                        help="Re-submit only failed rows from previous DW batch runs and merge results")
+                        help="Re-submit only failed rows from previous Doubleword or V7 runs and merge results")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--all-doubleword", action="store_true",
                        help="Run only Doubleword models")
     group.add_argument("--all-openrouter", action="store_true",
                        help="Run only OpenRouter models")
+    group.add_argument("--all-v7", action="store_true",
+                       help="Run only V7 Go models (see config_models_v7.py)")
+    parser.add_argument(
+        "--v7-agent-template",
+        metavar="PATH",
+        default=None,
+        help="Go Agent v2 project export JSON: sets agent_template_json for every V7 model in this run "
+             "(overrides config_models_v7); relative paths resolve from repo root like the default filename",
+    )
     args = parser.parse_args()
+
+    if args.v7_agent_template:
+        _v7_t = _resolve_v7_agent_template_cli_path(args.v7_agent_template)
+        if not os.path.isfile(_v7_t):
+            parser.error(f"--v7-agent-template: not a file: {_v7_t}")
+        args.v7_agent_template = _v7_t
 
     # Announce potentially_deprecated models (informational — they still run)
     pdep_dw = {k: v for k, v in DOUBLEWORD_MODELS.items() if v.get("potentially_deprecated")}
@@ -1069,22 +1565,28 @@ async def main():
         models_to_run = list(DOUBLEWORD_MODELS)   # includes potentially_deprecated
     elif args.all_openrouter:
         models_to_run = list(OPENROUTER_MODELS)
+    elif args.all_v7:
+        models_to_run = list(V7_MODELS)
     else:
         models_to_run = list(ALL_MODELS)           # includes potentially_deprecated
 
     # Partition models by backend
     dw_models = []
+    v7_models = []
     or_models = []
     for model_short_name in models_to_run:
         backend = _resolve_model(model_short_name)
         if backend == "doubleword":
             dw_models.append(model_short_name)
+        elif backend == "v7":
+            v7_models.append(model_short_name)
         else:
             or_models.append(model_short_name)
 
     # Print run plan
     log.info("=" * 60)
-    log.info("Extraction run: {} OpenRouter + {} Doubleword models", len(or_models), len(dw_models))
+    log.info("Extraction run: {} OpenRouter + {} Doubleword + {} V7 models",
+             len(or_models), len(dw_models), len(v7_models))
     log.info("=" * 60)
 
     if or_models:
@@ -1092,6 +1594,13 @@ async def main():
     if dw_models:
         from llm_doubleword import load_checkpoint
         _print_provider_plan("doubleword", dw_models, checkpoint=load_checkpoint())
+    if v7_models:
+        from llm_v7 import load_checkpoint as _v7_load_checkpoint
+        _print_provider_plan("v7", v7_models, checkpoint=_v7_load_checkpoint())
+        if args.v7_agent_template:
+            log.info("[V7] Using --v7-agent-template: {}", args.v7_agent_template)
+    elif args.v7_agent_template:
+        log.warning("--v7-agent-template ignored: no V7 models in this run")
 
     all_statuses = {}  # (provider, model) -> status
 
@@ -1117,6 +1626,19 @@ async def main():
             dw_statuses = await _run_all_doubleword(dw_models, args.completion_window) or {}
         for model_short_name in dw_models:
             all_statuses[("doubleword", model_short_name)] = dw_statuses.get(model_short_name, "unknown")
+
+    if v7_models:
+        log.info("-" * 60)
+        if args.retry_failed:
+            log.info("V7 retry-failed ({} model(s) to check)", len(v7_models))
+            log.info("-" * 60)
+            v7_statuses = await _retry_failed_rows_v7(v7_models, args.v7_agent_template) or {}
+        else:
+            log.info("Starting V7 ({} models)", len(v7_models))
+            log.info("-" * 60)
+            v7_statuses = await _run_all_v7(v7_models, args.v7_agent_template) or {}
+        for model_short_name in v7_models:
+            all_statuses[("v7", model_short_name)] = v7_statuses.get(model_short_name, "unknown")
 
     # Final summary
     _print_run_summary(all_statuses)

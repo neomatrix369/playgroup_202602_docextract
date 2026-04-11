@@ -93,25 +93,20 @@ DOUBLEWORD_MODELS = {
         "ctx":        131_000,
         "notes":      "",
     },
-
-    # ═══════════════════════════════════════════════════════════
-    #  POTENTIALLY DEPRECATED MODELS
-    #  Not seen on the Doubleword pricing page as of first_noticed_missing.
-    #  These models still run normally — the flag is informational only.
-    #  Confirm manually and set "deprecated": True to fully retire.
-    # ═══════════════════════════════════════════════════════════
-
     "dw-deepseek-ocr-2": {
         "model":      "deepseek-ai/DeepSeek-OCR-2",
         "multimodal": False,
         "modalities": ["text"],
         "tier":       "ultra_cheap",
         "price_in":   0.08, "price_out": 0.08,
-        "ctx":        262_000,
+        "ctx":        8_000,
         "notes":      "",
-        "potentially_deprecated":  True,
-        "first_noticed_missing":   "2026-04-05",
     },
+
+    # ═══════════════════════════════════════════════════════════
+    #  VISION-LANGUAGE MODELS
+    # ═══════════════════════════════════════════════════════════
+
     "dw-qwen3-vl-30b": {
         "model":      "Qwen/Qwen3-VL-30B-A3B-Instruct-FP8",
         "multimodal": True,
@@ -120,8 +115,6 @@ DOUBLEWORD_MODELS = {
         "price_in":   0.07, "price_out": 0.30,
         "ctx":        256_000,
         "notes":      "30B MoE (3B active), vision-language",
-        "potentially_deprecated":  True,
-        "first_noticed_missing":   "2026-03-29",
     },
     "dw-qwen3-vl-235b": {
         "model":      "Qwen/Qwen3-VL-235B-A22B-Instruct-FP8",
@@ -130,8 +123,6 @@ DOUBLEWORD_MODELS = {
         "tier":       "premium",
         "price_in":   0.15, "price_out": 0.55,
         "ctx":        256_000,
-        "notes":      "235B MoE (22B active), vision-language",
-        "potentially_deprecated":  True,
-        "first_noticed_missing":   "2026-03-29",
+        "notes":      "235B MoE (22B active), vision-language, ~GPT-5 Chat and Claude 4 Opus Thinking",
     },
 }

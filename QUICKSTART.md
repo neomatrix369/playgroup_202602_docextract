@@ -37,10 +37,19 @@ Create a `.env` file in the project root:
 
 ```
 OPENROUTER_API_KEY=sk-or-v1-...
-DOUBLEWORD_API_KEY=your-doubleword-api-key-here   # optional, for batch extraction
+DOUBLEWORD_API_KEY=your-doubleword-api-key-here   # optional, for Doubleword batch extraction
+
+# Optional — V7 Go (only if you run models from config_models_v7.py, e.g. v7-charity-extract)
+V7_GO_API_KEY=your-v7-go-api-key
+V7_GO_WORKSPACE_ID=your-workspace-uuid
+V7_GO_AGENT_ID=your-agent-uuid
+# Optional overrides (defaults shown):
+# V7_GO_INPUT_FIELD_SLUG=document-text
+# V7_GO_OUTPUT_FIELD_SLUG=extracted-json
+# V7_GO_BASE_URL=https://go.v7labs.com
 ```
 
-The OpenRouter key is required. The Doubleword key is only needed if you want to run `dw-*` models via `extractor.py`.
+The OpenRouter key is required for OpenRouter models. The Doubleword key is only needed for `DOUBLEWORD_MODELS` entries (e.g. `dw-qwen3.5-9b`). The V7 variables are only needed for `V7_MODELS` entries (see [README.md](README.md) — V7 Go section).
 
 ---
 
@@ -72,8 +81,9 @@ Head to [README.md](README.md) for the full end-to-end workflow. The key command
 
 - **Pass a model name** → run that model only (e.g. `python extractor.py gemini-2.0-flash`)
 - **Pass multiple model names** → run each in turn (backend auto-detected per model)
-- **Pass no args** → run all models from both providers; already-completed runs are skipped (idempotent)
+- **Pass no args** → run all models from every registry (OpenRouter, Doubleword, and V7 if any are defined); already-completed runs are skipped (idempotent)
 - **Use `--all-openrouter`** → run only OpenRouter models
 - **Use `--all-doubleword`** → run only Doubleword batch models
+- **Use `--all-v7`** → run only V7 Go models from `config_models_v7.py`
 
 The same applies to `score.py`: no args scores all models and prints a leaderboard; pass a filename for a verbose diff of one model.
