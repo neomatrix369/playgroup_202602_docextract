@@ -744,11 +744,21 @@ function modelDisplayName(m){
   return p && m.startsWith(p) ? m.slice(p.length) : m
 }
 const TIER_ORDER = ['free','ultra-cheap','great-value','premium','v7']
+/** Map raw config tier → stacked-bar bucket (V7 sub-tiers v7-google etc. → v7). */
+function providerChartTierBucket(rawTier){
+  const t = String(rawTier||'').replace(/_/g,'-').toLowerCase()
+  if(!t || t==='unknown') return 'other'
+  if(t==='v7' || t.startsWith('v7-')) return 'v7'
+  if(['free','ultra-cheap','great-value','premium'].includes(t)) return t
+  return 'other'
+}
 function tierLabel(t){
-  return {'free':'Free','ultra-cheap':'Ultra-cheap','great-value':'Great Value','premium':'Premium','v7':'V7 Go'}[t]||t
+  return {'free':'Free','ultra-cheap':'Ultra-cheap','great-value':'Great Value','premium':'Premium','v7':'V7 Go','other':'Other'}[t]||t
 }
 function tierBadgeCls(t){
-  return {'free':'badge-gray','ultra-cheap':'badge-blue','great-value':'badge-green','premium':'badge-yellow','v7':'badge-v7'}[t]||'badge-gray'
+  const k = String(t||'').replace(/_/g,'-').toLowerCase()
+  if(k==='v7'||k.startsWith('v7-')) return 'badge-v7'
+  return {'free':'badge-gray','ultra-cheap':'badge-blue','great-value':'badge-green','premium':'badge-yellow','v7':'badge-v7','other':'badge-gray'}[t]||'badge-gray'
 }
 function costTierBadge(m){
   const t = RAW.model_meta?.[m]?.tier || 'unknown'
@@ -1472,13 +1482,16 @@ function renderProviderAnalysis(){
     }
   })
 
-  // Tier distribution chart
-  const tierColors = {'free':'#94a3b8','ultra-cheap':'#3b82f6','great-value':'#10b981','premium':'#f59e0b','v7':'#8b5cf6'}
-  const tierLabels = ['free','ultra-cheap','great-value','premium','v7']
+  // Tier distribution chart (buckets v7-* sub-tiers into V7; unknown → Other)
+  const tierColors = {'free':'#94a3b8','ultra-cheap':'#3b82f6','great-value':'#10b981','premium':'#f59e0b','v7':'#8b5cf6','other':'#64748b'}
+  const tierLabels = ['free','ultra-cheap','great-value','premium','v7','other']
   const datasets = tierLabels.map(t=>({
     label: tierLabel(t),
     data: providers.map(p=>{
-      return mods.filter(m=>(RAW.model_providers?.[m]||'')=== p && (RAW.model_meta?.[m]?.tier||'')=== t).length
+      return mods.filter(m=>{
+        if((RAW.model_providers?.[m]||'')!== p) return false
+        return providerChartTierBucket(RAW.model_meta?.[m]?.tier)=== t
+      }).length
     }),
     backgroundColor: tierColors[t],
     borderRadius:4
@@ -1607,13 +1620,16 @@ function renderEvolution(){
     {phase:'Extended Results', commits:'5d92ce5', detail:'Ran extractions for 8 additional models (claude-3.5-haiku, command-r-plus, gemma-3-27b-free, etc.). Added extraction_stats.csv with per-model timing and cost data.', icon:'📊'},
     {phase:'Cost & Speed Tracking', commits:'5b13d98, f640b10', detail:'Added time and cost columns to the scoring leaderboard and playground. Reads actual elapsed time and API cost from extraction stats. Estimates costs for models without stats using config pricing. Added Project Evolution tab.', icon:'💰'},
     {phase:'Doubleword Batch API', commits:'05ed52c, 2777ca6', detail:'Added Doubleword as a second provider with batch API extraction pipeline. Created config_models_doubleword.py with 8 models (Qwen3, GPT-OSS). Updated pricing from official Doubleword docs.', icon:'🔗'},
-    {phase:'V7 Go backend', commits:'—', detail:'Optional third provider: entity + PDF upload via llm_v7.py, 32 registry keys in config_models_v7.py, outputs playgroup_dev_extracted__v7__*.tsv. score.py and the playground treat v7 like OpenRouter/Doubleword (F1 from TSVs; time/cost from extraction_stats when present).', icon:'🟣'},
     {phase:'Unified Multi-Provider Extractor', commits:'777f280, cffb225, e707ad2', detail:'Combined separate OpenRouter/Doubleword extractors into a single unified extractor.py with auto-detected backend. Renamed legacy files with provider suffixes (config_models_openrouter.py, llm_openrouter_calls.log).', icon:'⚙️'},
     {phase:'Provider-Aware Pipeline', commits:'7297e92, 5cb5fef', detail:'Added provider name to all prints, logs, filenames, and CSV columns. Defaults to running all providers. Added --all-openrouter flag for OpenRouter-only runs. Updated docs for the multi-provider workflow.', icon:'🏷️'},
     {phase:'Doubleword Extraction Results', commits:'c7d5a37', detail:'Ran extraction for 7 Doubleword models (dw-qwen3.5-9b, dw-qwen3.5-35b, dw-qwen3-14b, dw-gpt-oss-20b, dw-qwen3-vl-30b, dw-qwen3-vl-235b, dw-qwen3.5-397b). Added checkpoint/resume and parallel batch submission for Doubleword pipeline.', icon:'📊'},
     {phase:'F1 / Semantic Scoring', commits:'7c97b16, c61e75b', detail:'Replaced simple exact-match accuracy with field-type-aware F1 scoring: exact match for IDs/dates, numeric tolerance (0.5%) for financials, fuzzy string similarity (SequenceMatcher) for text fields like names and addresses. Leaderboard now shows F1, Precision, Recall.', icon:'🎯'},
     {phase:'Provider Summary & Leaderboard', commits:'cfa9c66', detail:'Added per-provider aggregated stats to the scoring leaderboard: All/Active/Failed counts, avg F1, best model, avg fields, time, and cost. Estimated values marked with ~. Provider summary helps compare OpenRouter vs Doubleword at a glance.', icon:'📋'},
     {phase:'Loguru Migration', commits:'13adfd2', detail:'Switched from stdlib logging to loguru across all scripts. Unified log format with module name binding, file sinks for LLM call logs, and level colors matching autobatcher defaults (blue DEBUG, bold INFO, yellow WARNING, red ERROR).', icon:'🪵'},
+    {phase:'Doubleword stats & batch hardening', commits:'07b3839, ac78758, 9c0b771, 1421010, 050e713, 8f28b7c', detail:'Backfilled Doubleword timing/cost into extraction_stats; error categorisation with failed-row retry and error_file_id download on failed batches; HuggingFace-based context discovery with truncation and self-heal; guarded submit_batch against PermissionDenied; tracked unavailable models.', icon:'🛡️'},
+    {phase:'Registry sync, DW models & OCR batches', commits:'12e2035, fc2cc2b, 932e0e6, f22d316, 464b6e8, 80a0b72, cb71242, 4e8bce3, 4a8b0aa', detail:'Auto-sync Doubleword pricing from the docs site; expanded registry (nine DW models, context fixes); augment-only policy (deprecate, never delete); potentially_deprecated flag; LightOnOCR top_k and extra_params preserved through batch sync/resubmit.', icon:'🔄'},
+    {phase:'Playground, docs hub & benchmark stats', commits:'7407385, 42a6ad8, 528b4da, ba04a45, bcb1176, ed91293, 4e1f7e0, 68043cd', detail:'Playground F1 tab evolution and Provider Analysis (catalog, cost efficiency, tier/modality charts). README restructured with audience signposts. Doubleword interactive learning-hub HTML (v4 + agent-oriented deck). README benchmark numbers and regenerated playground data.', icon:'📚'},
+    {phase:'V7 Go platform', commits:'5ed9149, 1aae645, bfdab7b, c792daf, 745eeee, 468c4c4, 36858b1', detail:'Third backend: llm_v7.py entities, PDF upload, doc-risk UI; Go Agent v2 registry and template tooling; slug-based field resolution; safe output paths; shortened shared agent__ ids in the UI; v7-go.md and QUICKSTART; scoring and playground aligned with OpenRouter/Doubleword.', icon:'🟣'},
   ]
 
   let html = '<div style="position:relative;padding-left:28px;border-left:3px solid var(--accent)">'
