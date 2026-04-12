@@ -23,7 +23,7 @@ Recompute after new extractions: `python score.py` (tail **Provider summary**), 
 | V7 `*.tsv` files scored | 33 |
 | Active (F1 > 0) | 33 |
 | Avg F1 (active only) | 0.833 |
-| Best F1 | 0.852 — `v7-go-agent-v2__gpt4-1` |
+| Best F1 | 0.852 — `gpt4-1` |
 | Avg wall-clock s / model (from stats merge) | ~124 |
 | Avg cost in leaderboard | $0 until `price_in` / `price_out` set |
 
