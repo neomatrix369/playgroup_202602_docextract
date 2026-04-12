@@ -26,9 +26,9 @@ Extract structured fields from UK charity financial PDFs using LLMs via [OpenRou
 |----------|--------|--------|--------|--------|---------|------------|------------|-------------|-------------|
 | Doubleword | 12 | 10 | 2 | 0.775 | 0.927 | dw-qwen3.5-9b | 60.0/85 (71%) | 5,336.2 | 0.0216 |
 | OpenRouter | 40 | 27 | 13 | 0.753 | 0.946 | gemini-3-pro | 56.0/85 (66%) | 3,612.8 | 0.0922 |
-| V7 Go | 33 | 33 | 0 | 0.833 | 0.852 | v7-go-agent-v2__gpt4-1† | 62.8/85 (74%) | 123.8 | 0.0000 |
+| V7 Go | 33 | 33 | 0 | 0.833 | 0.852 | gpt4-1† | 62.8/85 (74%) | 123.8 | 0.0000 |
 
-† Leaderboard / playground may show **`gpt4-1`** when every `v7-go-agent-v2__*` model shares that prefix (short display rule). **V7 cost** stays **0** in these aggregates until you set `price_in` / `price_out` in `config_models_v7.py`; **`batch_id`** in CSV is synthetic — see [V7 Go — Timing and cost](#v7-go--timing-and-cost).
+† Same short label as `score.py` / the playground; TSV filenames and `extraction_stats.csv` use the full id `v7-go-agent-v2__gpt4-1`. **V7 cost** stays **0** in these aggregates until you set `price_in` / `price_out` in `config_models_v7.py`; **`batch_id`** in CSV is synthetic — see [V7 Go — Timing and cost](#v7-go--timing-and-cost).
 
 Doubleword’s snapshot **average** F1 among active models (0.775) edges OpenRouter’s (0.753); OpenRouter still has the highest **single-model** F1 (`gemini-3-pro`, 0.946). **V7** in this dataset averages **0.833** F1 with **no** failed (F1=0) runs among the 33 scored files. OpenRouter’s average is dragged down by free-tier failures; Doubleword’s average cost per active model (~$0.022) is lower than OpenRouter’s (~$0.092). V7 dollar totals stay at zero until pricing is mirrored into config (see [Auto-Sync Pricing](#auto-sync-pricing)).
 
@@ -42,7 +42,7 @@ Doubleword’s snapshot **average** F1 among active models (0.775) edges OpenRou
 | 4 | gemini-3-flash | OpenRouter | 0.926 | 0.962 | 0.893 | 76/85 (89%) |
 | 5 | gemini-2.5-flash | OpenRouter | 0.922 | 0.962 | 0.885 | 75/85 (88%) |
 
-*(No V7 model in the global top five on 2026-04-11; best V7 run is **v7-go-agent-v2__gpt4-1** at F1 **0.852**, ranked just below the OpenRouter / Doubleword leaders — run `python score.py` for the full sort.)*
+*(No V7 model in the global top five on 2026-04-11; best V7 run is **gpt4-1** at F1 **0.852**, ranked just below the OpenRouter / Doubleword leaders — run `python score.py` for the full sort.)*
 
 **Takeaways:**
 
@@ -108,7 +108,7 @@ The key result files:
 | `data/extraction_stats.csv` | One row per model run: `provider` is `openrouter`, `doubleword`, or `v7`; tier, row counts, per-field hit rates, wall-clock time, cost. Doubleword rows include real `batch_id`; V7 rows use a **synthetic** `batch_id` (checkpoint map), not a Doubleword batch. |
 | [which-models-extracted-playground.html](which-models-extracted-playground.html) | Interactive playground — open in browser for charts, heatmaps, and recommendations |
 
-The leaderboard printed by `score.py` is ranked by F1 and includes precision, recall, field counts, time, and cost. For readability, the printed **Model** column (and the playground’s tables and chart labels) **shortens** ids when every model name that contains `__` shares the same `agent__` prefix — for example `v7-go-agent-v2__gpt4-1` is shown as `gpt4-1`. Names without `__`, or mixed `__` prefixes, stay full-length so rows stay distinct. **Canonical ids** (for filenames, `extraction_stats.csv`, and lookups) are always the full string.
+The leaderboard printed by `score.py` is ranked by F1 and includes precision, recall, field counts, time, and cost. For readability, the printed **Model** column (and the playground’s tables and chart labels) **shortens** ids when every model name that contains `__` shares the same `agent__` prefix — for example **`gpt4-1`** instead of **`v7-go-agent-v2__gpt4-1`**. Names without `__`, or mixed `__` prefixes, stay full-length so rows stay distinct. **Canonical ids** (for filenames, `extraction_stats.csv`, and lookups) are always the full string.
 
 ```
 Provider     Model                     Mod    Docs     F1   Prec  Recall          Fields    Time(s)    Cost($)
@@ -116,7 +116,7 @@ Provider     Model                     Mod    Docs     F1   Prec  Recall        
 openrouter   gemini-3-pro              MM       11  0.946  0.975   0.918   78.1/85 (92%)    ~2273.3    ~0.3780
 openrouter   qwen3-235b                text     11  0.937  0.975   0.902   76.7/85 (90%)    ~2273.3    ~0.0258
 doubleword   dw-qwen3.5-9b             text     11  0.927  0.974   0.885   75.2/85 (88%)      353.0     0.0354
-v7           v7-go-agent-v2__claude-sonnet MM   11    …      …       …       …               …          …
+v7           claude-sonnet               MM   11    …      …       …       …               …          …
 ...
 ```
 
