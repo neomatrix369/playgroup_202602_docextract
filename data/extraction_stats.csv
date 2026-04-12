@@ -51,7 +51,7 @@ datetime,provider,model_short_name,model_full_name,tier,multimodal,price_in,pric
 2026-04-11 17:32:44,OpenRouter,qwen3-vl-8b,qwen/qwen3-vl-8b-instruct,ultra_cheap,True,0.08,0.5,131000,11,11,0,0.0,0,0,0.0,0.0,0.0,11,11,11,10,10,11,11,11,
 2026-04-11 17:32:44,OpenRouter,pixtral-12b,pixtral-12b,,False,0,0,0,11,0,11,0.0,0,0,0.0,0.0,0.0,0,0,0,0,0,0,0,0,
 2026-04-11 17:32:45,OpenRouter,qwen3-vl-30b-free,qwen3-vl-30b-free,,False,0,0,0,11,0,11,0.0,0,0,0.0,0.0,0.0,0,0,0,0,0,0,0,0,
-2026-04-11 18:40:47,V7,v7-claude-4-5-opus,V7 Go — Claude 4.5 Opus (claude_4_5_opus),v7,True,0.0,0.0,200000,11,11,0,241.77,0,0,0.0,21.98,0.0,11,11,11,10,9,11,11,11,d81afc84-c6fc-4e29-aeb4-6dac5193f991
+2026-04-11 18:40:47,V7,v7-claude-4-5-opus,V7 Go — Claude 4.5 Opus (claude_4_5_opus),v7-anthropic,True,0.0,0.0,200000,11,11,0,241.77,0,0,0.0,21.98,0.0,11,11,11,10,9,11,11,11,d81afc84-c6fc-4e29-aeb4-6dac5193f991
 2026-04-11 16:53:48,V7,v7-go-agent-v2,v7-go-agent-v2,,False,0,0,0,11,11,0,5.89,0,0,0.0,0.54,0.0,11,11,11,9,9,11,11,11,1ee2f84f-0cda-4820-b546-c16d5c2e4195
 2026-04-11 18:43:29,V7,v7-go-agent-v2__ai-complicated-task,v7-go-agent-v2__ai-complicated-task,,False,0,0,0,11,11,0,0.0,0,0,0.0,0.0,0.0,11,11,11,9,9,11,11,11,
 2026-04-11 18:43:29,V7,v7-go-agent-v2__ai-default,v7-go-agent-v2__ai-default,,False,0,0,0,11,11,0,0.0,0,0,0.0,0.0,0.0,11,11,11,10,9,11,11,11,

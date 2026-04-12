@@ -5,11 +5,12 @@ from difflib import SequenceMatcher
 
 from config_models_doubleword import DOUBLEWORD_MODELS
 from config_models_openrouter import OPENROUTER_MODELS
+from config_models_v7 import V7_MODELS
 from utils import get_logger
 
 log = get_logger("score")
 
-ALL_MODELS = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS}
+ALL_MODELS = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS, **V7_MODELS}
 
 # Fields where exact match is required (no fuzzy scoring)
 EXACT_FIELDS = {"charity_number", "report_date"}
@@ -51,8 +52,16 @@ def _field_similarity(key, expected_val, predicted_val):
     return SequenceMatcher(None, _normalize(expected_val), _normalize(predicted_val)).ratio()
 
 
-def _mod_tag(model_name):
+def _model_cfg_for_tag(model_name):
+    """Resolve config for leaderboard Mod column; TSV filenames use __ where registry uses /."""
     cfg = ALL_MODELS.get(model_name)
+    if cfg is None and model_name.startswith("v7-") and "__" in model_name:
+        cfg = ALL_MODELS.get(model_name.replace("__", "/", 1))
+    return cfg
+
+
+def _mod_tag(model_name):
+    cfg = _model_cfg_for_tag(model_name)
     return "MM" if cfg and cfg.get("multimodal") else "text"
 
 

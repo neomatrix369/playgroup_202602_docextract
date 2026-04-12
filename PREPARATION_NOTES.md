@@ -49,6 +49,7 @@ cc19e4fd0c4a605a7f537050df52483e.pdf, 15, 5, scan (offset), EASY-Y
 # Things we could test
 
 * calling llm_openrouter with an unknown model name, only_providers should raise
+* extractor / score parity: a completed V7 run (`playgroup_dev_extracted__v7__*.tsv`) should appear in `python score.py` alongside OpenRouter and Doubleword rows (`provider` = `v7`)
 
 # Future topics?
 

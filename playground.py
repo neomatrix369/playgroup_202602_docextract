@@ -51,9 +51,10 @@ def load_model_meta() -> dict:
     try:
         from config_models_openrouter import OPENROUTER_MODELS
         from config_models_doubleword import DOUBLEWORD_MODELS
+        from config_models_v7 import V7_MODELS
     except ImportError:
         return {}
-    all_models = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS}
+    all_models = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS, **V7_MODELS}
     meta = {}
     for short_name, cfg in all_models.items():
         if not isinstance(cfg, dict):
@@ -70,6 +71,11 @@ def load_model_meta() -> dict:
             "ctx":        cfg.get("ctx"),
             "notes":      cfg.get("notes", ""),
         }
+    # TSV filenames use __ where V7 registry keys use / (e.g. v7-go-agent-v2__gpt4-1)
+    for short_name, block in list(meta.items()):
+        if short_name.startswith("v7-") and "/" in short_name:
+            alias = short_name.replace("/", "__", 1)
+            meta.setdefault(alias, block)
     return meta
 
 
@@ -161,7 +167,8 @@ def load_extraction_stats() -> dict:
         try:
             from config_models_openrouter import OPENROUTER_MODELS
             from config_models_doubleword import DOUBLEWORD_MODELS
-            all_models = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS}
+            from config_models_v7 import V7_MODELS
+            all_models = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS, **V7_MODELS}
         except ImportError:
             all_models = {}
         for model_name, cfg in all_models.items():
@@ -401,6 +408,7 @@ tr:hover td{background:var(--surface2)}
 .badge-orange{background:#ffedd5;color:#9a3412}
 .badge-red{background:#fee2e2;color:#991b1b}
 .badge-gray{background:#f1f5f9;color:#475569}
+.badge-v7{background:#ede9fe;color:#5b21b6}
 .heatmap{overflow-x:auto}
 .heatmap table td,.heatmap table th{padding:5px 6px;text-align:center;font-size:12px;white-space:nowrap}
 .heatmap table th{font-size:11px;background:var(--surface2)}
@@ -735,12 +743,22 @@ function modelDisplayName(m){
   const p = sharedModelDisplayPrefix()
   return p && m.startsWith(p) ? m.slice(p.length) : m
 }
-const TIER_ORDER = ['free','ultra-cheap','great-value','premium']
+const TIER_ORDER = ['free','ultra-cheap','great-value','premium','v7']
+/** Map raw config tier → stacked-bar bucket (V7 sub-tiers v7-google etc. → v7). */
+function providerChartTierBucket(rawTier){
+  const t = String(rawTier||'').replace(/_/g,'-').toLowerCase()
+  if(!t || t==='unknown') return 'other'
+  if(t==='v7' || t.startsWith('v7-')) return 'v7'
+  if(['free','ultra-cheap','great-value','premium'].includes(t)) return t
+  return 'other'
+}
 function tierLabel(t){
-  return {'free':'Free','ultra-cheap':'Ultra-cheap','great-value':'Great Value','premium':'Premium'}[t]||t
+  return {'free':'Free','ultra-cheap':'Ultra-cheap','great-value':'Great Value','premium':'Premium','v7':'V7 Go','other':'Other'}[t]||t
 }
 function tierBadgeCls(t){
-  return {'free':'badge-gray','ultra-cheap':'badge-blue','great-value':'badge-green','premium':'badge-yellow'}[t]||'badge-gray'
+  const k = String(t||'').replace(/_/g,'-').toLowerCase()
+  if(k==='v7'||k.startsWith('v7-')) return 'badge-v7'
+  return {'free':'badge-gray','ultra-cheap':'badge-blue','great-value':'badge-green','premium':'badge-yellow','v7':'badge-v7','other':'badge-gray'}[t]||'badge-gray'
 }
 function costTierBadge(m){
   const t = RAW.model_meta?.[m]?.tier || 'unknown'
@@ -748,12 +766,15 @@ function costTierBadge(m){
 }
 function providerLabel(m){
   const p = RAW.model_providers?.[m] || 'unknown'
-  return p.charAt(0).toUpperCase() + p.slice(1)
+  return p === 'v7' ? 'V7 Go' : (p.charAt(0).toUpperCase() + p.slice(1))
+}
+function providerChartLabel(p){
+  return p === 'v7' ? 'V7 Go' : (p.charAt(0).toUpperCase() + p.slice(1))
 }
 function providerBadge(m){
   const p = RAW.model_providers?.[m] || 'unknown'
-  const cls = {'openrouter':'badge-blue','doubleword':'badge-yellow'}[p]||'badge-gray'
-  const label = p.charAt(0).toUpperCase() + p.slice(1)
+  const cls = {'openrouter':'badge-blue','doubleword':'badge-yellow','v7':'badge-v7'}[p]||'badge-gray'
+  const label = p === 'v7' ? 'V7 Go' : (p.charAt(0).toUpperCase() + p.slice(1))
   return `<span class="badge ${cls}">${label}</span>`
 }
 function allProviders(){
@@ -812,7 +833,7 @@ function renderRankings(){
   const provSel = document.getElementById('rank-provider')
   providers.forEach(p=>{
     const opt = document.createElement('option')
-    opt.value = p; opt.text = p.charAt(0).toUpperCase()+p.slice(1)
+    opt.value = p; opt.text = p === 'v7' ? 'V7 Go' : (p.charAt(0).toUpperCase() + p.slice(1))
     provSel.appendChild(opt)
   })
   renderRankTable()
@@ -1423,6 +1444,7 @@ function renderProviderAnalysis(){
   const totalActive = activeModels().length
   const dwCount = mods.filter(m=>(RAW.model_providers?.[m]||'')==='doubleword').length
   const orCount = mods.filter(m=>(RAW.model_providers?.[m]||'')==='openrouter').length
+  const v7Count = mods.filter(m=>(RAW.model_providers?.[m]||'')==='v7').length
   document.getElementById('provider-stats-bar').innerHTML = `
     <div class="stat-card"><div class="val">${providers.length}</div><div class="lbl">Providers</div></div>
     <div class="stat-card"><div class="val">${totalConfigured}</div><div class="lbl">Models configured</div></div>
@@ -1430,6 +1452,7 @@ function renderProviderAnalysis(){
     <div class="stat-card"><div class="val">${totalActive}</div><div class="lbl">Active (F1 > 0)</div></div>
     <div class="stat-card"><div class="val">${orCount}</div><div class="lbl">OpenRouter</div></div>
     <div class="stat-card"><div class="val">${dwCount}</div><div class="lbl">Doubleword</div></div>
+    <div class="stat-card"><div class="val">${v7Count}</div><div class="lbl">V7 Go</div></div>
   `
 
   // Provider F1 comparison chart
@@ -1446,7 +1469,7 @@ function renderProviderAnalysis(){
   chartProviderF1 = new Chart(ctx1,{
     type:'bar',
     data:{
-      labels: provData.map(d=>d.p.charAt(0).toUpperCase()+d.p.slice(1)),
+      labels: provData.map(d=>providerChartLabel(d.p)),
       datasets:[
         {label:'Avg F1', data:provData.map(d=>+(d.avg*100).toFixed(1)), backgroundColor:'rgba(99,102,241,0.6)', borderRadius:4},
         {label:'Best F1', data:provData.map(d=>+(d.best*100).toFixed(1)), backgroundColor:'rgba(16,185,129,0.6)', borderRadius:4}
@@ -1459,13 +1482,16 @@ function renderProviderAnalysis(){
     }
   })
 
-  // Tier distribution chart
-  const tierColors = {'free':'#94a3b8','ultra-cheap':'#3b82f6','great-value':'#10b981','premium':'#f59e0b'}
-  const tierLabels = ['free','ultra-cheap','great-value','premium']
+  // Tier distribution chart (buckets v7-* sub-tiers into V7; unknown → Other)
+  const tierColors = {'free':'#94a3b8','ultra-cheap':'#3b82f6','great-value':'#10b981','premium':'#f59e0b','v7':'#8b5cf6','other':'#64748b'}
+  const tierLabels = ['free','ultra-cheap','great-value','premium','v7','other']
   const datasets = tierLabels.map(t=>({
     label: tierLabel(t),
     data: providers.map(p=>{
-      return mods.filter(m=>(RAW.model_providers?.[m]||'')=== p && (RAW.model_meta?.[m]?.tier||'')=== t).length
+      return mods.filter(m=>{
+        if((RAW.model_providers?.[m]||'')!== p) return false
+        return providerChartTierBucket(RAW.model_meta?.[m]?.tier)=== t
+      }).length
     }),
     backgroundColor: tierColors[t],
     borderRadius:4
@@ -1474,7 +1500,7 @@ function renderProviderAnalysis(){
   if(chartProviderTiers) chartProviderTiers.destroy()
   chartProviderTiers = new Chart(ctx2,{
     type:'bar',
-    data:{labels: providers.map(p=>p.charAt(0).toUpperCase()+p.slice(1)), datasets},
+    data:{labels: providers.map(p=>providerChartLabel(p)), datasets},
     options:{
       responsive:true, maintainAspectRatio:false,
       plugins:{legend:{position:'top'}},
@@ -1537,7 +1563,7 @@ function renderProviderAnalysis(){
   const catSel = document.getElementById('catalog-provider')
   providers.forEach(p=>{
     const opt = document.createElement('option')
-    opt.value = p; opt.text = p.charAt(0).toUpperCase()+p.slice(1)
+    opt.value = p; opt.text = p === 'v7' ? 'V7 Go' : (p.charAt(0).toUpperCase() + p.slice(1))
     catSel.appendChild(opt)
   })
   renderModelCatalog()
@@ -1600,6 +1626,10 @@ function renderEvolution(){
     {phase:'F1 / Semantic Scoring', commits:'7c97b16, c61e75b', detail:'Replaced simple exact-match accuracy with field-type-aware F1 scoring: exact match for IDs/dates, numeric tolerance (0.5%) for financials, fuzzy string similarity (SequenceMatcher) for text fields like names and addresses. Leaderboard now shows F1, Precision, Recall.', icon:'🎯'},
     {phase:'Provider Summary & Leaderboard', commits:'cfa9c66', detail:'Added per-provider aggregated stats to the scoring leaderboard: All/Active/Failed counts, avg F1, best model, avg fields, time, and cost. Estimated values marked with ~. Provider summary helps compare OpenRouter vs Doubleword at a glance.', icon:'📋'},
     {phase:'Loguru Migration', commits:'13adfd2', detail:'Switched from stdlib logging to loguru across all scripts. Unified log format with module name binding, file sinks for LLM call logs, and level colors matching autobatcher defaults (blue DEBUG, bold INFO, yellow WARNING, red ERROR).', icon:'🪵'},
+    {phase:'Doubleword stats & batch hardening', commits:'07b3839, ac78758, 9c0b771, 1421010, 050e713, 8f28b7c', detail:'Backfilled Doubleword timing/cost into extraction_stats; error categorisation with failed-row retry and error_file_id download on failed batches; HuggingFace-based context discovery with truncation and self-heal; guarded submit_batch against PermissionDenied; tracked unavailable models.', icon:'🛡️'},
+    {phase:'Registry sync, DW models & OCR batches', commits:'12e2035, fc2cc2b, 932e0e6, f22d316, 464b6e8, 80a0b72, cb71242, 4e8bce3, 4a8b0aa', detail:'Auto-sync Doubleword pricing from the docs site; expanded registry (nine DW models, context fixes); augment-only policy (deprecate, never delete); potentially_deprecated flag; LightOnOCR top_k and extra_params preserved through batch sync/resubmit.', icon:'🔄'},
+    {phase:'Playground, docs hub & benchmark stats', commits:'7407385, 42a6ad8, 528b4da, ba04a45, bcb1176, ed91293, 4e1f7e0, 68043cd', detail:'Playground F1 tab evolution and Provider Analysis (catalog, cost efficiency, tier/modality charts). README restructured with audience signposts. Doubleword interactive learning-hub HTML (v4 + agent-oriented deck). README benchmark numbers and regenerated playground data.', icon:'📚'},
+    {phase:'V7 Go platform', commits:'5ed9149, 1aae645, bfdab7b, c792daf, 745eeee, 468c4c4, 36858b1', detail:'Third backend: llm_v7.py entities, PDF upload, doc-risk UI; Go Agent v2 registry and template tooling; slug-based field resolution; safe output paths; shortened shared agent__ ids in the UI; v7-go.md and QUICKSTART; scoring and playground aligned with OpenRouter/Doubleword.', icon:'🟣'},
   ]
 
   let html = '<div style="position:relative;padding-left:28px;border-left:3px solid var(--accent)">'
@@ -1629,7 +1659,7 @@ function renderEvolution(){
       <tr><td style="font-weight:600">Documents in corpus</td><td>${RAW.doc_names.length} charity PDFs (UK, 100+ pages each)</td></tr>
       <tr><td style="font-weight:600">Fields extracted per doc</td><td>${RAW.fields.length} (identity, financial, address)</td></tr>
       <tr><td style="font-weight:600">Models configured</td><td>${allModels().length} total, ${active.length} functional, ${failed} failed (F1=0)</td></tr>
-      <tr><td style="font-weight:600">API providers</td><td>${allProviders().map(p=>p.charAt(0).toUpperCase()+p.slice(1)).join(', ')} (${allProviders().length} providers)</td></tr>
+      <tr><td style="font-weight:600">API providers</td><td>${allProviders().map(p=>providerChartLabel(p)).join(', ')} (${allProviders().length} providers)</td></tr>
       <tr><td style="font-weight:600">Total field comparisons</td><td>${totalExtractions} expected values scored</td></tr>
       <tr><td style="font-weight:600">Best model (F1)</td><td><strong>${modelDisplayName(bestModelF1)}</strong> at F1=${f1Score(bestModelF1).toFixed(3)}</td></tr>
       <tr><td style="font-weight:600">Average F1</td><td>${avgF1.toFixed(3)} across ${active.length} functional models</td></tr>
