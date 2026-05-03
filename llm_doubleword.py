@@ -237,7 +237,7 @@ async def download_results(client: AsyncOpenAI, output_file_id: str) -> dict[int
             results[row_num] = {"error": str(error_data)}
         else:
             body = response_data.get("body", {})
-            usage = body.get("usage", {})
+            usage = body.get("usage") or {}
             choices = body.get("choices", [])
             if choices:
                 raw_text = choices[0].get("message", {}).get("content", "")

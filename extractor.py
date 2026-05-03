@@ -1560,16 +1560,19 @@ def _resolve_model(model_short_name):
 
 
 async def main():
-    # Sync Doubleword model pricing before anything else
-    import sync_doubleword_models
-    sync_doubleword_models.sync()
-    # Reload the config after sync so we pick up any changes
-    import importlib
-    import config_models_doubleword as _cfg_dw
-    importlib.reload(_cfg_dw)
-    global DOUBLEWORD_MODELS, ALL_MODELS
-    DOUBLEWORD_MODELS = _cfg_dw.DOUBLEWORD_MODELS
-    ALL_MODELS = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS, **V7_MODELS}
+    # Sync Doubleword model pricing before anything else (unless disabled)
+    if not os.getenv("SKIP_DOUBLEWORD_SYNC"):
+        import sync_doubleword_models
+        sync_doubleword_models.sync()
+        # Reload the config after sync so we pick up any changes
+        import importlib
+        import config_models_doubleword as _cfg_dw
+        importlib.reload(_cfg_dw)
+        global DOUBLEWORD_MODELS, ALL_MODELS
+        DOUBLEWORD_MODELS = _cfg_dw.DOUBLEWORD_MODELS
+        ALL_MODELS = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS, **V7_MODELS}
+    else:
+        log.info("[Main] Skipping Doubleword auto-sync (SKIP_DOUBLEWORD_SYNC set)")
 
     parser = argparse.ArgumentParser(
         description="Extract charity data via OpenRouter, Doubleword Batch API, or V7 Go agents. "

@@ -84,3 +84,13 @@ datetime,provider,model_short_name,model_full_name,tier,multimodal,price_in,pric
 2026-04-11 18:43:29,V7,v7-go-agent-v2__o3-mini,v7-go-agent-v2__o3-mini,,False,0,0,0,11,11,0,0.0,0,0,0.0,0.0,0.0,11,11,11,9,9,11,11,11,
 2026-04-11 18:43:29,V7,v7-go-agent-v2__o3,v7-go-agent-v2__o3,,False,0,0,0,11,11,0,0.0,0,0,0.0,0.0,0.0,11,11,11,9,9,11,11,11,
 2026-04-11 18:43:29,V7,v7-go-agent-v2__o4-mini,v7-go-agent-v2__o4-mini,,False,0,0,0,11,11,0,0.0,0,0,0.0,0.0,0.0,11,11,11,10,9,11,11,11,
+2026-05-03 23:43:35,Doubleword,dw-gemma-4-31b-it,google/gemma-4-31B-it,standard,True,0.07,0.2,256000,11,1,10,152,73523,163,0.005179,13.82,0.000471,1,1,1,1,1,1,1,1,2bf54052-93a4-4bb6-b398-3e3a9c1edf42
+2026-05-03 23:48:23,Doubleword,dw-qwen3-5-4b,Qwen/Qwen3.5-4B,standard,True,0.04,0.06,262144,11,2,9,238,15384,2221,0.000749,21.64,6.8e-05,2,2,2,1,1,2,2,2,9d768b1d-b2f4-4f7c-a44e-6fecfeb09408
+2026-05-03 23:48:24,Doubleword,dw-qwen3-5-35b-a3b,Qwen/Qwen3.5-35B-A3B-FP8,standard,True,0.05,0.2,262144,11,8,3,374,130223,37646,0.01404,34.0,0.001276,8,8,8,7,7,7,8,8,8e61b515-5aef-49b9-b92f-a6dfdb6a34a6
+2026-05-03 23:48:24,Doubleword,dw-qwen3-vl-30b-a3b-instruct,Qwen/Qwen3-VL-30B-A3B-Instruct-FP8,standard,True,0.05,0.2,262144,11,11,0,275,176847,1556,0.009154,25.0,0.000832,11,11,11,11,11,11,11,11,24c6c330-1179-43fe-8f73-46070770e7ec
+2026-05-03 23:48:25,Doubleword,dw-olmocr-2-7b-1025,allenai/olmOCR-2-7B-1025-FP8,budget,True,0.1,0.1,16834,11,0,11,422,83926,1406,0.008533,38.36,0.000776,0,0,0,0,0,0,0,0,3617ef09-4d6d-42e5-9fdb-213f36b4218f
+2026-05-03 23:49:40,Doubleword,dw-qwen3-5-397b-a17b,Qwen/Qwen3.5-397B-A17B-FP8,premium,True,0.15,1.2,262144,11,6,5,512,70189,6624,0.018477,46.55,0.00168,6,6,6,5,5,6,6,6,0fb9ac4b-d39f-431c-bca0-3bcd4f75669c
+2026-05-03 23:51:17,Doubleword,dw-qwen3-6-35b-a3b,Qwen/Qwen3.6-35B-A3B-FP8,standard,True,0.05,0.2,262144,11,11,0,632,176660,34945,0.015822,57.45,0.001438,11,11,11,9,9,10,11,11,212ebb97-7aee-4096-a556-bf29162fe551
+2026-05-03 23:53:36,Doubleword,dw-qwen3-5-35b-a3b-dottxt,Qwen/Qwen3.5-35B-A3B-FP8-dottxt,standard,True,0.1,0.4,262144,11,11,0,749,176660,70658,0.045929,68.09,0.004175,11,11,11,9,9,10,11,11,e0c386f1-c486-442d-9aa0-2cb7f55489fd
+2026-05-03 23:54:08,Doubleword,dw-qwen3-5-9b-dottxt,Qwen/Qwen3.5-9B-dottxt,standard,True,0.06,0.58,262144,11,9,2,782,167038,49379,0.038662,71.09,0.003515,9,9,9,7,7,8,9,9,29dc3329-c12a-4445-ab04-92b5cfe736cf
+2026-05-03 23:54:19,Doubleword,dw-qwen3-vl-235b-a22b-instruct,Qwen/Qwen3-VL-235B-A22B-Instruct-FP8,standard,True,0.1,0.4,262144,11,11,0,785,176847,1537,0.018299,71.36,0.001664,11,11,11,10,10,11,11,11,a621281c-9a59-4059-b0e4-c4ec10bea467
