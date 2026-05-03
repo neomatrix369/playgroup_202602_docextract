@@ -2,8 +2,14 @@
 
 Bypasses autobatcher to give full control over batch lifecycle:
 submit, poll, resume, and download results independently.
+
+OCR models receive PDF pages as base64-encoded images via the OpenAI vision
+content format. Each PDF is rendered to images using PyMuPDF; all pages of a
+single PDF are sent as multiple image_url entries in one batch request.
 """
 
+import base64
+import io
 import json
 import os
 import time
@@ -106,6 +112,77 @@ def mark_model_unavailable(model_short_name: str, reason: str):
     )
 
 
+# ── PDF → base64 image conversion for OCR models ────────────────────
+
+def _pdf_to_base64_images(pdf_path: str, max_dim: int = 1540) -> list[str]:
+    """Render each page of a PDF to a JPEG base64 string, capped at max_dim px.
+
+    Returns a list of base64-encoded JPEG strings (one per page).
+    """
+    import pymupdf
+
+    doc = pymupdf.open(pdf_path)
+    images = []
+    for page in doc:
+        rect = page.rect
+        longest = max(rect.width, rect.height)
+        zoom = max_dim / longest if longest > max_dim else 1.0
+        mat = pymupdf.Matrix(zoom, zoom)
+        pix = page.get_pixmap(matrix=mat)
+
+        img_bytes = pix.tobytes("jpeg")
+        images.append(base64.b64encode(img_bytes).decode("ascii"))
+    doc.close()
+    return images
+
+
+def _build_ocr_messages(
+    pdf_path: str,
+    model_cfg: dict,
+    extraction_prompt: str,
+) -> list[dict]:
+    """Build the messages array for an OCR model request.
+
+    Returns a list of message dicts suitable for the OpenAI chat completions API.
+    The message includes base64-encoded page images plus an appropriate text prompt.
+
+    For LightOnOCR (ocr_no_system_prompt=True): no system message, image-only
+    user content — the model repeats any text prompt.
+
+    For other OCR models: system message + user content with images + OCR prompt
+    followed by the extraction prompt.
+    """
+    max_dim = model_cfg.get("ocr_max_image_dim", 1540)
+    page_images = _pdf_to_base64_images(pdf_path, max_dim=max_dim)
+    no_system = model_cfg.get("ocr_no_system_prompt", False)
+    ocr_prompt = model_cfg.get("ocr_prompt")
+
+    image_content = [
+        {
+            "type": "image_url",
+            "image_url": {"url": f"data:image/jpeg;base64,{img}"},
+        }
+        for img in page_images
+    ]
+
+    messages = []
+
+    if no_system:
+        # LightOnOCR: image-only, no text at all
+        messages.append({"role": "user", "content": image_content})
+    else:
+        messages.append({"role": "system", "content": SYSTEM_MESSAGE})
+        user_parts = list(image_content)
+        text_prompt = ""
+        if ocr_prompt:
+            text_prompt += ocr_prompt + "\n\n"
+        text_prompt += extraction_prompt
+        user_parts.append({"type": "text", "text": text_prompt})
+        messages.append({"role": "user", "content": user_parts})
+
+    return messages
+
+
 # ── Batch operations ────────────────────────────────────────────────
 
 async def submit_batch(
@@ -116,22 +193,45 @@ async def submit_batch(
     rows: list[tuple[int, str, str]],
     completion_window: str = "1h",
     extra_params: dict | None = None,
+    model_cfg: dict | None = None,
 ) -> str:
     """Submit rows as a batch job. Saves checkpoint. Returns batch_id.
 
     Args:
         rows: list of (row_num, pdf_filename, text_combined)
         extra_params: optional sampling params merged into each request body (e.g. {"top_k": 1})
+        model_cfg: full model config dict; when present and ocr=True, sends PDF
+                   pages as base64 images instead of text.
     """
+    is_ocr = model_cfg.get("ocr", False) if model_cfg else False
+
     lines = []
-    for row_num, _pdf_filename, text_combined in rows:
-        prompt = prompt_template + text_combined
-        body = {
-            "model": model_full_name,
-            "messages": [
+    for row_num, pdf_filename, text_combined in rows:
+        if is_ocr:
+            pdf_path = os.path.join("data", pdf_filename)
+            if not os.path.exists(pdf_path):
+                logger.error("[OCR] PDF not found: {} — falling back to text for row {}", pdf_path, row_num)
+                is_ocr_row = False
+            else:
+                is_ocr_row = True
+
+            if is_ocr_row:
+                messages = _build_ocr_messages(pdf_path, model_cfg, prompt_template)
+            else:
+                messages = [
+                    {"role": "system", "content": SYSTEM_MESSAGE},
+                    {"role": "user", "content": prompt_template + text_combined},
+                ]
+        else:
+            prompt = prompt_template + text_combined
+            messages = [
                 {"role": "system", "content": SYSTEM_MESSAGE},
                 {"role": "user", "content": prompt},
-            ],
+            ]
+
+        body = {
+            "model": model_full_name,
+            "messages": messages,
         }
         if extra_params:
             body.update(extra_params)
@@ -148,7 +248,8 @@ async def submit_batch(
         file=(f"batch-{model_short_name}.jsonl", content.encode("utf-8")),
         purpose="batch",
     )
-    logger.info("Uploaded batch file {} for {}", file_response.id, model_short_name)
+    logger.info("Uploaded batch file {} for {}{}", file_response.id, model_short_name,
+                " [OCR image mode]" if is_ocr else "")
 
     batch_response = await client.batches.create(
         input_file_id=file_response.id,

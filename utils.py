@@ -45,8 +45,14 @@ def extract_from_triple_backticks(text):
 
     Expects the text to end with lines containing triple backticks surrounding content.
     Returns the extracted content, or None if no triple backticks found.
+
+    Also strips <think>...</think> blocks emitted by reasoning models (GLM-5.1,
+    Qwen3.5 family, etc.) before attempting extraction.
     """
     import re
+
+    # Strip thinking blocks from reasoning models before extraction
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
 
     # Find all occurrences of triple backticks with content between them
     # This handles both single-line (```content```) and multi-line formats

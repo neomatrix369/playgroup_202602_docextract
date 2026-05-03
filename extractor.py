@@ -320,6 +320,13 @@ def _truncate_rows_to_ctx(rows, model_cfg) -> list:
     return truncated
 
 
+def _dw_submit_rows(rows, model_cfg):
+    """Rows for Doubleword submit_batch: OCR models skip text truncation (they receive images)."""
+    if model_cfg.get("ocr"):
+        return rows
+    return _truncate_rows_to_ctx(rows, model_cfg)
+
+
 def _v7_submit_rows(rows, model_cfg):
     """Rows passed to V7 submit_batch: PDF path skips OCR truncation (multimodal)."""
     if model_cfg.get("multimodal"):
@@ -819,8 +826,9 @@ async def _retry_failed_rows_doubleword(models_to_retry, completion_window="1h")
         try:
             batch_id = await llm_doubleword.submit_batch(
                 client, model_short_name, model_cfg["model"],
-                PROMPT_TEMPLATE, _truncate_rows_to_ctx(subset, model_cfg), completion_window,
+                PROMPT_TEMPLATE, _dw_submit_rows(subset, model_cfg), completion_window,
                 extra_params=model_cfg.get("extra_params"),
+                model_cfg=model_cfg,
             )
         except Exception as e:
             reason = str(e)
@@ -1085,8 +1093,9 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
         try:
             batch_id = await llm_doubleword.submit_batch(
                 client, model_short_name, model_cfg["model"],
-                PROMPT_TEMPLATE, _truncate_rows_to_ctx(rows, model_cfg), completion_window,
+                PROMPT_TEMPLATE, _dw_submit_rows(rows, model_cfg), completion_window,
                 extra_params=model_cfg.get("extra_params"),
+                model_cfg=model_cfg,
             )
         except Exception as e:
             reason = str(e)
@@ -1118,8 +1127,9 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
             try:
                 batch_id = await llm_doubleword.submit_batch(
                     client, model_short_name, model_cfg["model"],
-                    PROMPT_TEMPLATE, _truncate_rows_to_ctx(rows, model_cfg), completion_window,
+                    PROMPT_TEMPLATE, _dw_submit_rows(rows, model_cfg), completion_window,
                     extra_params=model_cfg.get("extra_params"),
+                    model_cfg=model_cfg,
                 )
             except Exception as sub_e:
                 reason = str(sub_e)
@@ -1148,8 +1158,9 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
             try:
                 batch_id = await llm_doubleword.submit_batch(
                     client, model_short_name, model_cfg["model"],
-                    PROMPT_TEMPLATE, _truncate_rows_to_ctx(rows, model_cfg), completion_window,
+                    PROMPT_TEMPLATE, _dw_submit_rows(rows, model_cfg), completion_window,
                     extra_params=model_cfg.get("extra_params"),
+                    model_cfg=model_cfg,
                 )
             except Exception as sub_e:
                 reason = str(sub_e)
