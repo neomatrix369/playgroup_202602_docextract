@@ -1,0 +1,5 @@
+{
+  "dw-deepseek-ocr-2": "Line 6: Request body is 7384418 bytes, which exceeds the maximum allowed size of 5242880 bytes",
+  "dw-lightonocr-2-1b-bbox-soup": "Line 6: Request body is 7382766 bytes, which exceeds the maximum allowed size of 5242880 bytes",
+  "dw-olmocr-2-7b-1025": "Line 6: Request body is 7384546 bytes, which exceeds the maximum allowed size of 5242880 bytes"
+}

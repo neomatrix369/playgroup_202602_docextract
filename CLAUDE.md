@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a **multi-model LLM benchmark** that extracts structured fields from UK charity financial PDFs. It compares dozens of models across three backends:
 - **OpenRouter** (~33 models, sync)
-- **Doubleword Batch API** (12 models, async with checkpoints)
+- **Doubleword Batch API** (21 models, async with checkpoints)
 - **V7 Go** (32 models, async entity API with checkpoints)
 
 The benchmark scores each model using F1/Precision/Recall and generates an interactive HTML playground for analysis.
@@ -97,7 +97,7 @@ All backends share a common interface in `extractor.py` but have different execu
 | File | Backend | Auto-sync? | Model Count |
 |------|---------|------------|-------------|
 | `config_models_openrouter.py` | OpenRouter | ❌ Manual | ~33 |
-| `config_models_doubleword.py` | Doubleword | ❌ **Manual override** | 19 |
+| `config_models_doubleword.py` | Doubleword | ❌ **Manual override** | 21 |
 | `config_models_v7.py` | V7 Go | ❌ Manual | 32 |
 
 **Doubleword auto-sync is DISABLED** (`SKIP_DOUBLEWORD_SYNC=1`) because:
@@ -187,16 +187,16 @@ Per-document F1 is computed from field-level TP/FP/FN, then averaged across all 
 
 | File | Purpose |
 |------|---------|
-| `extractor.py` | Unified orchestrator: auto-detects backend, auto-syncs Doubleword pricing, handles checkpoints |
+| `extractor.py` | Unified orchestrator: auto-detects backend, handles checkpoints (Doubleword auto-sync disabled by default) |
 | `llm_openrouter.py` | OpenRouter HTTP client (sync per-row) |
 | `llm_doubleword.py` | Doubleword Batch API client (async batch: submit → poll → download) |
 | `llm_v7.py` | V7 Go entity API client (async: create entity per row or Go Agent v2 flow with PDF upload) |
 | `score.py` | F1/Precision/Recall scorer with field-level similarity. No args → leaderboard; pass filename → verbose diff |
 | `playground.py` | Generates `which-models-extracted-playground.html` from `data/` |
-| `config_models_*.py` | Model registries (OpenRouter manual, Doubleword auto-generated, V7 manual) |
-| `sync_doubleword_models.py` | Auto-sync Doubleword pricing from docs endpoint |
+| `config_models_*.py` | Model registries (OpenRouter manual, Doubleword manually corrected, V7 manual) |
+| `sync_doubleword_models.py` | Sync Doubleword pricing from docs endpoint (disabled by default via `SKIP_DOUBLEWORD_SYNC=1`) |
 | `sync_v7_go_agent_template.py` | Refresh `v7_go_agent_v2_template.json` from V7 API after UI property changes |
-| `utils.py` | Shared helpers: `get_logger`, `extract_from_triple_backticks`, `sanitize_error_message` |
+| `utils.py` | Shared helpers: `get_logger`, `extract_from_triple_backticks` (strips `<think>` blocks from reasoning models), `sanitize_error_message` |
 | `v7_go_ensure.py` | V7 Go configuration validation utilities |
 
 ## Environment Variables
@@ -225,6 +225,13 @@ V7_GO_INPUT_FIELD_SLUG=document-text  # single-output agents
 V7_GO_OUTPUT_FIELD_SLUG=extracted-json  # single-output agents
 V7_GO_FILE_FIELD_SLUG=...  # File property for PDFs; for Go Agent v2 often omit
 V7_GO_PARENT_ENTITY_ID=...  # Only for collection (child) projects — parent *entity* id (not project id)
+V7_GO_PDF_DIR=data  # directory containing PDF files for multimodal upload
+V7_GO_AUTO_ENSURE_PROPERTIES=1  # auto-create missing properties on the V7 agent
+```
+
+### Optional Doubleword overrides
+```bash
+SKIP_DOUBLEWORD_SYNC=1  # disable auto-sync of model registry (preserves manual identifier corrections)
 ```
 
 See `docs/v7-go.md` for V7-specific setup details and `QUICKSTART.md` for full environment setup.
@@ -236,5 +243,5 @@ See `docs/v7-go.md` for V7-specific setup details and `QUICKSTART.md` for full e
 - **All providers scored together**: `score.py` and `playground.py` automatically include any `data/playgroup_dev_extracted__*.tsv` files regardless of backend
 - **Short labels in UI**: When all `__`-suffixed models share the same agent prefix, leaderboards and playground show shortened names (e.g., `gpt4-1`), but filenames and CSV stay full-length
 - **OpenRouter tiers** (in `config_models_openrouter.py`): `free`, `ultra_cheap` (<$0.30/M), `great_value` ($0.30–$1.00/M), `premium` (>$1.00/M)
-- **Doubleword tiers**: `ultra_cheap` (≤$0.40/M combined), `premium` (>$0.50/M combined); pricing is for 1h batch (24h is 30-50% cheaper via `--completion-window 24h`)
+- **Doubleword tiers** (in `config_models_doubleword.py`): `budget`, `standard`, `premium`; pricing is for 1h batch (24h is 30-50% cheaper via `--completion-window 24h`)
 - **Hardest fields** (even top models struggle): `income_annually_in_british_pounds`, `spending_annually_in_british_pounds`

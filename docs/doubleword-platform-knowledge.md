@@ -4,6 +4,8 @@
 
 **See also (same repo):** **OpenRouter** (~33 models, `config_models_openrouter.py`, manual pricing). **V7 Go** (32 optional keys, `config_models_v7.py`, manual pricing, entity API — no Doubleword-style batch id). Short V7 reference: [docs/v7-go.md](v7-go.md); full workflow: [README.md — V7 Go](../README.md#v7-go-optional-backend). Cross-backend stats and pricing: [README — Key Findings](../README.md#key-findings).
 
+> **Note (2026-05):** Doubleword auto-sync is **disabled** (`SKIP_DOUBLEWORD_SYNC=1`). The docs endpoint lists model identifiers that don't match the batch API (e.g. `DeepSeek/DeepSeek-V4-Pro` in docs vs `deepseek-ai/DeepSeek-V4-Pro` at the API). `config_models_doubleword.py` now has **21** manually corrected entries (up from 12). The model catalog below may not match the corrected identifiers — always defer to `config_models_doubleword.py` for the actual working names.
+
 ---
 
 ## 1. What is Doubleword?
@@ -104,23 +106,33 @@ response = await client.chat.completions.create(...)
 
 ### 2.6 Model Catalog
 
-Model names use `dw-` prefix in Doubleword's native API.
+Model names use `dw-` prefix in this repo's registry. **21 extraction models** in `config_models_doubleword.py` as of 2026-05, grouped into `budget`, `standard`, and `premium` tiers. OCR models receive PDF pages as base64-encoded images rendered via PyMuPDF; reasoning models (GLM-5.1, Qwen3.5 family) emit `<think>` blocks that are stripped before JSON extraction.
 
-| Model | Notes |
+| Model (registry key) | Notes |
 |---|---|
-| `dw-llama-3.3-70b` | General purpose |
-| `dw-llama-3.1-405b` | Largest open model |
-| `dw-deepseek-r1` | Reasoning |
-| `dw-deepseek-v3` | General |
-| `dw-qwen-2.5-72b` | General |
-| `dw-mistral-large` | General |
-| `dw-nemotron-70b` | General; note overnight pricing discrepancy between docs ($0.00) and marketing site ($0.15/$0.38) |
-| `dw-vl-235b` | Vision/multimodal |
-| `dw-deepseek-ocr-2` | OCR |
-| `dw-olmocr-2-7b` | OCR |
-| `dw-lighton-ocr-2-1b` | OCR (small, fast) |
+| `dw-deepseek-ocr-2` | OCR (budget) |
+| `dw-deepseek-v4-flash` | General (premium) |
+| `dw-deepseek-v4-pro` | General (premium) |
+| `dw-gemma-4-31b-it` | General (standard) |
+| `dw-glm-5-1` | Reasoning (premium) — emits `<think>` blocks |
+| `dw-gpt-oss-20b` | General (standard) |
+| `dw-kimi-k2-6` | General (premium) |
+| `dw-lightonocr-2-1b-bbox-soup` | OCR, small/fast (budget) |
+| `dw-nemotron-3-super-120b-a12b` | General (standard) |
+| `dw-olmocr-2-7b-1025` | OCR (budget) |
+| `dw-qwen3-14b` | General (budget) |
+| `dw-qwen3-5-35b-a3b` | General (standard) |
+| `dw-qwen3-5-35b-a3b-dottxt` | General + Dottxt (standard) |
+| `dw-qwen3-5-397b-a17b` | Large MoE (premium) |
+| `dw-qwen3-5-397b-a17b-dottxt` | Large MoE + Dottxt (premium) |
+| `dw-qwen3-5-4b` | Small (standard) |
+| `dw-qwen3-5-9b` | General (standard) — former top Doubleword F1 |
+| `dw-qwen3-5-9b-dottxt` | General + Dottxt (standard) |
+| `dw-qwen3-6-35b-a3b` | General (standard) |
+| `dw-qwen3-vl-235b-a22b-instruct` | Vision/multimodal (standard) |
+| `dw-qwen3-vl-30b-a3b-instruct` | Vision/multimodal (standard) |
 
-> Canonical pricing: https://docs.doubleword.ai/batches/model-pricing and https://www.doubleword.ai (may differ — verify both)
+> **Important:** Doubleword's docs endpoint lists model identifiers that don't match their batch API (e.g. `DeepSeek/DeepSeek-V4-Pro` in docs but `deepseek-ai/DeepSeek-V4-Pro` at the API). The registry keys above use manually corrected identifiers. Canonical pricing: https://docs.doubleword.ai/batches/model-pricing and https://www.doubleword.ai (may differ — verify both)
 
 ### 2.7 Tool Calling & Structured Outputs
 

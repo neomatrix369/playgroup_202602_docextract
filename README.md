@@ -16,7 +16,7 @@ Extract structured fields from UK charity financial PDFs using LLMs via [OpenRou
 
 ## Key Findings
 
-> **Provider aggregates below** match `python score.py` over every `data/*_dev_extracted__*.tsv` file present on **2026-04-11** (**85** scored runs: **40** counted as OpenRouter — 33 under `playgroup_dev_extracted__openrouter__*.tsv` plus **7** legacy paths without a provider segment, which `score.py` treats as OpenRouter — plus **12** Doubleword and **33** V7). **Registries:** 33 OpenRouter keys, 12 Doubleword models (auto-synced pricing), 32 V7 keys — see `config_models_*.py`. Refresh numbers and [which-models-extracted-playground.html](which-models-extracted-playground.html) after new extractions: `python score.py` (check the printed **Provider summary**), then `python playground.py`.
+> **Provider aggregates below** match `python score.py` over every `data/*_dev_extracted__*.tsv` file present on **2026-04-11** (**91** scored runs: **40** counted as OpenRouter — 33 under `playgroup_dev_extracted__openrouter__*.tsv` plus **7** legacy paths without a provider segment, which `score.py` treats as OpenRouter — plus **18** Doubleword and **33** V7). **Registries:** 33 OpenRouter keys, 21 Doubleword models (manual corrections — auto-sync disabled via `SKIP_DOUBLEWORD_SYNC=1`), 32 V7 keys — see `config_models_*.py`. Refresh numbers and [which-models-extracted-playground.html](which-models-extracted-playground.html) after new extractions: `python score.py` (check the printed **Provider summary**), then `python playground.py`.
 
 **V7 Go** is a third extraction backend (optional). Completed runs write `data/playgroup_dev_extracted__v7__*.tsv`; `python score.py` and the playground score them like OpenRouter and Doubleword.
 
@@ -69,7 +69,7 @@ V7 runs are **async** with **checkpoints** and **resume** (`data/.v7_checkpoints
 
 ### Auto-Sync Pricing (Doubleword) and other registries
 
-**Doubleword** — Model pricing is automatically synced from Doubleword's [agent-friendly docs endpoint](https://docs.doubleword.ai/inference-api/model-pricing.md) (`llms.txt` enabled) at the start of each `extractor.py` run via `sync_doubleword_models.py`. This means `config_models_doubleword.py` is auto-generated — no manual edits needed. If nothing has changed, the sync is skipped silently.
+**Doubleword** — Auto-sync is **disabled** (`SKIP_DOUBLEWORD_SYNC=1` in `.env`). Doubleword's docs endpoint lists model identifiers that don't match their batch API, so `config_models_doubleword.py` contains **manual corrections** to use actual working identifiers. Example: docs show `DeepSeek/DeepSeek-V4-Pro` but the API expects `deepseek-ai/DeepSeek-V4-Pro`. To re-enable auto-sync, remove `SKIP_DOUBLEWORD_SYNC` from `.env` (this will overwrite manual edits). The standalone script `sync_doubleword_models.py` can still be run manually if you want to reset to the docs version.
 
 **OpenRouter** — The ~33 models and their per-token pricing live in `config_models_openrouter.py` and are **maintained manually** in this repo; `extractor.py` does not fetch them from a remote pricing API.
 
@@ -206,7 +206,7 @@ python extractor.py v7-go-agent-v2/claude-sonnet --retry-failed
 
 **`--v7-agent-template PATH`** — Optional. Path to a Go Agent v2 **project export JSON**. For every V7 model in that run, it sets `agent_template_json` to this file, overriding the value in `config_models_v7.py`. Use with `--all-v7`, explicit `v7-*` model names, or `--retry-failed` whenever V7 models are included. Relative paths resolve from the **repository root** (same rule as filenames in config). If the run has no V7 models, the flag is ignored with a warning.
 
-Each run auto-syncs **Doubleword** model pricing first (OpenRouter and V7 config files are unchanged by that step), then prints a per-provider plan (which models will run, skip, or resume) and executes extraction. Ctrl-C during Doubleword or V7 polling triggers a graceful shutdown — checkpoints are preserved and jobs resume on next run. On completion it prints a combined summary with completed/skipped/interrupted/failed counts. When a Doubleword batch completes with partial failures, the DW error file is automatically downloaded and the per-row rejection reasons (e.g. `context_length_exceeded`) are logged to the console and recorded. Use `--retry-failed` on a subsequent run to re-submit only those rows and merge the results back into the existing output file (Doubleword and V7 each maintain their own failed-row manifests). If a model is unavailable (e.g. `PermissionDenied` on submit), it is automatically recorded in the provider-specific unavailable-models file and skipped on future runs. For V7, skips also log a **resolved settings snapshot** (workspace, agent, file-field source, mode) and **actionable hints** derived from the stored failure reason (e.g. file-upload 404, DNS, parent entity mix-ups).
+Each run prints a per-provider plan (which models will run, skip, or resume) and executes extraction. Ctrl-C during Doubleword or V7 polling triggers a graceful shutdown — checkpoints are preserved and jobs resume on next run. On completion it prints a combined summary with completed/skipped/interrupted/failed counts. When a Doubleword batch completes with partial failures, the DW error file is automatically downloaded and the per-row rejection reasons (e.g. `context_length_exceeded`) are logged to the console and recorded. Use `--retry-failed` on a subsequent run to re-submit only those rows and merge the results back into the existing output file (Doubleword and V7 each maintain their own failed-row manifests). If a model is unavailable (e.g. `PermissionDenied` on submit), it is automatically recorded in the provider-specific unavailable-models file and skipped on future runs. For V7, skips also log a **resolved settings snapshot** (workspace, agent, file-field source, mode) and **actionable hints** derived from the stored failure reason (e.g. file-upload 404, DNS, parent entity mix-ups).
 
 **Output and state files**
 
@@ -299,16 +299,16 @@ python score.py data/playgroup_dev_extracted__v7__v7-go-agent-v2__claude-sonnet.
 | File | Purpose |
 |---|---|
 | `llm_openrouter.py` | LLM client for OpenRouter (synchronous). Run directly for a smoke test. |
-| `llm_doubleword.py` | LLM client for Doubleword Batch API (async, direct batch management with checkpoint/resume). |
+| `llm_doubleword.py` | LLM client for Doubleword Batch API (async, direct batch management with checkpoint/resume). OCR models receive PDF pages as base64-encoded images via PyMuPDF; reasoning-model `<think>` blocks are stripped before JSON extraction. |
 | `llm_v7.py` | LLM client for [V7 Go](https://docs.go.v7labs.com/) (async HTTP: create entity per row, poll until output field ready; Go Agent v2: empty entity body, PDF upload, multi-field merge). Resolves file field and parent entity with guardrails; logs diagnostics for unavailable-model skips. Same orchestration hooks as `llm_doubleword.py` (`submit_batch`, `poll_batch`, `download_results`, checkpoints). |
 | `extraction_and_prompt_example.py` | Simple single-model extraction loop, good for prompt experiments. |
-| `extractor.py` | Unified extraction runner. Auto-detects backend from registries (`DOUBLEWORD_MODELS`, `V7_MODELS`, `OPENROUTER_MODELS`). Auto-syncs Doubleword pricing at startup. Doubleword and V7 use async polling with checkpoint/resume; OpenRouter is sync per row. Graceful Ctrl-C preserves checkpoints. Doubleword: downloads DW error files for pre-processing rejections. Flags: `--completion-window`, `--all-doubleword`, `--all-openrouter`, `--all-v7`, `--v7-agent-template`, `--retry-failed`. |
-| `sync_doubleword_models.py` | Auto-syncs Doubleword model pricing from their [docs markdown endpoint](https://docs.doubleword.ai/inference-api/model-pricing.md). Regenerates `config_models_doubleword.py`. Skips save when nothing changed. Called by `extractor.py` at startup; can also run standalone. |
+| `extractor.py` | Unified extraction runner. Auto-detects backend from registries (`DOUBLEWORD_MODELS`, `V7_MODELS`, `OPENROUTER_MODELS`). Doubleword sync is **disabled by default** (`SKIP_DOUBLEWORD_SYNC=1`). Doubleword and V7 use async polling with checkpoint/resume; OpenRouter is sync per row. Graceful Ctrl-C preserves checkpoints. Truncates OCR text to model context window (conservative 3 chars/token estimate). Doubleword: downloads DW error files for pre-processing rejections. Flags: `--completion-window`, `--all-doubleword`, `--all-openrouter`, `--all-v7`, `--v7-agent-template`, `--retry-failed`. |
+| `sync_doubleword_models.py` | Auto-syncs Doubleword model pricing from their [docs markdown endpoint](https://docs.doubleword.ai/inference-api/model-pricing.md). Regenerates `config_models_doubleword.py`. Skips save when nothing changed. **Disabled by default** (`SKIP_DOUBLEWORD_SYNC=1`) because docs model identifiers don't match the batch API — `config_models_doubleword.py` has manual corrections. Run standalone only to reset to docs version. |
 | `sync_v7_go_agent_template.py` | Fetches the current V7 Go project + property list from the API and refreshes `v7_go_agent_v2_template.json` when the normalized JSON differs (stable ordering, tool placeholders for non-manual fields). Uses the same env vars as `llm_v7.py`. |
 | `score.py` | Scorer with F1/Precision/Recall. No args → ranked leaderboard; pass a filename → verbose field-by-field diff. Leaderboard **Model** column uses the same short display rule as the playground when shared `agent__` prefixes apply (see [Results](#results)). |
-| `utils.py` | Shared helpers (`extract_from_triple_backticks`, `sanitize_error_message`). |
+| `utils.py` | Shared helpers (`extract_from_triple_backticks` — strips `<think>` blocks from reasoning models before extraction, `sanitize_error_message`, `get_logger`). |
 | `config_models_openrouter.py` | OpenRouter model registry — 33 models organised by tier. |
-| `config_models_doubleword.py` | Doubleword model registry — 12 extraction models (auto-generated by `sync_doubleword_models.py`). |
+| `config_models_doubleword.py` | Doubleword model registry — 21 extraction models (manually maintained; auto-sync disabled via `SKIP_DOUBLEWORD_SYNC=1`). |
 | `config_models_v7.py` | V7 Go model registry — short names (e.g. `v7-go-agent-v2/claude-sonnet`) mapped to display metadata; agent IDs and field slugs usually come from env (see “V7 Go” above). |
 | `playground.py` | Generates `which-models-extracted-playground.html` from extraction results. Chart/table **labels** use short model names when safe (shared `agent__` prefix); embedded JSON keys stay full ids. |
 
@@ -327,14 +327,15 @@ Models are grouped into four tiers by cost (per million input tokens):
 
 #### Doubleword Batch API (`config_models_doubleword.py`)
 
-Prefixed with `dw-`. Auto-generated by `sync_doubleword_models.py` from the [Doubleword pricing page](https://docs.doubleword.ai/inference-api/model-pricing.md). Pricing is for the 1h batch tier (24h is 30-50% cheaper). Embedding models are excluded (not used for extraction).
+Prefixed with `dw-`. **21** extraction models, maintained manually (auto-sync disabled via `SKIP_DOUBLEWORD_SYNC=1` because Doubleword's docs show model identifiers that don't match their batch API — see [Auto-Sync Pricing](#auto-sync-pricing)). Pricing is for the 1h batch tier (24h is 30-50% cheaper). Embedding models are excluded (not used for extraction). OCR models receive PDF pages as base64-encoded images rendered via PyMuPDF.
 
-| Tier | Cost (in+out/M) | Examples |
-|---|---|---|
-| `ultra_cheap` | ≤ $0.40 combined | `dw-qwen3.5-4b`, `dw-qwen3.5-9b`, `dw-qwen3-14b`, `dw-gpt-oss-20b`, `dw-qwen3.5-35b`, `dw-qwen3-vl-30b`, `dw-deepseek-ocr-2`, `dw-olmocr-2-7b-1025-fp8`, `dw-lightonocr-2-1b-bbox-soup` |
-| `premium` | > $0.50 combined | `dw-nemotron-120b`, `dw-qwen3.5-397b`, `dw-qwen3-vl-235b` |
+| Tier | Examples |
+|---|---|
+| `budget` (4) | `dw-deepseek-ocr-2`, `dw-lightonocr-2-1b-bbox-soup`, `dw-olmocr-2-7b-1025`, `dw-qwen3-14b` |
+| `standard` (11) | `dw-gemma-4-31b-it`, `dw-gpt-oss-20b`, `dw-nemotron-3-super-120b-a12b`, `dw-qwen3-5-35b-a3b`, `dw-qwen3-5-35b-a3b-dottxt`, `dw-qwen3-5-4b`, `dw-qwen3-5-9b`, `dw-qwen3-5-9b-dottxt`, `dw-qwen3-6-35b-a3b`, `dw-qwen3-vl-235b-a22b-instruct`, `dw-qwen3-vl-30b-a3b-instruct` |
+| `premium` (6) | `dw-deepseek-v4-flash`, `dw-deepseek-v4-pro`, `dw-glm-5-1`, `dw-kimi-k2-6`, `dw-qwen3-5-397b-a17b`, `dw-qwen3-5-397b-a17b-dottxt` |
 
-Each model entry includes: model ID, `multimodal` flag, supported modalities, context length, and notes.
+Each model entry includes: model ID (manually corrected from API), `multimodal` flag, supported modalities, context length, and notes.
 
 <a id="v7-registry"></a>
 
