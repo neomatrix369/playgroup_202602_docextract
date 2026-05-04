@@ -4,8 +4,9 @@ Bypasses autobatcher to give full control over batch lifecycle:
 submit, poll, resume, and download results independently.
 
 OCR models receive PDF pages as base64-encoded images via the OpenAI vision
-content format. Each PDF is rendered to images using PyMuPDF; all pages of a
-single PDF are sent as multiple image_url entries in one batch request.
+content format. PyMuPDF renders pages (bounded by registry `ocr_max_pages`,
+dimensions, JPEG quality); Doubleword rejects JSONL lines over 5MB, so payloads
+may adaptively lower quality/scale until under budget.
 """
 
 import base64
@@ -114,23 +115,40 @@ def mark_model_unavailable(model_short_name: str, reason: str):
 
 # ── PDF → base64 image conversion for OCR models ────────────────────
 
-def _pdf_to_base64_images(pdf_path: str, max_dim: int = 1540) -> list[str]:
+DOUBLEWORD_MAX_LINE_BYTES = 5_242_880  # 5 MB per-line limit in JSONL batch files
+
+def _pdf_to_base64_images(
+    pdf_path: str,
+    max_dim: int = 1540,
+    max_pages: int | None = None,
+    jpeg_quality: int = 80,
+) -> list[str]:
     """Render each page of a PDF to a JPEG base64 string, capped at max_dim px.
+
+    Args:
+        max_dim: longest side of rendered image in pixels
+        max_pages: if set, only render the first N pages
+        jpeg_quality: JPEG compression quality (1-100, lower = smaller)
 
     Returns a list of base64-encoded JPEG strings (one per page).
     """
     import pymupdf
 
     doc = pymupdf.open(pdf_path)
+    pages = list(doc)
+    if max_pages and len(pages) > max_pages:
+        logger.debug("Capping {} pages to {} for {}", len(pages), max_pages, pdf_path)
+        pages = pages[:max_pages]
+
     images = []
-    for page in doc:
+    for page in pages:
         rect = page.rect
         longest = max(rect.width, rect.height)
         zoom = max_dim / longest if longest > max_dim else 1.0
         mat = pymupdf.Matrix(zoom, zoom)
         pix = page.get_pixmap(matrix=mat)
 
-        img_bytes = pix.tobytes("jpeg")
+        img_bytes = pix.tobytes("jpeg", jpg_quality=jpeg_quality)
         images.append(base64.b64encode(img_bytes).decode("ascii"))
     doc.close()
     return images
@@ -140,6 +158,7 @@ def _build_ocr_messages(
     pdf_path: str,
     model_cfg: dict,
     extraction_prompt: str,
+    size_budget: int = DOUBLEWORD_MAX_LINE_BYTES,
 ) -> list[dict]:
     """Build the messages array for an OCR model request.
 
@@ -151,12 +170,56 @@ def _build_ocr_messages(
 
     For other OCR models: system message + user content with images + OCR prompt
     followed by the extraction prompt.
+
+    If the resulting payload exceeds size_budget, retries with progressively
+    lower quality/resolution until it fits.
     """
     max_dim = model_cfg.get("ocr_max_image_dim", 1540)
-    page_images = _pdf_to_base64_images(pdf_path, max_dim=max_dim)
+    max_pages = model_cfg.get("ocr_max_pages")
+    jpeg_quality = model_cfg.get("ocr_jpeg_quality", 80)
     no_system = model_cfg.get("ocr_no_system_prompt", False)
     ocr_prompt = model_cfg.get("ocr_prompt")
 
+    # Adaptive rendering: try progressively smaller settings if payload is too large
+    attempts = [
+        (max_dim, max_pages, jpeg_quality),
+        (max_dim, max_pages, 60),
+        (int(max_dim * 0.75), max_pages, 60),
+        (int(max_dim * 0.6), max_pages, 50),
+    ]
+
+    for dim, pages, quality in attempts:
+        page_images = _pdf_to_base64_images(
+            pdf_path, max_dim=dim, max_pages=pages, jpeg_quality=quality,
+        )
+        messages = _assemble_ocr_messages(
+            page_images, no_system, ocr_prompt, extraction_prompt,
+        )
+        payload_size = len(json.dumps(messages).encode("utf-8"))
+
+        # Leave ~200KB headroom for the JSONL wrapper (custom_id, method, url, model)
+        if payload_size < size_budget - 200_000:
+            if (dim, pages, quality) != attempts[0]:
+                logger.info(
+                    "Adapted OCR settings for {} → dim={}, quality={} ({:.1f} MB)",
+                    pdf_path, dim, quality, payload_size / 1024 / 1024,
+                )
+            return messages
+
+    logger.warning(
+        "OCR payload for {} still {:.1f} MB after all reductions — sending anyway",
+        pdf_path, payload_size / 1024 / 1024,
+    )
+    return messages
+
+
+def _assemble_ocr_messages(
+    page_images: list[str],
+    no_system: bool,
+    ocr_prompt: str | None,
+    extraction_prompt: str,
+) -> list[dict]:
+    """Assemble message dicts from pre-rendered page images."""
     image_content = [
         {
             "type": "image_url",
@@ -168,7 +231,6 @@ def _build_ocr_messages(
     messages = []
 
     if no_system:
-        # LightOnOCR: image-only, no text at all
         messages.append({"role": "user", "content": image_content})
     else:
         messages.append({"role": "system", "content": SYSTEM_MESSAGE})
