@@ -292,6 +292,8 @@ def _run_openrouter(model_short_name):
 DOUBLEWORD_POLL_INTERVAL = 10  # seconds between poll cycles
 V7_POLL_INTERVAL = 5  # V7 entity polling (lighter than DW batch file generation)
 
+_pending_progress = {}  # model_short_name -> "X/Y" — last-known progress for models still polling when interrupted
+
 
 _PROMPT_OVERHEAD_TOKENS = 500   # system + user prompt template + JSON response budget
 _CHARS_PER_TOKEN = 3            # conservative for whitespace-heavy OCR text
@@ -848,6 +850,7 @@ async def _retry_failed_rows_doubleword(models_to_retry, completion_window="1h")
     # Poll loop — same pattern as _run_all_doubleword
     log.info("[Retry] Polling {} batch(es)... (Ctrl-C to stop gracefully)", len(pending))
     interrupted = False
+    last_counts = {}
     try:
         while pending:
             await asyncio.sleep(DOUBLEWORD_POLL_INTERVAL)
@@ -862,6 +865,7 @@ async def _retry_failed_rows_doubleword(models_to_retry, completion_window="1h")
                     poll_summary.append(f"{model_short_name}:error")
                     continue
 
+                last_counts[model_short_name] = f"{counts['completed']}/{counts['total']}"
                 poll_summary.append(f"{model_short_name}: {counts['completed']}/{counts['total']}")
 
                 if status == "completed":
@@ -928,7 +932,8 @@ async def _retry_failed_rows_doubleword(models_to_retry, completion_window="1h")
         interrupted = True
         log.warning("Interrupted — checkpoints saved, pending retries can resume next run")
         for model_short_name in pending:
-            statuses[model_short_name] = "interrupted"
+            statuses[model_short_name] = "pending"
+            _pending_progress[model_short_name] = last_counts.get(model_short_name, "?/?")
 
     await client.close()
     if not interrupted:
@@ -1002,6 +1007,7 @@ async def _retry_failed_rows_v7(models_to_retry, v7_agent_template: str | None =
 
     log.info("[V7 Retry] Polling {} batch(es)...", len(pending))
     interrupted = False
+    last_counts = {}
     try:
         while pending:
             await asyncio.sleep(V7_POLL_INTERVAL)
@@ -1012,6 +1018,7 @@ async def _retry_failed_rows_v7(models_to_retry, v7_agent_template: str | None =
                 except Exception as e:
                     log.error("[V7 Retry][{}] Poll error: {}", model_short_name, e)
                     continue
+                last_counts[model_short_name] = f"{counts.get('completed', '?')}/{counts.get('total', '?')}"
                 log.debug("[V7 Retry] {} {}/{}", model_short_name, counts.get("completed"), counts.get("total"))
                 if status == "completed":
                     new_results = await llm_v7.download_results(client, output_file_id)
@@ -1035,7 +1042,9 @@ async def _retry_failed_rows_v7(models_to_retry, v7_agent_template: str | None =
     except (KeyboardInterrupt, asyncio.CancelledError):
         interrupted = True
         for model_short_name in pending:
-            statuses[model_short_name] = "interrupted"
+            statuses[model_short_name] = "pending"
+            _pending_progress[model_short_name] = last_counts.get(model_short_name, "?/?")
+
 
     await client.aclose()
     if not interrupted:
@@ -1190,6 +1199,7 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
     log.info("[Doubleword] Polling {} batch(es)... (Ctrl-C to stop gracefully)", total_models)
 
     interrupted = False
+    last_counts = {}
     try:
         while pending:
             await asyncio.sleep(DOUBLEWORD_POLL_INTERVAL)
@@ -1204,6 +1214,7 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
                     poll_summary.append(f"{model_short_name}:error")
                     continue
 
+                last_counts[model_short_name] = f"{counts['completed']}/{counts['total']}"
                 poll_summary.append(f"{model_short_name}:{counts['completed']}/{counts['total']}")
 
                 if status == "completed":
@@ -1281,7 +1292,8 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
                      ", ".join(pending.keys()))
         log.warning("=" * 60)
         for model_short_name in pending:
-            statuses[model_short_name] = "interrupted"
+            statuses[model_short_name] = "pending"
+            _pending_progress[model_short_name] = last_counts.get(model_short_name, "?/?")
 
     await client.close()
     if not interrupted:
@@ -1422,6 +1434,7 @@ async def _run_all_v7(models_to_run, v7_agent_template: str | None = None):
     log.info("[V7] Polling {} job(s)... (Ctrl-C stops gracefully)", total_models)
 
     interrupted = False
+    last_counts = {}
     try:
         while pending:
             await asyncio.sleep(V7_POLL_INTERVAL)
@@ -1436,6 +1449,7 @@ async def _run_all_v7(models_to_run, v7_agent_template: str | None = None):
                     poll_summary.append(f"{model_short_name}:error")
                     continue
 
+                last_counts[model_short_name] = f"{counts['completed']}/{counts['total']}"
                 poll_summary.append(f"{model_short_name}:{counts['completed']}/{counts['total']}")
 
                 if status == "completed":
@@ -1467,7 +1481,9 @@ async def _run_all_v7(models_to_run, v7_agent_template: str | None = None):
         interrupted = True
         log.warning("Interrupted — V7 checkpoints saved; re-run to resume")
         for model_short_name in pending:
-            statuses[model_short_name] = "interrupted"
+            statuses[model_short_name] = "pending"
+            _pending_progress[model_short_name] = last_counts.get(model_short_name, "?/?")
+
 
     await client.aclose()
     if not interrupted:
@@ -1517,20 +1533,33 @@ def _print_run_summary(all_statuses):
     log.info("=" * 60)
     log.info("Run Summary")
     log.info("=" * 60)
-    for status in ("completed", "skipped", "interrupted", "failed", "cancelled", "expired", "unknown"):
+    for status in ("completed", "skipped", "pending", "interrupted", "failed", "cancelled", "expired", "unknown"):
         models = by_status.get(status, [])
         if not models:
             continue
         label = status.capitalize().ljust(10)
-        model_list = ", ".join(f"{m} ({p})" for p, m in models)
+        if status == "pending":
+            model_list = ", ".join(
+                f"{m} ({p}, {_pending_progress.get(m, '?/?')})" for p, m in models
+            )
+        else:
+            model_list = ", ".join(f"{m} ({p})" for p, m in models)
         level = "ERROR" if status in ("failed", "cancelled", "expired", "unknown") else "INFO"
-        log.log(level, "  {}: {}", label, model_list)
+        if status == "pending":
+            log.log(level, "  {}: {} — will resume next run", label, model_list)
+        else:
+            log.log(level, "  {}: {}", label, model_list)
 
     total = len(all_statuses)
     completed = len(by_status.get("completed", []))
     skipped = len(by_status.get("skipped", []))
+    pending_count = len(by_status.get("pending", []))
     failed_count = sum(len(by_status.get(s, [])) for s in ("failed", "cancelled", "expired", "unknown"))
-    log.info("  Total: {}  |  Completed: {}  |  Skipped: {}  |  Failed: {}", total, completed, skipped, failed_count)
+    parts = [f"Total: {total}", f"Completed: {completed}", f"Skipped: {skipped}"]
+    if pending_count:
+        parts.append(f"Pending: {pending_count}")
+    parts.append(f"Failed: {failed_count}")
+    log.info("  {}",  "  |  ".join(parts))
     log.info("=" * 60)
 
 
