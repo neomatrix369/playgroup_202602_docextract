@@ -4,6 +4,8 @@
 
 **See also (same repo):** **OpenRouter** (~33 models, `config_models_openrouter.py`, manual pricing). **V7 Go** (32 optional keys, `config_models_v7.py`, manual pricing, entity API — no Doubleword-style batch id). Short V7 reference: [docs/v7-go.md](v7-go.md); full workflow: [README.md — V7 Go](../README.md#v7-go-optional-backend). Cross-backend stats and pricing: [README — Key Findings](../README.md#key-findings).
 
+> **Note (2026-05):** Doubleword auto-sync is **disabled** (`SKIP_DOUBLEWORD_SYNC=1`). The docs endpoint lists model identifiers that don't match the batch API (e.g. `DeepSeek/DeepSeek-V4-Pro` in docs vs `deepseek-ai/DeepSeek-V4-Pro` at the API). `config_models_doubleword.py` now has **21** manually corrected entries (up from 12). The model catalog below may not match the corrected identifiers — always defer to `config_models_doubleword.py` for the actual working names.
+
 ---
 
 ## 1. What is Doubleword?
@@ -104,34 +106,69 @@ response = await client.chat.completions.create(...)
 
 ### 2.6 Model Catalog
 
-Model names use `dw-` prefix in Doubleword's native API.
+Model names use `dw-` prefix in this repo's registry. **21 extraction models** in `config_models_doubleword.py` as of 2026-05, grouped into `budget`, `standard`, and `premium` tiers. OCR models receive PDF pages as base64-encoded images rendered via PyMuPDF; reasoning models (GLM-5.1, Qwen3.5 family) emit `<think>` blocks that are stripped before JSON extraction.
 
-| Model | Notes |
+| Model (registry key) | Notes |
 |---|---|
-| `dw-llama-3.3-70b` | General purpose |
-| `dw-llama-3.1-405b` | Largest open model |
-| `dw-deepseek-r1` | Reasoning |
-| `dw-deepseek-v3` | General |
-| `dw-qwen-2.5-72b` | General |
-| `dw-mistral-large` | General |
-| `dw-nemotron-70b` | General; note overnight pricing discrepancy between docs ($0.00) and marketing site ($0.15/$0.38) |
-| `dw-vl-235b` | Vision/multimodal |
-| `dw-deepseek-ocr-2` | OCR |
-| `dw-olmocr-2-7b` | OCR |
-| `dw-lighton-ocr-2-1b` | OCR (small, fast) |
+| `dw-deepseek-ocr-2` | OCR (budget) |
+| `dw-deepseek-v4-flash` | General (premium) |
+| `dw-deepseek-v4-pro` | General (premium) |
+| `dw-gemma-4-31b-it` | General (standard) |
+| `dw-glm-5-1` | Reasoning (premium) — emits `<think>` blocks |
+| `dw-gpt-oss-20b` | General (standard) |
+| `dw-kimi-k2-6` | General (premium) |
+| `dw-lightonocr-2-1b-bbox-soup` | OCR, small/fast (budget) |
+| `dw-nemotron-3-super-120b-a12b` | General (standard) |
+| `dw-olmocr-2-7b-1025` | OCR (budget) |
+| `dw-qwen3-14b` | General (budget) |
+| `dw-qwen3-5-35b-a3b` | General (standard) |
+| `dw-qwen3-5-35b-a3b-dottxt` | General + Dottxt (standard) |
+| `dw-qwen3-5-397b-a17b` | Large MoE (premium) |
+| `dw-qwen3-5-397b-a17b-dottxt` | Large MoE + Dottxt (premium) |
+| `dw-qwen3-5-4b` | Small (standard) |
+| `dw-qwen3-5-9b` | General (standard) — former top Doubleword F1 |
+| `dw-qwen3-5-9b-dottxt` | General + Dottxt (standard) |
+| `dw-qwen3-6-35b-a3b` | General (standard) |
+| `dw-qwen3-vl-235b-a22b-instruct` | Vision/multimodal (standard) |
+| `dw-qwen3-vl-30b-a3b-instruct` | Vision/multimodal (standard) |
 
-> Canonical pricing: https://docs.doubleword.ai/batches/model-pricing and https://www.doubleword.ai (may differ — verify both)
+> **Important:** Doubleword's docs endpoint lists model identifiers that don't match their batch API (e.g. `DeepSeek/DeepSeek-V4-Pro` in docs but `deepseek-ai/DeepSeek-V4-Pro` at the API). The registry keys above use manually corrected identifiers. Canonical pricing: https://docs.doubleword.ai/batches/model-pricing and https://www.doubleword.ai (may differ — verify both)
+
+**Registry metadata per model** (in `config_models_doubleword.py`):
+
+| Field | Purpose |
+|---|---|
+| `model` | HuggingFace-style identifier (manually corrected to match the batch API) |
+| `intelligence` | Doubleword's benchmark intelligence score (e.g. 54 for Kimi K2.6, 12.8 for Qwen3-14B) |
+| `quantization` | Weight format: `FP8`, `FP4+FP8`, `INT4`, `NVFP4`, or unset |
+| `apis` | Supported API modes: `["batch", "async", "realtime"]` |
+| `params_total` / `params_active` | Total and active parameter count (MoE models differ, e.g. `1.6T` / `49B`) |
+| `thinking_default` | `True` if reasoning/thinking mode is on by default (GLM-5.1, Qwen3.5/3.6 families) |
+| `extra_params` | Default sampling overrides (e.g. `{"temperature": 0.7, "top_p": 0.8}`) |
+| `dottxt` | `True` for dottxt structured generation variants (constrained JSON/grammar outputs) |
+| `ocr` | `True` for OCR models; these receive PDF pages as base64-encoded JPEG images |
+| `ocr_prompt` | Model-specific prompt for OCR extraction (e.g. DeepSeek-OCR-2 uses `<\|grounding\|>Convert the document to markdown.`) |
+| `ocr_max_image_dim` | Max pixel dimension for rendered page images (1540 typical, 1288 for olmOCR) |
+| `description` / `usage_notes` | Human-readable model description and usage guidance |
+
+**Thinking mode** — Models with `thinking_default: True` (GLM-5.1, Qwen3.5-9B, Qwen3.5-4B, Qwen3.5-35B, Qwen3.6-35B, etc.) emit `<think>...</think>` reasoning blocks before their JSON output. The extraction pipeline strips these blocks automatically via `utils.extract_from_triple_backticks`. To disable thinking at the API level: `chat_template_kwargs: {enable_thinking: false}`.
+
+**Dottxt structured generation** — Models with `dottxt: True` (e.g. `dw-qwen3-5-9b-dottxt`, `dw-qwen3-5-35b-a3b-dottxt`, `dw-qwen3-5-397b-a17b-dottxt`) use Doubleword's dottxt backend for constrained JSON/grammar outputs. Pricing is typically 2x the non-dottxt variant.
+
+**OCR model workflow** — Models with `ocr: True` receive PDF pages rendered to JPEG via PyMuPDF (not OCR text). Each page is sent as a base64 `image_url` entry in the OpenAI vision message format. Model-specific prompts and max image dimensions are configured per-model. `ocr_no_system_prompt: True` (LightOnOCR) means no system or user prompt is sent — only the image.
 
 ### 2.7 Tool Calling & Structured Outputs
 
 - Supported via standard OpenAI-compatible `tools` parameter
 - Structured outputs: use `response_format: { type: "json_object" }` or JSON schema
 - Works in realtime and async modes; batch tool calling has caveats (verify in docs)
+- **dottxt** models provide constrained structured generation via grammar-backed outputs (see model catalog above)
 
 ### 2.8 Vision / Multimodal
 
-- Use `dw-vl-235b` for image+text input
+- Multiple models now support multimodal input: `dw-gemma-4-31b-it`, `dw-kimi-k2-6`, `dw-qwen3-5-*`, `dw-qwen3-6-35b-a3b`, `dw-qwen3-vl-*`, and OCR models
 - Pass images as base64 in the messages `content` array (OpenAI vision format)
+- OCR models use a dedicated workflow: PDFs are rendered to JPEG images via PyMuPDF with model-specific max dimensions
 
 ### 2.9 Embeddings
 

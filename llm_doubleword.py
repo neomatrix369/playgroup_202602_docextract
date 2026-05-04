@@ -2,8 +2,15 @@
 
 Bypasses autobatcher to give full control over batch lifecycle:
 submit, poll, resume, and download results independently.
+
+OCR models receive PDF pages as base64-encoded images via the OpenAI vision
+content format. PyMuPDF renders pages (bounded by registry `ocr_max_pages`,
+dimensions, JPEG quality); Doubleword rejects JSONL lines over 5MB, so payloads
+may adaptively lower quality/scale until under budget.
 """
 
+import base64
+import io
 import json
 import os
 import time
@@ -106,6 +113,138 @@ def mark_model_unavailable(model_short_name: str, reason: str):
     )
 
 
+# ── PDF → base64 image conversion for OCR models ────────────────────
+
+DOUBLEWORD_MAX_LINE_BYTES = 5_242_880  # 5 MB per-line limit in JSONL batch files
+
+def _pdf_to_base64_images(
+    pdf_path: str,
+    max_dim: int = 1540,
+    max_pages: int | None = None,
+    jpeg_quality: int = 80,
+) -> list[str]:
+    """Render each page of a PDF to a JPEG base64 string, capped at max_dim px.
+
+    Args:
+        max_dim: longest side of rendered image in pixels
+        max_pages: if set, only render the first N pages
+        jpeg_quality: JPEG compression quality (1-100, lower = smaller)
+
+    Returns a list of base64-encoded JPEG strings (one per page).
+    """
+    import pymupdf
+
+    doc = pymupdf.open(pdf_path)
+    pages = list(doc)
+    if max_pages and len(pages) > max_pages:
+        logger.debug("Capping {} pages to {} for {}", len(pages), max_pages, pdf_path)
+        pages = pages[:max_pages]
+
+    images = []
+    for page in pages:
+        rect = page.rect
+        longest = max(rect.width, rect.height)
+        zoom = max_dim / longest if longest > max_dim else 1.0
+        mat = pymupdf.Matrix(zoom, zoom)
+        pix = page.get_pixmap(matrix=mat)
+
+        img_bytes = pix.tobytes("jpeg", jpg_quality=jpeg_quality)
+        images.append(base64.b64encode(img_bytes).decode("ascii"))
+    doc.close()
+    return images
+
+
+def _build_ocr_messages(
+    pdf_path: str,
+    model_cfg: dict,
+    extraction_prompt: str,
+    size_budget: int = DOUBLEWORD_MAX_LINE_BYTES,
+) -> list[dict]:
+    """Build the messages array for an OCR model request.
+
+    Returns a list of message dicts suitable for the OpenAI chat completions API.
+    The message includes base64-encoded page images plus an appropriate text prompt.
+
+    For LightOnOCR (ocr_no_system_prompt=True): no system message, image-only
+    user content — the model repeats any text prompt.
+
+    For other OCR models: system message + user content with images + OCR prompt
+    followed by the extraction prompt.
+
+    If the resulting payload exceeds size_budget, retries with progressively
+    lower quality/resolution until it fits.
+    """
+    max_dim = model_cfg.get("ocr_max_image_dim", 1540)
+    max_pages = model_cfg.get("ocr_max_pages")
+    jpeg_quality = model_cfg.get("ocr_jpeg_quality", 80)
+    no_system = model_cfg.get("ocr_no_system_prompt", False)
+    ocr_prompt = model_cfg.get("ocr_prompt")
+
+    # Adaptive rendering: try progressively smaller settings if payload is too large
+    attempts = [
+        (max_dim, max_pages, jpeg_quality),
+        (max_dim, max_pages, 60),
+        (int(max_dim * 0.75), max_pages, 60),
+        (int(max_dim * 0.6), max_pages, 50),
+    ]
+
+    for dim, pages, quality in attempts:
+        page_images = _pdf_to_base64_images(
+            pdf_path, max_dim=dim, max_pages=pages, jpeg_quality=quality,
+        )
+        messages = _assemble_ocr_messages(
+            page_images, no_system, ocr_prompt, extraction_prompt,
+        )
+        payload_size = len(json.dumps(messages).encode("utf-8"))
+
+        # Leave ~200KB headroom for the JSONL wrapper (custom_id, method, url, model)
+        if payload_size < size_budget - 200_000:
+            if (dim, pages, quality) != attempts[0]:
+                logger.info(
+                    "Adapted OCR settings for {} → dim={}, quality={} ({:.1f} MB)",
+                    pdf_path, dim, quality, payload_size / 1024 / 1024,
+                )
+            return messages
+
+    logger.warning(
+        "OCR payload for {} still {:.1f} MB after all reductions — sending anyway",
+        pdf_path, payload_size / 1024 / 1024,
+    )
+    return messages
+
+
+def _assemble_ocr_messages(
+    page_images: list[str],
+    no_system: bool,
+    ocr_prompt: str | None,
+    extraction_prompt: str,
+) -> list[dict]:
+    """Assemble message dicts from pre-rendered page images."""
+    image_content = [
+        {
+            "type": "image_url",
+            "image_url": {"url": f"data:image/jpeg;base64,{img}"},
+        }
+        for img in page_images
+    ]
+
+    messages = []
+
+    if no_system:
+        messages.append({"role": "user", "content": image_content})
+    else:
+        messages.append({"role": "system", "content": SYSTEM_MESSAGE})
+        user_parts = list(image_content)
+        text_prompt = ""
+        if ocr_prompt:
+            text_prompt += ocr_prompt + "\n\n"
+        text_prompt += extraction_prompt
+        user_parts.append({"type": "text", "text": text_prompt})
+        messages.append({"role": "user", "content": user_parts})
+
+    return messages
+
+
 # ── Batch operations ────────────────────────────────────────────────
 
 async def submit_batch(
@@ -116,22 +255,45 @@ async def submit_batch(
     rows: list[tuple[int, str, str]],
     completion_window: str = "1h",
     extra_params: dict | None = None,
+    model_cfg: dict | None = None,
 ) -> str:
     """Submit rows as a batch job. Saves checkpoint. Returns batch_id.
 
     Args:
         rows: list of (row_num, pdf_filename, text_combined)
         extra_params: optional sampling params merged into each request body (e.g. {"top_k": 1})
+        model_cfg: full model config dict; when present and ocr=True, sends PDF
+                   pages as base64 images instead of text.
     """
+    is_ocr = model_cfg.get("ocr", False) if model_cfg else False
+
     lines = []
-    for row_num, _pdf_filename, text_combined in rows:
-        prompt = prompt_template + text_combined
-        body = {
-            "model": model_full_name,
-            "messages": [
+    for row_num, pdf_filename, text_combined in rows:
+        if is_ocr:
+            pdf_path = os.path.join("data", pdf_filename)
+            if not os.path.exists(pdf_path):
+                logger.error("[OCR] PDF not found: {} — falling back to text for row {}", pdf_path, row_num)
+                is_ocr_row = False
+            else:
+                is_ocr_row = True
+
+            if is_ocr_row:
+                messages = _build_ocr_messages(pdf_path, model_cfg, prompt_template)
+            else:
+                messages = [
+                    {"role": "system", "content": SYSTEM_MESSAGE},
+                    {"role": "user", "content": prompt_template + text_combined},
+                ]
+        else:
+            prompt = prompt_template + text_combined
+            messages = [
                 {"role": "system", "content": SYSTEM_MESSAGE},
                 {"role": "user", "content": prompt},
-            ],
+            ]
+
+        body = {
+            "model": model_full_name,
+            "messages": messages,
         }
         if extra_params:
             body.update(extra_params)
@@ -148,7 +310,8 @@ async def submit_batch(
         file=(f"batch-{model_short_name}.jsonl", content.encode("utf-8")),
         purpose="batch",
     )
-    logger.info("Uploaded batch file {} for {}", file_response.id, model_short_name)
+    logger.info("Uploaded batch file {} for {}{}", file_response.id, model_short_name,
+                " [OCR image mode]" if is_ocr else "")
 
     batch_response = await client.batches.create(
         input_file_id=file_response.id,
@@ -237,7 +400,7 @@ async def download_results(client: AsyncOpenAI, output_file_id: str) -> dict[int
             results[row_num] = {"error": str(error_data)}
         else:
             body = response_data.get("body", {})
-            usage = body.get("usage", {})
+            usage = body.get("usage") or {}
             choices = body.get("choices", [])
             if choices:
                 raw_text = choices[0].get("message", {}).get("content", "")

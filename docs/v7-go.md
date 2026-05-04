@@ -9,7 +9,7 @@ This repo can run the charity PDF benchmark through **[V7 Go](https://go.v7labs.
 | Backend | Registry file | Model count (typical) | Pricing in repo | Time / cost in `extraction_stats.csv` |
 |---------|----------------|------------------------|-----------------|----------------------------------------|
 | **OpenRouter** | `config_models_openrouter.py` | ~33 | Manual per-model | From API token usage + config |
-| **Doubleword** | `config_models_doubleword.py` | 12 extraction models | **Auto-synced** from Doubleword docs on each `extractor.py` run | Batch metadata + tokens + config |
+| **Doubleword** | `config_models_doubleword.py` | 21 extraction models | **Manual** (auto-sync disabled via `SKIP_DOUBLEWORD_SYNC=1`; identifiers corrected from API) | Batch metadata + tokens + config |
 | **V7 Go** | `config_models_v7.py` | 32 | **Manual** (`price_in` / `price_out`); no sync job | Wall-clock polling; **no tokens** from this API path — cost often **$0** until you set prices |
 
 For provider-level F1 / time / cost aggregates (same formulas as `score.py`), see [README — Key Findings](../README.md#key-findings) and [V7 Go — Timing and cost](../README.md#v7-go--timing-and-cost).
