@@ -134,16 +134,41 @@ Model names use `dw-` prefix in this repo's registry. **21 extraction models** i
 
 > **Important:** Doubleword's docs endpoint lists model identifiers that don't match their batch API (e.g. `DeepSeek/DeepSeek-V4-Pro` in docs but `deepseek-ai/DeepSeek-V4-Pro` at the API). The registry keys above use manually corrected identifiers. Canonical pricing: https://docs.doubleword.ai/batches/model-pricing and https://www.doubleword.ai (may differ — verify both)
 
+**Registry metadata per model** (in `config_models_doubleword.py`):
+
+| Field | Purpose |
+|---|---|
+| `model` | HuggingFace-style identifier (manually corrected to match the batch API) |
+| `intelligence` | Doubleword's benchmark intelligence score (e.g. 54 for Kimi K2.6, 12.8 for Qwen3-14B) |
+| `quantization` | Weight format: `FP8`, `FP4+FP8`, `INT4`, `NVFP4`, or unset |
+| `apis` | Supported API modes: `["batch", "async", "realtime"]` |
+| `params_total` / `params_active` | Total and active parameter count (MoE models differ, e.g. `1.6T` / `49B`) |
+| `thinking_default` | `True` if reasoning/thinking mode is on by default (GLM-5.1, Qwen3.5/3.6 families) |
+| `extra_params` | Default sampling overrides (e.g. `{"temperature": 0.7, "top_p": 0.8}`) |
+| `dottxt` | `True` for dottxt structured generation variants (constrained JSON/grammar outputs) |
+| `ocr` | `True` for OCR models; these receive PDF pages as base64-encoded JPEG images |
+| `ocr_prompt` | Model-specific prompt for OCR extraction (e.g. DeepSeek-OCR-2 uses `<\|grounding\|>Convert the document to markdown.`) |
+| `ocr_max_image_dim` | Max pixel dimension for rendered page images (1540 typical, 1288 for olmOCR) |
+| `description` / `usage_notes` | Human-readable model description and usage guidance |
+
+**Thinking mode** — Models with `thinking_default: True` (GLM-5.1, Qwen3.5-9B, Qwen3.5-4B, Qwen3.5-35B, Qwen3.6-35B, etc.) emit `<think>...</think>` reasoning blocks before their JSON output. The extraction pipeline strips these blocks automatically via `utils.extract_from_triple_backticks`. To disable thinking at the API level: `chat_template_kwargs: {enable_thinking: false}`.
+
+**Dottxt structured generation** — Models with `dottxt: True` (e.g. `dw-qwen3-5-9b-dottxt`, `dw-qwen3-5-35b-a3b-dottxt`, `dw-qwen3-5-397b-a17b-dottxt`) use Doubleword's dottxt backend for constrained JSON/grammar outputs. Pricing is typically 2x the non-dottxt variant.
+
+**OCR model workflow** — Models with `ocr: True` receive PDF pages rendered to JPEG via PyMuPDF (not OCR text). Each page is sent as a base64 `image_url` entry in the OpenAI vision message format. Model-specific prompts and max image dimensions are configured per-model. `ocr_no_system_prompt: True` (LightOnOCR) means no system or user prompt is sent — only the image.
+
 ### 2.7 Tool Calling & Structured Outputs
 
 - Supported via standard OpenAI-compatible `tools` parameter
 - Structured outputs: use `response_format: { type: "json_object" }` or JSON schema
 - Works in realtime and async modes; batch tool calling has caveats (verify in docs)
+- **dottxt** models provide constrained structured generation via grammar-backed outputs (see model catalog above)
 
 ### 2.8 Vision / Multimodal
 
-- Use `dw-vl-235b` for image+text input
+- Multiple models now support multimodal input: `dw-gemma-4-31b-it`, `dw-kimi-k2-6`, `dw-qwen3-5-*`, `dw-qwen3-6-35b-a3b`, `dw-qwen3-vl-*`, and OCR models
 - Pass images as base64 in the messages `content` array (OpenAI vision format)
+- OCR models use a dedicated workflow: PDFs are rendered to JPEG images via PyMuPDF with model-specific max dimensions
 
 ### 2.9 Embeddings
 

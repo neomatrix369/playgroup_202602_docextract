@@ -335,7 +335,7 @@ Prefixed with `dw-`. **21** extraction models, maintained manually (auto-sync di
 | `standard` (11) | `dw-gemma-4-31b-it`, `dw-gpt-oss-20b`, `dw-nemotron-3-super-120b-a12b`, `dw-qwen3-5-35b-a3b`, `dw-qwen3-5-35b-a3b-dottxt`, `dw-qwen3-5-4b`, `dw-qwen3-5-9b`, `dw-qwen3-5-9b-dottxt`, `dw-qwen3-6-35b-a3b`, `dw-qwen3-vl-235b-a22b-instruct`, `dw-qwen3-vl-30b-a3b-instruct` |
 | `premium` (6) | `dw-deepseek-v4-flash`, `dw-deepseek-v4-pro`, `dw-glm-5-1`, `dw-kimi-k2-6`, `dw-qwen3-5-397b-a17b`, `dw-qwen3-5-397b-a17b-dottxt` |
 
-Each model entry includes: model ID (manually corrected from API), `multimodal` flag, supported modalities, context length, and notes.
+Each model entry includes: model ID (manually corrected from API), `multimodal` flag, supported modalities, context length, `intelligence` score, `quantization` (FP8/FP4/INT4/NVFP4), API modes (`batch`/`async`/`realtime`), `params_total`/`params_active`, `thinking_default` (reasoning on by default?), `dottxt` flag (structured generation variant), `ocr` flag with OCR-specific config (`ocr_prompt`, `ocr_max_image_dim`), `description`, and `usage_notes`.
 
 <a id="v7-registry"></a>
 

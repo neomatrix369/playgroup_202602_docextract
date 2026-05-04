@@ -70,6 +70,15 @@ def load_model_meta() -> dict:
             "modalities": cfg.get("modalities", []),
             "ctx":        cfg.get("ctx"),
             "notes":      cfg.get("notes", ""),
+            "intelligence": cfg.get("intelligence"),
+            "quantization": cfg.get("quantization"),
+            "apis":       cfg.get("apis", []),
+            "params_total": cfg.get("params_total"),
+            "params_active": cfg.get("params_active"),
+            "thinking_default": cfg.get("thinking_default"),
+            "dottxt":     cfg.get("dottxt", False),
+            "ocr":        cfg.get("ocr", False),
+            "description": cfg.get("description", ""),
         }
     # TSV filenames use __ where V7 registry keys use / (e.g. v7-go-agent-v2__gpt4-1)
     for short_name, block in list(meta.items()):
@@ -479,7 +488,9 @@ select,button.ctrl{padding:6px 12px;border:1px solid var(--border);border-radius
             <option value="all">All Models</option>
             <option value="active">Functional Only</option>
             <option value="free">Free tier only</option>
+            <option value="budget">≤ Budget</option>
             <option value="ultra-cheap">≤ Ultra-cheap</option>
+            <option value="standard">≤ Standard</option>
             <option value="great-value">≤ Great Value</option>
           </select>
         </label>
@@ -607,7 +618,9 @@ select,button.ctrl{padding:6px 12px;border:1px solid var(--border);border-radius
         <select id="rec-budget" onchange="renderRecommendations()">
           <option value="any">Any cost</option>
           <option value="free">Free only</option>
+          <option value="budget">≤ Budget</option>
           <option value="ultra-cheap">≤ Ultra-cheap</option>
+          <option value="standard">≤ Standard</option>
           <option value="great-value">≤ Great Value</option>
           <option value="premium">All (incl. Premium)</option>
         </select>
@@ -743,22 +756,22 @@ function modelDisplayName(m){
   const p = sharedModelDisplayPrefix()
   return p && m.startsWith(p) ? m.slice(p.length) : m
 }
-const TIER_ORDER = ['free','ultra-cheap','great-value','premium','v7']
+const TIER_ORDER = ['free','budget','ultra-cheap','standard','great-value','premium','v7']
 /** Map raw config tier → stacked-bar bucket (V7 sub-tiers v7-google etc. → v7). */
 function providerChartTierBucket(rawTier){
   const t = String(rawTier||'').replace(/_/g,'-').toLowerCase()
   if(!t || t==='unknown') return 'other'
   if(t==='v7' || t.startsWith('v7-')) return 'v7'
-  if(['free','ultra-cheap','great-value','premium'].includes(t)) return t
+  if(['free','budget','ultra-cheap','standard','great-value','premium'].includes(t)) return t
   return 'other'
 }
 function tierLabel(t){
-  return {'free':'Free','ultra-cheap':'Ultra-cheap','great-value':'Great Value','premium':'Premium','v7':'V7 Go','other':'Other'}[t]||t
+  return {'free':'Free','budget':'Budget','ultra-cheap':'Ultra-cheap','standard':'Standard','great-value':'Great Value','premium':'Premium','v7':'V7 Go','other':'Other'}[t]||t
 }
 function tierBadgeCls(t){
   const k = String(t||'').replace(/_/g,'-').toLowerCase()
   if(k==='v7'||k.startsWith('v7-')) return 'badge-v7'
-  return {'free':'badge-gray','ultra-cheap':'badge-blue','great-value':'badge-green','premium':'badge-yellow','v7':'badge-v7','other':'badge-gray'}[t]||'badge-gray'
+  return {'free':'badge-gray','budget':'badge-blue','ultra-cheap':'badge-blue','standard':'badge-green','great-value':'badge-green','premium':'badge-yellow','v7':'badge-v7','other':'badge-gray'}[k]||'badge-gray'
 }
 function costTierBadge(m){
   const t = RAW.model_meta?.[m]?.tier || 'unknown'
@@ -846,7 +859,7 @@ function rankRows(){
   const sort = document.getElementById('rank-sort').value
   const filter = document.getElementById('rank-filter').value
   const provFilter = document.getElementById('rank-provider')?.value || 'all'
-  const tierBudgets = {'free':['free'],'ultra-cheap':['free','ultra-cheap'],'great-value':['free','ultra-cheap','great-value']}
+  const tierBudgets = {'free':['free'],'budget':['free','budget'],'ultra-cheap':['free','budget','ultra-cheap'],'standard':['free','budget','ultra-cheap','standard'],'great-value':['free','budget','ultra-cheap','standard','great-value']}
   let models = allModels()
   if(filter==='active') models = activeModels()
   else if(tierBudgets[filter]) models = models.filter(m=>tierBudgets[filter].includes(RAW.model_meta?.[m]?.tier))
@@ -1310,7 +1323,7 @@ function renderRecommendations(){
   const usecase = document.getElementById('rec-usecase').value
   const budget  = document.getElementById('rec-budget').value
   const relevantFields = usecase==='all' ? RAW.fields : RAW.field_groups[usecase]
-  const budgetTiers = {'free':['free'],'ultra-cheap':['free','ultra-cheap'],'great-value':['free','ultra-cheap','great-value'],'premium':TIER_ORDER}
+  const budgetTiers = {'free':['free'],'budget':['free','budget'],'ultra-cheap':['free','budget','ultra-cheap'],'standard':['free','budget','ultra-cheap','standard'],'great-value':['free','budget','ultra-cheap','standard','great-value'],'premium':TIER_ORDER}
   const allowed = budget==='any' ? null : budgetTiers[budget]
   const models = activeModels().filter(m=> !allowed || allowed.includes(RAW.model_meta?.[m]?.tier))
 
@@ -1483,8 +1496,8 @@ function renderProviderAnalysis(){
   })
 
   // Tier distribution chart (buckets v7-* sub-tiers into V7; unknown → Other)
-  const tierColors = {'free':'#94a3b8','ultra-cheap':'#3b82f6','great-value':'#10b981','premium':'#f59e0b','v7':'#8b5cf6','other':'#64748b'}
-  const tierLabels = ['free','ultra-cheap','great-value','premium','v7','other']
+  const tierColors = {'free':'#94a3b8','budget':'#60a5fa','ultra-cheap':'#3b82f6','standard':'#34d399','great-value':'#10b981','premium':'#f59e0b','v7':'#8b5cf6','other':'#64748b'}
+  const tierLabels = ['free','budget','ultra-cheap','standard','great-value','premium','v7','other']
   const datasets = tierLabels.map(t=>({
     label: tierLabel(t),
     data: providers.map(p=>{
@@ -1582,7 +1595,8 @@ function renderModelCatalog(){
 
   let html = `<table><thead><tr>
     <th>Model</th><th>Provider</th><th>F1</th><th>Tier</th><th>Modalities</th>
-    <th>Context</th><th>Price (in/out)</th><th>Notes</th>
+    <th>Context</th><th>Params</th><th>IQ</th><th>Quant</th><th>Thinking</th>
+    <th>Price (in/out)</th><th>APIs</th><th>Description</th>
   </tr></thead><tbody>`
   models.forEach(m=>{
     const meta = RAW.model_meta?.[m]||{}
@@ -1591,15 +1605,28 @@ function renderModelCatalog(){
     const ctx = meta.ctx ? (meta.ctx>=1000000 ? (meta.ctx/1000000).toFixed(0)+'M' : (meta.ctx/1000).toFixed(0)+'K') : '—'
     const priceIn = meta.price_in!=null ? '$'+meta.price_in.toFixed(2) : '—'
     const priceOut = meta.price_out!=null ? '$'+meta.price_out.toFixed(2) : '—'
+    const params = meta.params_total ? (meta.params_active ? meta.params_total+' ('+meta.params_active+' active)' : meta.params_total) : '—'
+    const iq = meta.intelligence!=null ? meta.intelligence : '—'
+    const quant = meta.quantization || '—'
+    const thinking = meta.thinking_default===true ? '✓ on' : meta.thinking_default===false ? 'off' : '—'
+    const apis = (meta.apis||[]).join(', ') || '—'
+    const flags = [meta.dottxt?'dottxt':'', meta.ocr?'OCR':''].filter(Boolean).join(' ')
+    const desc = meta.description || ''
+    const descShort = desc.length > 120 ? desc.slice(0,117)+'…' : desc
     html += `<tr>
-      <td><strong>${modelDisplayName(m)}</strong></td>
+      <td><strong>${modelDisplayName(m)}</strong>${flags?' <span class="badge badge-blue" style="font-size:9px">'+flags+'</span>':''}</td>
       <td>${providerBadge(m)}</td>
       <td style="color:${hsl(f1)};font-weight:600">${f1?f1.toFixed(3):'<span style="color:var(--red)">0</span>'}</td>
       <td>${costTierBadge(m)}</td>
       <td style="font-size:11px">${mods||'—'}</td>
       <td style="font-size:12px">${ctx}</td>
+      <td style="font-size:11px">${params}</td>
+      <td style="font-size:12px;font-weight:600;color:var(--accent)">${iq}</td>
+      <td style="font-size:11px">${quant}</td>
+      <td style="font-size:11px">${thinking}</td>
       <td style="font-size:11px">${priceIn} / ${priceOut}</td>
-      <td style="font-size:11px;color:var(--muted);max-width:220px">${meta.notes||''}</td>
+      <td style="font-size:10px">${apis}</td>
+      <td style="font-size:10px;color:var(--muted);max-width:220px" title="${desc}">${descShort}</td>
     </tr>`
   })
   html += '</tbody></table>'
@@ -1630,6 +1657,7 @@ function renderEvolution(){
     {phase:'Registry sync, DW models & OCR batches', commits:'12e2035, fc2cc2b, 932e0e6, f22d316, 464b6e8, 80a0b72, cb71242, 4e8bce3, 4a8b0aa', detail:'Auto-sync Doubleword pricing from the docs site; expanded registry (nine DW models, context fixes); augment-only policy (deprecate, never delete); potentially_deprecated flag; LightOnOCR top_k and extra_params preserved through batch sync/resubmit.', icon:'🔄'},
     {phase:'Playground, docs hub & benchmark stats', commits:'7407385, 42a6ad8, 528b4da, ba04a45, bcb1176, ed91293, 4e1f7e0, 68043cd', detail:'Playground F1 tab evolution and Provider Analysis (catalog, cost efficiency, tier/modality charts). README restructured with audience signposts. Doubleword interactive learning-hub HTML (v4 + agent-oriented deck). README benchmark numbers and regenerated playground data.', icon:'📚'},
     {phase:'V7 Go platform', commits:'5ed9149, 1aae645, bfdab7b, c792daf, 745eeee, 468c4c4, 36858b1', detail:'Third backend: llm_v7.py entities, PDF upload, doc-risk UI; Go Agent v2 registry and template tooling; slug-based field resolution; safe output paths; shortened shared agent__ ids in the UI; v7-go.md and QUICKSTART; scoring and playground aligned with OpenRouter/Doubleword.', icon:'🟣'},
+    {phase:'Doubleword registry expansion & manual corrections', commits:'3f13051, 9070966, d1b3ad1, 1d0ca10', detail:'Expanded Doubleword registry from 12 to 21 models (DeepSeek V4, GLM-5.1, Kimi K2.6, Gemma 4, Qwen3.5/3.6 families). Disabled auto-sync (SKIP_DOUBLEWORD_SYNC=1) because docs model identifiers don\'t match the batch API — all model IDs manually corrected. Added rich metadata: intelligence scores, quantization, API modes, parameter counts, thinking mode defaults, dottxt structured generation, OCR-specific configs. New tiers: budget/standard/premium. Reasoning-model <think> block stripping. Context window truncation. PyMuPDF PDF-to-image rendering for OCR models.', icon:'🔧'},
   ]
 
   let html = '<div style="position:relative;padding-left:28px;border-left:3px solid var(--accent)">'
@@ -1665,7 +1693,7 @@ function renderEvolution(){
       <tr><td style="font-weight:600">Average F1</td><td>${avgF1.toFixed(3)} across ${active.length} functional models</td></tr>
       <tr><td style="font-weight:600">Average exact-match accuracy</td><td>${pct(avgAcc)} across ${active.length} functional models</td></tr>
       <tr><td style="font-weight:600">Scoring</td><td>F1 (semantic: exact for IDs, numeric tolerance for financials, fuzzy for text)</td></tr>
-      <tr><td style="font-weight:600">Model tiers</td><td>Free → Ultra-cheap → Great Value → Premium</td></tr>
+      <tr><td style="font-weight:600">Model tiers</td><td>Free → Budget → Ultra-cheap → Standard → Great Value → Premium</td></tr>
     </table>`
   document.getElementById('evolution-stats').innerHTML = statsHtml
 

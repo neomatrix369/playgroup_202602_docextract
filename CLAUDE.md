@@ -244,4 +244,7 @@ See `docs/v7-go.md` for V7-specific setup details and `QUICKSTART.md` for full e
 - **Short labels in UI**: When all `__`-suffixed models share the same agent prefix, leaderboards and playground show shortened names (e.g., `gpt4-1`), but filenames and CSV stay full-length
 - **OpenRouter tiers** (in `config_models_openrouter.py`): `free`, `ultra_cheap` (<$0.30/M), `great_value` ($0.30–$1.00/M), `premium` (>$1.00/M)
 - **Doubleword tiers** (in `config_models_doubleword.py`): `budget`, `standard`, `premium`; pricing is for 1h batch (24h is 30-50% cheaper via `--completion-window 24h`)
+- **Doubleword config metadata**: Each entry has `intelligence` score, `quantization`, `apis` (batch/async/realtime), `params_total`/`params_active`, `thinking_default`, `dottxt` flag (structured gen), `ocr` flag with `ocr_prompt`/`ocr_max_image_dim`, `description`, and `usage_notes`
+- **Reasoning model handling**: `<think>` blocks from reasoning models (GLM-5.1, Qwen3.5 family) are stripped by `utils.extract_from_triple_backticks` before JSON extraction
+- **OCR models**: Receive PDF pages as base64-encoded JPEG images via PyMuPDF (not OCR text); configured with `ocr: True` and model-specific prompts in the registry
 - **Hardest fields** (even top models struggle): `income_annually_in_british_pounds`, `spending_annually_in_british_pounds`
