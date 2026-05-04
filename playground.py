@@ -46,6 +46,30 @@ FIELD_GROUPS = {
 }
 
 
+_MODEL_ALIASES: dict[str, str] = {
+    "dw-qwen3.5-9b":    "dw-qwen3-5-9b",
+    "dw-qwen3.5-35b":   "dw-qwen3-5-35b-a3b",
+    "dw-qwen3.5-397b":  "dw-qwen3-5-397b-a17b",
+    "dw-qwen3.5-4b":    "dw-qwen3-5-4b",
+    "dw-qwen3-vl-30b":  "dw-qwen3-vl-30b-a3b-instruct",
+    "dw-qwen3-vl-235b": "dw-qwen3-vl-235b-a22b-instruct",
+    "dw-nemotron-120b":  "dw-nemotron-3-super-120b-a12b",
+}
+
+_DEPRECATED_MODELS: dict[str, dict] = {
+    "deepseek-r1-free":     {"tier": "free", "deprecated": True},
+    "gemini-flash-free":    {"tier": "free", "deprecated": True},
+    "gpt-oss-120b-free":    {"tier": "free", "deprecated": True},
+    "llama-3.2-90b-vision": {"tier": "free", "deprecated": True, "multimodal": True},
+    "llama-4-scout-free":   {"tier": "free", "deprecated": True},
+    "pixtral-12b":          {"tier": "free", "deprecated": True, "multimodal": True},
+    "qwen3-vl-30b-free":    {"tier": "free", "deprecated": True, "multimodal": True},
+    "v7-go-agent-v2":       {"tier": "v7-managed", "multimodal": True,
+                             "modalities": ["text", "image"]},
+    "dw-olmocr-2-7b-1025-fp8": {"tier": "budget", "deprecated": True, "ocr": True},
+}
+
+
 def load_model_meta() -> dict:
     """Read tier, pricing and modality info from all model configs."""
     try:
@@ -60,7 +84,6 @@ def load_model_meta() -> dict:
         if not isinstance(cfg, dict):
             continue
         raw_tier = cfg.get("tier", "unknown")
-        # normalise underscore tiers → hyphen for display consistency
         tier = raw_tier.replace("_", "-")
         meta[short_name] = {
             "tier":       tier,
@@ -85,6 +108,27 @@ def load_model_meta() -> dict:
         if short_name.startswith("v7-") and "/" in short_name:
             alias = short_name.replace("/", "__", 1)
             meta.setdefault(alias, block)
+
+    # Renamed models: inherit metadata from the current registry key
+    for old_name, canonical in _MODEL_ALIASES.items():
+        if old_name not in meta and canonical in meta:
+            meta[old_name] = {**meta[canonical], "alias_of": canonical}
+
+    # Deprecated / removed models: provide minimal metadata so they don't show as "unknown"
+    for name, overrides in _DEPRECATED_MODELS.items():
+        if name not in meta:
+            meta[name] = {
+                "tier": overrides.get("tier", "deprecated"),
+                "price_in": overrides.get("price_in"),
+                "price_out": overrides.get("price_out"),
+                "multimodal": overrides.get("multimodal", False),
+                "modalities": overrides.get("modalities", []),
+                "ctx": overrides.get("ctx"),
+                "notes": overrides.get("notes", ""),
+                "deprecated": overrides.get("deprecated", False),
+                "ocr": overrides.get("ocr", False),
+            }
+
     return meta
 
 
@@ -342,6 +386,16 @@ def main():
         log.info("  [{}] {}  {}  {:.1f}%  ({}/{})",
                  provider, f"{model_name:35s}", f"{mm_tag:<6}",
                  scores['accuracy'] * 100, scores['total_correct'], scores['total_expected'])
+
+    # Backfill providers for models in stats/meta but without a TSV file (e.g. failed OCR runs)
+    for name in set(list(extraction_stats) + list(model_meta)):
+        if name not in model_providers:
+            if name.startswith("dw-"):
+                model_providers[name] = "doubleword"
+            elif name.startswith("v7-"):
+                model_providers[name] = "v7"
+            else:
+                model_providers[name] = "openrouter"
 
     # F1/Precision/Recall from score.py (semantic scoring)
     from score import score_all_models as _score_all
