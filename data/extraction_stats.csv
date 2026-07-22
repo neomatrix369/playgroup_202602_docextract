@@ -110,3 +110,4 @@ datetime,provider,model_short_name,model_full_name,tier,multimodal,price_in,pric
 2026-05-04 01:19:46,Doubleword,dw-gemma-4-31b-it,google/gemma-4-31B-it,standard,True,0.07,0.2,256000,11,9,2,1532,187699,1660,0.013471,139.27,0.001225,9,9,9,8,8,9,9,9,584dfa12-279a-4200-bb32-af98a5315074
 2026-05-04 02:15:07,Doubleword,dw-olmocr-2-7b-1025,allenai/olmOCR-2-7B-1025-FP8,budget,True,0.1,0.1,16834,11,1,10,162,68458,1407,0.006986,14.73,0.000635,1,1,1,1,1,0,0,0,ec9c7e42-00c3-44dc-a45e-03041bc41453
 2026-05-04 02:17:09,Doubleword,dw-deepseek-ocr-2,deepseek-ai/DeepSeek-OCR-2,budget,True,0.05,0.05,16834,11,0,11,301,0,0,0.0,27.36,0.0,0,0,0,0,0,0,0,0,7ef09a3d-c3df-48fb-a4dc-aaa9a714c88a
+2026-07-22 13:16:23,Doubleword,dw-lightonocr-2-1b-bbox-soup,lightonai/LightOnOCR-2-1B-bbox-soup,budget,True,0.05,0.05,16384,11,0,11,624,68332,1272,0.00348,56.73,0.000316,0,0,0,0,0,0,0,0,c83b5985-aded-4830-b602-08f15619f253
