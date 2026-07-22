@@ -37,11 +37,10 @@ PRICING_URL = "https://docs.doubleword.ai/inference-api/model-pricing.md"
 CONFIG_PATH = "config_models_doubleword.py"
 
 # DW Batch API — canonical model ID source (OpenAI-compatible /v1/models endpoint)
-DW_BATCH_API_BASE = "https://api.doubleword.ai"
-DW_API_MODELS_ENDPOINT = "/v1/models"
+DW_API_MODELS_URL = "https://api.doubleword.ai/v1/models"
 
-# Model IDs to skip (embedding-only models — not useful for our extraction benchmark)
-SKIP_MODEL_IDS: frozenset[str] = frozenset({"Qwen/Qwen3-Embedding-8B"})
+# Non-inference model types to exclude from the extraction benchmark
+_SKIP_MODEL_SUBSTRINGS = ("embedding", "reranker")
 
 # HuggingFace config.json — fallback source for context window when DW docs omit it
 HF_CONFIG_URL = "https://huggingface.co/{model_id}/resolve/main/config.json"
@@ -78,10 +77,9 @@ def _fetch_api_models(api_key: str) -> list[str] | None:
     This is the authoritative source for correct model IDs — the docs markdown
     page has historically used mismatched identifiers.
     """
-    url = f"{DW_BATCH_API_BASE}{DW_API_MODELS_ENDPOINT}"
     try:
         resp = httpx.get(
-            url,
+            DW_API_MODELS_URL,
             headers={"Authorization": f"Bearer {api_key}"},
             timeout=10,
             follow_redirects=True,
@@ -94,7 +92,10 @@ def _fetch_api_models(api_key: str) -> list[str] | None:
             )
             return None
         data = resp.json()
-        return [m["id"] for m in data.get("data", []) if m["id"] not in SKIP_MODEL_IDS]
+        return [
+            m["id"] for m in data.get("data", [])
+            if not any(s in m["id"].lower() for s in _SKIP_MODEL_SUBSTRINGS)
+        ]
     except Exception as e:
         log.warning("[Sync] Could not fetch DW Batch API model list: {}", e)
         return None
@@ -195,12 +196,10 @@ def _print_diff_report(changes: dict) -> None:
 
     print(f"\n{'═'*60}\n")
 
-    # Save report to data/
-    report_path = f"data/dw_model_diff_{date.today()}.txt"
+    # Save summary to data/ alongside other internal dot-files
+    report_path = f"data/.dw_model_diff_{date.today()}.txt"
     try:
-        import io, sys
         os.makedirs("data", exist_ok=True)
-        # Capture the same output to file
         lines = []
         lines.append(f"DW Model Diff — {date.today()}")
         lines.append(f"API: {changes['api_total']} models   Config: {changes['config_total']} entries")
