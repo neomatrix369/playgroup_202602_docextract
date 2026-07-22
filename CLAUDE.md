@@ -72,6 +72,9 @@ python playground.py
 # Detect models added/removed from DW Batch API vs local config (read-only, no file changes)
 python sync_doubleword_models.py --diff
 
+# Show all models returned by the DW Batch API (raw list, no comparison)
+python sync_doubleword_models.py --probe-api
+
 # Manual Doubleword sync (auto-sync DISABLED via SKIP_DOUBLEWORD_SYNC=1)
 # config_models_doubleword.py contains manual corrections for API model identifiers
 # Doubleword's docs are out of sync with their API — model names corrected manually
