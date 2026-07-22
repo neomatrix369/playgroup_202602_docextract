@@ -902,6 +902,7 @@ async def _retry_failed_rows_doubleword(models_to_retry, completion_window="1h")
                         statuses[model_short_name] = "partial"
                     else:
                         statuses[model_short_name] = "still_failed"
+                    log.info("[Retry][{}] Batch done → https://app.doubleword.ai/batches/{}", model_short_name, batch_id)
                 elif status in ("failed", "expired", "cancelled"):
                     if status == "expired":
                         log.error("[Retry][{}] Batch expired — consider --completion-window 24h",
@@ -921,6 +922,7 @@ async def _retry_failed_rows_doubleword(models_to_retry, completion_window="1h")
                     llm_doubleword.remove_checkpoint_entry(model_short_name)
                     done.append(model_short_name)
                     statuses[model_short_name] = status
+                    log.error("[Retry][{}] Batch {} → https://app.doubleword.ai/batches/{}", model_short_name, status, batch_id)
 
             for m in done:
                 del pending[m]
@@ -1254,6 +1256,7 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
                     done.append(model_short_name)
                     completed_models += 1
                     statuses[model_short_name] = "completed"
+                    log.info("[{}] Batch done → https://app.doubleword.ai/batches/{}", model_short_name, batch_id)
                 elif status in ("failed", "expired", "cancelled"):
                     if status == "expired":
                         log.error("[{}] Batch expired — next run will resubmit; "
@@ -1273,6 +1276,7 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
                     done.append(model_short_name)
                     failed_models += 1
                     statuses[model_short_name] = status
+                    log.error("[{}] Batch {} → https://app.doubleword.ai/batches/{}", model_short_name, status, batch_id)
 
             for m in done:
                 del pending[m]
