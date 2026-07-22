@@ -4,6 +4,11 @@ Uses the agent-friendly markdown endpoint at docs.doubleword.ai (llms.txt enable
 to fetch a clean pricing table instead of scraping HTML. Skips saving when nothing
 has changed. Designed to run at the start of each extractor run.
 
+Also provides detect_changes() and a --diff CLI flag to compare the DW Batch API's
+canonical /v1/models list against our config. The API endpoint returns the correct
+HuggingFace model IDs that the batch API actually accepts — unlike the docs page,
+which has historically used mismatched identifiers.
+
 IMPORTANT — augment-only policy
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Models are NEVER removed from config_models_doubleword.py by this script.
@@ -31,6 +36,13 @@ log = get_logger("sync_dw")
 PRICING_URL = "https://docs.doubleword.ai/inference-api/model-pricing.md"
 CONFIG_PATH = "config_models_doubleword.py"
 
+# DW Batch API — canonical model ID source (OpenAI-compatible /v1/models endpoint)
+DW_BATCH_API_BASE = "https://api.doubleword.ai"
+DW_API_MODELS_ENDPOINT = "/v1/models"
+
+# Model IDs to skip (embedding-only models — not useful for our extraction benchmark)
+SKIP_MODEL_IDS: frozenset[str] = frozenset({"Qwen/Qwen3-Embedding-8B"})
+
 # HuggingFace config.json — fallback source for context window when DW docs omit it
 HF_CONFIG_URL = "https://huggingface.co/{model_id}/resolve/main/config.json"
 CTX_DEFAULT = 262_000  # value used when DW page has no Max Total Tokens
@@ -54,6 +66,158 @@ def _fetch_hf_ctx(model_id: str) -> int | None:
     except Exception:
         pass
     return None
+
+
+def _fetch_api_models(api_key: str) -> list[str] | None:
+    """Fetch canonical model IDs from the DW Batch API /v1/models endpoint.
+
+    Returns a list of HuggingFace-format model IDs that the Batch API actually
+    accepts (excluding embedding models).  Returns None on any failure so callers
+    can fall back gracefully.
+
+    This is the authoritative source for correct model IDs — the docs markdown
+    page has historically used mismatched identifiers.
+    """
+    url = f"{DW_BATCH_API_BASE}{DW_API_MODELS_ENDPOINT}"
+    try:
+        resp = httpx.get(
+            url,
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=10,
+            follow_redirects=True,
+        )
+        if resp.status_code != 200:
+            log.warning(
+                "[Sync] DW API /v1/models returned {} — {}",
+                resp.status_code,
+                resp.text[:200],
+            )
+            return None
+        data = resp.json()
+        return [m["id"] for m in data.get("data", []) if m["id"] not in SKIP_MODEL_IDS]
+    except Exception as e:
+        log.warning("[Sync] Could not fetch DW Batch API model list: {}", e)
+        return None
+
+
+def detect_changes(api_key: str | None = None) -> dict:
+    """Compare the DW Batch API model list against our current config.
+
+    Uses the canonical /v1/models endpoint to find models that are new on DW
+    (not yet in our config) or gone from DW (in our config but no longer in API).
+
+    Returns a dict with keys:
+        new       – list of model IDs present in API but not in config
+        gone      – list of {short_name, model} for IDs in config but not in API
+        unchanged – list of model IDs present in both
+        api_total    – total from API (excluding skipped)
+        config_total – total entries in config
+        error     – error string (only present when API call failed)
+    """
+    if api_key is None:
+        api_key = os.getenv("DOUBLEWORD_API_KEY", "").strip()
+
+    api_model_ids = _fetch_api_models(api_key)
+    if api_model_ids is None:
+        return {"error": "Could not fetch DW API model list — check DOUBLEWORD_API_KEY"}
+
+    existing = _load_existing_models()
+    config_ids = {v["model"] for v in existing.values()}
+
+    api_set = set(api_model_ids)
+    new_ids = sorted(api_set - config_ids)
+    gone_ids = sorted(config_ids - api_set)
+
+    gone = []
+    for model_id in gone_ids:
+        for short_name, entry in existing.items():
+            if entry["model"] == model_id:
+                gone.append({"short_name": short_name, "model": model_id})
+                break
+
+    return {
+        "new": new_ids,
+        "gone": gone,
+        "unchanged": sorted(api_set & config_ids),
+        "api_total": len(api_model_ids),
+        "config_total": len(existing),
+    }
+
+
+def _print_diff_report(changes: dict) -> None:
+    """Print a human-readable diff report from detect_changes() output."""
+    if "error" in changes:
+        log.warning("[Diff] {}", changes["error"])
+        return
+
+    new = changes["new"]
+    gone = changes["gone"]
+    unchanged = changes["unchanged"]
+
+    print(f"\n{'═'*60}")
+    print(f"  DW Model Diff  —  {date.today()}")
+    print(f"  API: {changes['api_total']} models   Config: {changes['config_total']} entries")
+    print(f"{'═'*60}")
+
+    if new:
+        print(f"\n✅  NEW ({len(new)}) — in DW API, not yet in our config:\n")
+        for mid in new:
+            print(f"    + {mid}")
+        print()
+        print("    Stub entries to add to config_models_doubleword.py:")
+        for mid in new:
+            short = _make_short_name(mid)
+            is_vl = "-vl-" in mid.lower()
+            mods = '["text", "image"]' if is_vl else '["text"]'
+            print(f"""
+    "{short}": {{
+        "model":      "{mid}",
+        "multimodal": {is_vl},
+        "modalities": {mods},
+        "tier":       "standard",       # TODO: verify
+        "price_in":   0.00, "price_out": 0.00,  # TODO: fill from pricing page
+        "ctx":        262_000,          # TODO: verify
+        "notes":      "",
+    }},""")
+    else:
+        print("\n✅  No new models.")
+
+    if gone:
+        print(f"\n⚠️   GONE ({len(gone)}) — in our config, not in DW API:\n")
+        for g in gone:
+            print(f"    - {g['short_name']}  ({g['model']})")
+        print("\n    Consider setting  'potentially_deprecated': True  in config.")
+    else:
+        print("\n✅  No models gone.")
+
+    if unchanged:
+        print(f"\n✅  UNCHANGED: {len(unchanged)} models present in both.")
+
+    print(f"\n{'═'*60}\n")
+
+    # Save report to data/
+    report_path = f"data/dw_model_diff_{date.today()}.txt"
+    try:
+        import io, sys
+        os.makedirs("data", exist_ok=True)
+        # Capture the same output to file
+        lines = []
+        lines.append(f"DW Model Diff — {date.today()}")
+        lines.append(f"API: {changes['api_total']} models   Config: {changes['config_total']} entries")
+        if new:
+            lines.append(f"\nNEW ({len(new)}):")
+            for mid in new:
+                lines.append(f"  + {mid}")
+        if gone:
+            lines.append(f"\nGONE ({len(gone)}):")
+            for g in gone:
+                lines.append(f"  - {g['short_name']}  ({g['model']})")
+        lines.append(f"\nUNCHANGED: {len(unchanged)} models")
+        with open(report_path, "w") as f:
+            f.write("\n".join(lines) + "\n")
+        print(f"Report saved to {report_path}")
+    except Exception as e:
+        log.warning("[Diff] Could not save report: {}", e)
 
 
 # Tier classification by combined price (High tier)
@@ -425,6 +589,51 @@ def _generate_config(models):
     return "\n".join(output_lines)
 
 
+def sync_from_api(api_key: str | None = None) -> bool:
+    """Detect model changes by querying the DW Batch API /v1/models endpoint.
+
+    Uses correct API-facing model IDs (unlike the docs markdown).  Safe to run
+    at every extractor startup — read-only, no config writes.
+
+    Logs warnings for new and gone models so the operator sees them immediately.
+    Run  python sync_doubleword_models.py --diff  to get stub entries for new models.
+
+    Returns True if any changes were detected.
+    """
+    if api_key is None:
+        api_key = os.getenv("DOUBLEWORD_API_KEY", "").strip()
+    if not api_key:
+        log.warning("[Sync] DOUBLEWORD_API_KEY not set — skipping API change detection")
+        return False
+
+    log.info("[Sync] Checking DW Batch API for model changes...")
+    changes = detect_changes(api_key)
+    if "error" in changes:
+        log.warning("[Sync] API change detection failed: {}", changes["error"])
+        return False
+
+    new_ids = changes["new"]
+    gone = changes["gone"]
+
+    if not new_ids and not gone:
+        log.info("[Sync] DW model list unchanged ({} models)", changes["api_total"])
+        return False
+
+    if new_ids:
+        log.warning("[Sync] ⚡ {} NEW model(s) on DW not yet in our config:", len(new_ids))
+        for mid in new_ids:
+            log.warning("[Sync]   + {}", mid)
+        log.warning("[Sync] Run:  python sync_doubleword_models.py --diff  for stub entries")
+
+    if gone:
+        log.warning("[Sync] ⚠  {} model(s) no longer in DW API:", len(gone))
+        for g in gone:
+            log.warning("[Sync]   - {}  ({})", g["short_name"], g["model"])
+        log.warning("[Sync] Consider setting 'potentially_deprecated': True in config")
+
+    return True
+
+
 def sync(write=True):
     """Fetch pricing page, merge with existing config, and optionally write.
 
@@ -513,4 +722,39 @@ def sync(write=True):
 
 
 if __name__ == "__main__":
-    sync()
+    import argparse
+    from dotenv import load_dotenv
+    load_dotenv()
+
+    parser = argparse.ArgumentParser(
+        description="Sync Doubleword model config and detect API changes.",
+    )
+    parser.add_argument(
+        "--diff",
+        action="store_true",
+        help="Compare DW Batch API model list against our config and show NEW/GONE/UNCHANGED",
+    )
+    parser.add_argument(
+        "--probe-api",
+        action="store_true",
+        help="Show all models returned by the DW Batch API /v1/models endpoint",
+    )
+    args = parser.parse_args()
+
+    if args.probe_api:
+        api_key = os.getenv("DOUBLEWORD_API_KEY", "").strip()
+        if not api_key:
+            print("DOUBLEWORD_API_KEY not set")
+        else:
+            models = _fetch_api_models(api_key)
+            if models:
+                print(f"DW Batch API /v1/models — {len(models)} models:")
+                for mid in sorted(models):
+                    print(f"  {mid}")
+            else:
+                print("Failed to fetch model list from DW API")
+    elif args.diff:
+        changes = detect_changes()
+        _print_diff_report(changes)
+    else:
+        sync()
