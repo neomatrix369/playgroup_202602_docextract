@@ -902,6 +902,7 @@ async def _retry_failed_rows_doubleword(models_to_retry, completion_window="1h")
                         statuses[model_short_name] = "partial"
                     else:
                         statuses[model_short_name] = "still_failed"
+                    log.info("[Retry][{}] Batch done → https://app.doubleword.ai/batches/{}", model_short_name, batch_id)
                 elif status in ("failed", "expired", "cancelled"):
                     if status == "expired":
                         log.error("[Retry][{}] Batch expired — consider --completion-window 24h",
@@ -921,6 +922,7 @@ async def _retry_failed_rows_doubleword(models_to_retry, completion_window="1h")
                     llm_doubleword.remove_checkpoint_entry(model_short_name)
                     done.append(model_short_name)
                     statuses[model_short_name] = status
+                    log.error("[Retry][{}] Batch {} → https://app.doubleword.ai/batches/{}", model_short_name, status, batch_id)
 
             for m in done:
                 del pending[m]
@@ -1254,6 +1256,7 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
                     done.append(model_short_name)
                     completed_models += 1
                     statuses[model_short_name] = "completed"
+                    log.info("[{}] Batch done → https://app.doubleword.ai/batches/{}", model_short_name, batch_id)
                 elif status in ("failed", "expired", "cancelled"):
                     if status == "expired":
                         log.error("[{}] Batch expired — next run will resubmit; "
@@ -1273,6 +1276,7 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
                     done.append(model_short_name)
                     failed_models += 1
                     statuses[model_short_name] = status
+                    log.error("[{}] Batch {} → https://app.doubleword.ai/batches/{}", model_short_name, status, batch_id)
 
             for m in done:
                 del pending[m]
@@ -1600,19 +1604,27 @@ def _resolve_model(model_short_name):
 
 
 async def main():
-    # Sync Doubleword model pricing before anything else (unless disabled)
+    # Detect DW model changes at startup (skipped for explicit non-DW runs)
+    import sys as _sys
+    _argv = _sys.argv[1:]
+    _explicitly_non_dw = (
+        ("--all-openrouter" in _argv or "--all-v7" in _argv)
+        and "--all-doubleword" not in _argv
+        and not any(a.startswith("dw-") for a in _argv)
+    )
+    import sync_doubleword_models
+    if not _explicitly_non_dw:
+        sync_doubleword_models.sync_from_api()
+
+    # Full pricing sync from docs (disabled by default — docs IDs historically mismatched)
     if not os.getenv("SKIP_DOUBLEWORD_SYNC"):
-        import sync_doubleword_models
         sync_doubleword_models.sync()
-        # Reload the config after sync so we pick up any changes
         import importlib
         import config_models_doubleword as _cfg_dw
         importlib.reload(_cfg_dw)
         global DOUBLEWORD_MODELS, ALL_MODELS
         DOUBLEWORD_MODELS = _cfg_dw.DOUBLEWORD_MODELS
         ALL_MODELS = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS, **V7_MODELS}
-    else:
-        log.info("[Main] Skipping Doubleword auto-sync (SKIP_DOUBLEWORD_SYNC set)")
 
     parser = argparse.ArgumentParser(
         description="Extract charity data via OpenRouter, Doubleword Batch API, or V7 Go agents. "

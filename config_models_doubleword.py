@@ -61,6 +61,21 @@ DOUBLEWORD_MODELS = {
         "description": "GLM-5.1-FP8 is Z.ai next-generation flagship model for agentic engineering, with significantly stronger coding capabilities than GLM-5. State-of-the-art on SWE-Bench Pro.",
         "usage_notes": "Thinking Mode: reasoning enabled by default. To disable: chat_template_kwargs: {enable_thinking: false}. Temp=1.0, TopP=0.95.",
     },
+    "dw-glm-5-2": {
+        "model":      "zai-org/GLM-5.2-FP8",
+        "multimodal": False,
+        "modalities": ["text"],
+        "tier":       "premium",           # TODO: verify price from DW pricing page
+        "price_in":   0.00, "price_out": 0.00,  # TODO: not yet on DW pricing page
+        "ctx":        1048576,
+        "quantization": "FP8",
+        "apis":       ["batch", "async", "realtime"],  # assumed same as GLM-5.1
+        "thinking_default": True,
+        "extra_params": {"temperature": 1.0, "top_p": 0.95},
+        "notes":      "FP8, APIs: Batch/Async/Realtime (assumed — verify pricing)",
+        "description": "GLM-5.2-FP8 is Z.ai's latest flagship with solid 1M-token context, advanced coding with flexible thinking effort levels, and an improved IndexShare MoE architecture (2.9× fewer per-token FLOPs at 1M ctx).",
+        "usage_notes": "⚠️ Price not yet on DW pricing page. Same calling convention as GLM-5.1: Thinking Mode enabled by default. To disable: chat_template_kwargs: {enable_thinking: false}. Temp=1.0, TopP=0.95.",
+    },
     "dw-nemotron-3-super-120b-a12b": {
         "model":      "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4",
         "multimodal": False,
@@ -78,6 +93,22 @@ DOUBLEWORD_MODELS = {
         "description": "NVIDIA Nemotron 3 Super 120B A12B is an open hybrid Mamba-Transformer LatentMoE model with 120B total parameters and 12B active parameters, built for agentic reasoning, coding, planning, and tool use.",
         "usage_notes": "Temp=1.0, TopP=0.95. To enable reasoning: extra_body={chat_template_kwargs: {enable_thinking: true}}. For low-effort reasoning mode add low_effort: true.",
     },
+    "dw-nemotron-3-ultra-550b-a55b": {
+        "model":      "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4",
+        "multimodal": False,
+        "modalities": ["text"],
+        "tier":       "premium",           # TODO: verify price from DW pricing page
+        "price_in":   0.00, "price_out": 0.00,  # TODO: not yet on DW pricing page
+        "ctx":        262144,
+        "quantization": "NVFP4",
+        "apis":       ["batch", "async"],  # assumed same as Nemotron-Super (no realtime)
+        "params_total": "550B", "params_active": "55B",
+        "thinking_default": False,
+        "extra_params": {"temperature": 1.0, "top_p": 0.95},
+        "notes":      "NVFP4, APIs: Batch/Async (assumed — verify pricing)",
+        "description": "NVIDIA Nemotron 3 Ultra 550B A55B: larger Mamba-Transformer LatentMoE variant with 550B total parameters and 55B active parameters, built for advanced agentic reasoning, coding, and planning.",
+        "usage_notes": "⚠️ Price not yet on DW pricing page. Same calling convention as Nemotron-Super: Temp=1.0, TopP=0.95. Thinking opt-in: extra_body={chat_template_kwargs: {enable_thinking: true}}. For low-effort mode add low_effort: true.",
+    },
     "dw-gpt-oss-20b": {
         "model":      "openai/gpt-oss-20b",
         "multimodal": False,
@@ -91,6 +122,19 @@ DOUBLEWORD_MODELS = {
         "thinking_default": False,
         "notes":      "Intelligence: 24.5, APIs: Batch/Async/Realtime",
         "description": "OpenAI gpt-oss-20b — for lower latency, and local or specialized use cases (21B parameters with 3.6B active parameters).",
+    },
+    "dw-gpt-oss-120b": {
+        "model":      "openai/gpt-oss-120b",
+        "multimodal": False,
+        "modalities": ["text"],
+        "tier":       "standard",          # TODO: verify price from DW pricing page
+        "price_in":   0.00, "price_out": 0.00,  # TODO: not yet on DW pricing page
+        "ctx":        131072,
+        "apis":       ["batch", "async", "realtime"],  # assumed same as gpt-oss-20b
+        "thinking_default": False,
+        "notes":      "APIs: Batch/Async/Realtime (assumed — verify pricing)",
+        "description": "OpenAI gpt-oss-120b — larger MoE variant of gpt-oss-20b for higher-capability tasks (120B total parameters).",
+        "usage_notes": "⚠️ Price not yet on DW pricing page. No special params required — same standard calling convention as gpt-oss-20b.",
     },
     "dw-qwen3-14b": {
         "model":      "Qwen/Qwen3-14B-FP8",
@@ -160,6 +204,18 @@ DOUBLEWORD_MODELS = {
         "notes":      "Intelligence: 39, APIs: Batch/Async/Realtime",
         "description": "Gemma 4 31B is Google DeepMind's most capable open model, built for advanced reasoning, coding, and multimodal understanding. 256K context, 140+ languages.",
         "usage_notes": "To enable reasoning: chat_template_kwargs: {enable_thinking: true}. Supports image and video input via image_url and video_url content types.",
+    },
+    "dw-inkling": {
+        "model":      "thinkingmachines/Inkling-NVFP4",
+        "multimodal": True,
+        "modalities": ["text", "image"],   # also supports audio — not used in this benchmark
+        "tier":       "standard",          # TODO: verify price from DW pricing page
+        "price_in":   0.00, "price_out": 0.00,  # TODO: not yet on DW pricing page
+        "ctx":        262_000,             # TODO: verify — not in HF config
+        "thinking_default": False,         # TODO: verify — model has <|content_thinking|> token
+        "notes":      "MoE, APIs: unknown (verify pricing page)",
+        "description": "Inkling (NVFP4) by Thinking Machines: general-purpose multimodal MoE model accepting text, image, and audio inputs. Designed for agentic systems, coding, RAG, and conversational tasks.",
+        "usage_notes": "⚠️ Price, context window, and API availability not yet confirmed on DW pricing page. Has reasoning capability via <|content_thinking|> token — verify if on by default. Audio input supported but not used in this benchmark. Verify API call format before running evals.",
     },
     "dw-qwen3-5-9b": {
         "model":      "Qwen/Qwen3.5-9B",

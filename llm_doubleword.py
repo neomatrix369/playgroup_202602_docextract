@@ -320,6 +320,7 @@ async def submit_batch(
     )
     logger.info("Submitted batch {} for {} ({} rows)",
                 batch_response.id, model_short_name, len(rows))
+    logger.info("  → Track progress: https://app.doubleword.ai/batches/{}", batch_response.id)
 
     cp = load_checkpoint()
     cp[model_short_name] = {

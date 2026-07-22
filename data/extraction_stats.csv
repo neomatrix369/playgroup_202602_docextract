@@ -110,3 +110,8 @@ datetime,provider,model_short_name,model_full_name,tier,multimodal,price_in,pric
 2026-05-04 01:19:46,Doubleword,dw-gemma-4-31b-it,google/gemma-4-31B-it,standard,True,0.07,0.2,256000,11,9,2,1532,187699,1660,0.013471,139.27,0.001225,9,9,9,8,8,9,9,9,584dfa12-279a-4200-bb32-af98a5315074
 2026-05-04 02:15:07,Doubleword,dw-olmocr-2-7b-1025,allenai/olmOCR-2-7B-1025-FP8,budget,True,0.1,0.1,16834,11,1,10,162,68458,1407,0.006986,14.73,0.000635,1,1,1,1,1,0,0,0,ec9c7e42-00c3-44dc-a45e-03041bc41453
 2026-05-04 02:17:09,Doubleword,dw-deepseek-ocr-2,deepseek-ai/DeepSeek-OCR-2,budget,True,0.05,0.05,16834,11,0,11,301,0,0,0.0,27.36,0.0,0,0,0,0,0,0,0,0,7ef09a3d-c3df-48fb-a4dc-aaa9a714c88a
+2026-07-22 13:16:23,Doubleword,dw-lightonocr-2-1b-bbox-soup,lightonai/LightOnOCR-2-1B-bbox-soup,budget,True,0.05,0.05,16384,11,0,11,624,68332,1272,0.00348,56.73,0.000316,0,0,0,0,0,0,0,0,c83b5985-aded-4830-b602-08f15619f253
+2026-07-22 14:45:01,Doubleword,dw-nemotron-3-ultra-550b-a55b,nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4,premium,False,0.0,0.0,262144,11,11,0,691,181119,26412,0.0,62.82,0.0,11,11,11,8,8,10,11,11,1461efe0-91ea-40e2-ab06-d14f77a74a4a
+2026-07-22 14:45:01,Doubleword,dw-gpt-oss-120b,openai/gpt-oss-120b,standard,False,0.0,0.0,131072,11,11,0,569,157898,8531,0.0,51.73,0.0,11,11,11,7,6,10,10,10,a5b93690-1ebf-4fde-a268-09c453b349bf
+2026-07-22 15:17:25,Doubleword,dw-inkling,thinkingmachines/Inkling-NVFP4,standard,True,0.0,0.0,262000,11,11,0,2721,157282,22562,0.0,247.36,0.0,11,11,11,8,8,10,11,11,46ca6305-7461-4f09-b085-7dc565512903
+2026-07-22 15:23:00,Doubleword,dw-glm-5-2,zai-org/GLM-5.2-FP8,premium,False,0.0,0.0,1048576,11,11,0,3053,162631,8628,0.0,277.55,0.0,11,11,11,9,9,10,11,11,201fbe7a-5089-4a7c-b828-e00b4378e8ee

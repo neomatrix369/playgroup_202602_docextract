@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a **multi-model LLM benchmark** that extracts structured fields from UK charity financial PDFs. It compares dozens of models across three backends:
 - **OpenRouter** (~33 models, sync)
-- **Doubleword Batch API** (21 models, async with checkpoints)
+- **Doubleword Batch API** (25 models, async with checkpoints)
 - **V7 Go** (32 models, async entity API with checkpoints)
 
 The benchmark scores each model using F1/Precision/Recall and generates an interactive HTML playground for analysis.
@@ -69,6 +69,12 @@ python playground.py
 
 ### Syncing configs
 ```bash
+# Detect models added/removed from DW Batch API vs local config (read-only, no file changes)
+python sync_doubleword_models.py --diff
+
+# Show all models returned by the DW Batch API (raw list, no comparison)
+python sync_doubleword_models.py --probe-api
+
 # Manual Doubleword sync (auto-sync DISABLED via SKIP_DOUBLEWORD_SYNC=1)
 # config_models_doubleword.py contains manual corrections for API model identifiers
 # Doubleword's docs are out of sync with their API — model names corrected manually
@@ -194,7 +200,7 @@ Per-document F1 is computed from field-level TP/FP/FN, then averaged across all 
 | `score.py` | F1/Precision/Recall scorer with field-level similarity. No args → leaderboard; pass filename → verbose diff |
 | `playground.py` | Generates `which-models-extracted-playground.html` from `data/` |
 | `config_models_*.py` | Model registries (OpenRouter manual, Doubleword manually corrected, V7 manual) |
-| `sync_doubleword_models.py` | Sync Doubleword pricing from docs endpoint (disabled by default via `SKIP_DOUBLEWORD_SYNC=1`) |
+| `sync_doubleword_models.py` | Sync Doubleword pricing from docs endpoint (disabled by default via `SKIP_DOUBLEWORD_SYNC=1`). Run with `--diff` to detect models added/removed from the DW Batch API vs local config. |
 | `sync_v7_go_agent_template.py` | Refresh `v7_go_agent_v2_template.json` from V7 API after UI property changes |
 | `utils.py` | Shared helpers: `get_logger`, `extract_from_triple_backticks` (strips `<think>` blocks from reasoning models), `sanitize_error_message` |
 | `v7_go_ensure.py` | V7 Go configuration validation utilities |
