@@ -115,3 +115,5 @@ datetime,provider,model_short_name,model_full_name,tier,multimodal,price_in,pric
 2026-07-22 14:45:01,Doubleword,dw-gpt-oss-120b,openai/gpt-oss-120b,standard,False,0.0,0.0,131072,11,11,0,569,157898,8531,0.0,51.73,0.0,11,11,11,7,6,10,10,10,a5b93690-1ebf-4fde-a268-09c453b349bf
 2026-07-22 15:17:25,Doubleword,dw-inkling,thinkingmachines/Inkling-NVFP4,standard,True,0.0,0.0,262000,11,11,0,2721,157282,22562,0.0,247.36,0.0,11,11,11,8,8,10,11,11,46ca6305-7461-4f09-b085-7dc565512903
 2026-07-22 15:23:00,Doubleword,dw-glm-5-2,zai-org/GLM-5.2-FP8,premium,False,0.0,0.0,1048576,11,11,0,3053,162631,8628,0.0,277.55,0.0,11,11,11,9,9,10,11,11,201fbe7a-5089-4a7c-b828-e00b4378e8ee
+2026-07-29 13:43:21,Doubleword,dw-kimi-k3,moonshotai/kimi-k3,standard,False,0.0,0.0,262000,11,11,0,81,160488,8197,0.0,7.36,0.0,11,11,11,9,9,10,11,11,8c6fc885-a472-45b6-9a72-5dd5b2479e81
+2026-07-29 13:45:53,Doubleword,dw-gemma-4-26b-a4b-it,google/gemma-4-26B-A4B-it,standard,False,0.0,0.0,262000,11,11,0,235,187699,1706,0.0,21.36,0.0,11,11,11,10,10,10,11,11,a03799cf-8e15-48ec-81f5-d6e74c7b7fd4
