@@ -422,4 +422,29 @@ DOUBLEWORD_MODELS = {
         "description": "olmOCR-2-7B: Ai2 FP8 OCR model fine-tuned from Qwen2.5-VL-7B-Instruct, with GRPO RL training for math equations, tables, and tricky OCR.",
         "usage_notes": "Requires text prompt alongside image. Default prompt: 'Attached is one page of a document... return plain text... Convert equations to LaTeX and tables to HTML.' Image longest dimension: 1288px.",
     },
+    # ═══════════════════════════════════════════════════════════
+    #  AUTO-ADDED 2026-07-29 — prices/tier/ctx need review
+    # ═══════════════════════════════════════════════════════════
+
+    "dw-gemma-4-26b-a4b-it": {
+        "model":      "google/gemma-4-26B-A4B-it",
+        "multimodal": False,
+        "modalities": ["text"],
+        "tier":       "standard",       # TODO: verify
+        "price_in":   0.00, "price_out": 0.00,  # TODO: fill from pricing page
+        "ctx":        262_000,
+        "notes":      "",
+        "auto_added": True,
+    },
+    "dw-kimi-k3": {
+        "model":      "moonshotai/kimi-k3",
+        "multimodal": False,
+        "modalities": ["text"],
+        "tier":       "standard",       # TODO: verify
+        "price_in":   0.00, "price_out": 0.00,  # TODO: fill from pricing page
+        "ctx":        262_000,
+        "notes":      "",
+        "auto_added": True,
+    },
+
 }

@@ -588,14 +588,101 @@ def _generate_config(models):
     return "\n".join(output_lines)
 
 
-def sync_from_api(api_key: str | None = None) -> bool:
+def _auto_add_new_models(new_ids: list[str]) -> int:
+    """Append minimal stub entries for new DW API models to CONFIG_PATH.
+
+    Uses API-accurate model IDs (correct HuggingFace format).  Stubs are marked
+    auto_added=True so they're easy to find for pricing/tier review later.
+    Skips any short_name that already exists in the config (collision guard).
+
+    Returns the number of entries actually written.
+    """
+    if not new_ids:
+        return 0
+
+    existing = _load_existing_models()
+    existing_short_names = set(existing.keys())
+
+    stubs = []
+    for mid in new_ids:
+        short = _make_short_name(mid)
+        if short in existing_short_names:
+            log.warning("[Sync] Auto-add: '{}' already exists in config, skipping", short)
+            continue
+
+        is_vl = "-vl-" in mid.lower() or "/vl-" in mid.lower()
+        mods = ["text", "image"] if is_vl else ["text"]
+        ctx = _fetch_hf_ctx(mid) or CTX_DEFAULT
+
+        stubs.append({
+            "short_name": short,
+            "model": mid,
+            "multimodal": is_vl,
+            "modalities": mods,
+            "tier": "standard",
+            "price_in": 0.00,
+            "price_out": 0.00,
+            "ctx": ctx,
+            "notes": "",
+            "auto_added": True,
+        })
+
+    if not stubs:
+        return 0
+
+    # Read current config and insert stubs before the closing `}`
+    with open(CONFIG_PATH, "r") as f:
+        content = f.read()
+
+    stub_lines = [
+        "",
+        "    # ═══════════════════════════════════════════════════════════",
+        f"    #  AUTO-ADDED {date.today()} — prices/tier/ctx need review",
+        "    # ═══════════════════════════════════════════════════════════",
+        "",
+    ]
+    for s in stubs:
+        mods_str = "[" + ", ".join(f'"{x}"' for x in s["modalities"]) + "]"
+        stub_lines += [
+            f'    "{s["short_name"]}": {{',
+            f'        "model":      "{s["model"]}",',
+            f'        "multimodal": {s["multimodal"]},',
+            f'        "modalities": {mods_str},',
+            f'        "tier":       "{s["tier"]}",       # TODO: verify',
+            f'        "price_in":   {s["price_in"]:.2f}, "price_out": {s["price_out"]:.2f},  # TODO: fill from pricing page',
+            f'        "ctx":        {s["ctx"]:_},',
+            f'        "notes":      "",',
+            f'        "auto_added": True,',
+            f'    }},',
+        ]
+
+    insert_block = "\n".join(stub_lines) + "\n"
+    # Insert before the final closing brace
+    closing = content.rfind("\n}")
+    if closing == -1:
+        log.warning("[Sync] Auto-add: could not find closing '}}' in config — aborting write")
+        return 0
+
+    new_content = content[:closing] + insert_block + content[closing:]
+    with open(CONFIG_PATH, "w") as f:
+        f.write(new_content)
+
+    for s in stubs:
+        log.info("[Sync] Auto-added stub: {}  ({})", s["short_name"], s["model"])
+
+    return len(stubs)
+
+
+def sync_from_api(api_key: str | None = None, write: bool = False) -> bool:
     """Detect model changes by querying the DW Batch API /v1/models endpoint.
 
-    Uses correct API-facing model IDs (unlike the docs markdown).  Safe to run
-    at every extractor startup — read-only, no config writes.
+    Uses correct API-facing model IDs (unlike the docs markdown).
 
-    Logs warnings for new and gone models so the operator sees them immediately.
-    Run  python sync_doubleword_models.py --diff  to get stub entries for new models.
+    When write=True, new models are automatically appended to config_models_doubleword.py
+    as minimal stubs (price/tier marked TODO) so extractor runs pick them up immediately.
+    Stubs are marked auto_added=True for easy identification and later review.
+
+    Logs warnings for gone models regardless of write mode.
 
     Returns True if any changes were detected.
     """
@@ -622,7 +709,15 @@ def sync_from_api(api_key: str | None = None) -> bool:
         log.warning("[Sync] ⚡ {} NEW model(s) on DW not yet in our config:", len(new_ids))
         for mid in new_ids:
             log.warning("[Sync]   + {}", mid)
-        log.warning("[Sync] Run:  python sync_doubleword_models.py --diff  for stub entries")
+        if write:
+            added = _auto_add_new_models(new_ids)
+            if added:
+                log.warning(
+                    "[Sync] Auto-added {} stub(s) to {} — review price/tier/ctx before scoring",
+                    added, CONFIG_PATH,
+                )
+        else:
+            log.warning("[Sync] Run:  python sync_doubleword_models.py --diff  for stub entries")
 
     if gone:
         log.warning("[Sync] ⚠  {} model(s) no longer in DW API:", len(gone))

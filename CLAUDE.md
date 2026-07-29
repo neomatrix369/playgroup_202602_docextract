@@ -69,7 +69,8 @@ python playground.py
 
 ### Syncing configs
 ```bash
-# Detect models added/removed from DW Batch API vs local config (read-only, no file changes)
+# Dry-run: show models added/removed from DW Batch API vs local config (read-only, no file changes)
+# Note: extractor.py auto-adds new models as stubs at startup — --diff is for manual inspection only
 python sync_doubleword_models.py --diff
 
 # Show all models returned by the DW Batch API (raw list, no comparison)
@@ -103,14 +104,12 @@ All backends share a common interface in `extractor.py` but have different execu
 | File | Backend | Auto-sync? | Model Count |
 |------|---------|------------|-------------|
 | `config_models_openrouter.py` | OpenRouter | ❌ Manual | ~33 |
-| `config_models_doubleword.py` | Doubleword | ❌ **Manual override** | 21 |
+| `config_models_doubleword.py` | Doubleword | ⚠️ **Partial** (new-model stubs auto-added; pricing manual) | 21 |
 | `config_models_v7.py` | V7 Go | ❌ Manual | 32 |
 
-**Doubleword auto-sync is DISABLED** (`SKIP_DOUBLEWORD_SYNC=1`) because:
-- Doubleword's docs endpoint lists model identifiers that don't match their batch API
-- `config_models_doubleword.py` contains **manual corrections** to use actual working identifiers
-- Example: docs show `DeepSeek/DeepSeek-V4-Pro` but API expects `deepseek-ai/DeepSeek-V4-Pro`
-- To re-enable auto-sync: remove `SKIP_DOUBLEWORD_SYNC` from `.env` (will overwrite manual edits)
+**Doubleword sync — two independent mechanisms:**
+- **New-model detection** (always on for DW runs): `extractor.py` queries the DW Batch API `/v1/models` at startup. Any model not yet in `config_models_doubleword.py` is auto-appended as a stub (`auto_added: True`, price `0.00`, tier `standard`). Review price/tier/ctx after the run.
+- **Full docs pricing sync** (`SKIP_DOUBLEWORD_SYNC=1`, **disabled** by default): rewrites `config_models_doubleword.py` from the docs markdown endpoint — disabled because docs identifiers don't match the batch API. `config_models_doubleword.py` contains **manual corrections** (e.g. docs show `DeepSeek/DeepSeek-V4-Pro`; API expects `deepseek-ai/DeepSeek-V4-Pro`). To re-enable, remove `SKIP_DOUBLEWORD_SYNC` from `.env` (will overwrite manual edits).
 
 **V7 Go pricing** (`price_in`/`price_out`) is manual — costs often show as `$0` in stats until set.
 
@@ -193,14 +192,14 @@ Per-document F1 is computed from field-level TP/FP/FN, then averaged across all 
 
 | File | Purpose |
 |------|---------|
-| `extractor.py` | Unified orchestrator: auto-detects backend, handles checkpoints (Doubleword auto-sync disabled by default) |
+| `extractor.py` | Unified orchestrator: auto-detects backend, handles checkpoints. Auto-adds new DW models as stubs at startup; full docs pricing sync still disabled by default. |
 | `llm_openrouter.py` | OpenRouter HTTP client (sync per-row) |
 | `llm_doubleword.py` | Doubleword Batch API client (async batch: submit → poll → download) |
 | `llm_v7.py` | V7 Go entity API client (async: create entity per row or Go Agent v2 flow with PDF upload) |
 | `score.py` | F1/Precision/Recall scorer with field-level similarity. No args → leaderboard; pass filename → verbose diff |
 | `playground.py` | Generates `which-models-extracted-playground.html` from `data/` |
 | `config_models_*.py` | Model registries (OpenRouter manual, Doubleword manually corrected, V7 manual) |
-| `sync_doubleword_models.py` | Sync Doubleword pricing from docs endpoint (disabled by default via `SKIP_DOUBLEWORD_SYNC=1`). Run with `--diff` to detect models added/removed from the DW Batch API vs local config. |
+| `sync_doubleword_models.py` | Sync Doubleword pricing from docs endpoint (disabled by default via `SKIP_DOUBLEWORD_SYNC=1`). At extractor startup, `sync_from_api(write=True)` auto-appends stubs for new API models. Run with `--diff` for a dry-run report; `--probe-api` to dump the raw API model list. |
 | `sync_v7_go_agent_template.py` | Refresh `v7_go_agent_v2_template.json` from V7 API after UI property changes |
 | `utils.py` | Shared helpers: `get_logger`, `extract_from_triple_backticks` (strips `<think>` blocks from reasoning models), `sanitize_error_message` |
 | `v7_go_ensure.py` | V7 Go configuration validation utilities |

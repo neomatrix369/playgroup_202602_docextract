@@ -1604,6 +1604,7 @@ def _resolve_model(model_short_name):
 
 
 async def main():
+    global DOUBLEWORD_MODELS, ALL_MODELS
     # Detect DW model changes at startup (skipped for explicit non-DW runs)
     import sys as _sys
     _argv = _sys.argv[1:]
@@ -1614,7 +1615,13 @@ async def main():
     )
     import sync_doubleword_models
     if not _explicitly_non_dw:
-        sync_doubleword_models.sync_from_api()
+        changed = sync_doubleword_models.sync_from_api(write=True)
+        if changed:
+            import importlib
+            import config_models_doubleword as _cfg_dw
+            importlib.reload(_cfg_dw)
+            DOUBLEWORD_MODELS = _cfg_dw.DOUBLEWORD_MODELS
+            ALL_MODELS = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS, **V7_MODELS}
 
     # Full pricing sync from docs (disabled by default — docs IDs historically mismatched)
     if not os.getenv("SKIP_DOUBLEWORD_SYNC"):
@@ -1622,7 +1629,6 @@ async def main():
         import importlib
         import config_models_doubleword as _cfg_dw
         importlib.reload(_cfg_dw)
-        global DOUBLEWORD_MODELS, ALL_MODELS
         DOUBLEWORD_MODELS = _cfg_dw.DOUBLEWORD_MODELS
         ALL_MODELS = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS, **V7_MODELS}
 
