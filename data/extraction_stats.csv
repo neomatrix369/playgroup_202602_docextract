@@ -117,3 +117,5 @@ datetime,provider,model_short_name,model_full_name,tier,multimodal,price_in,pric
 2026-07-22 15:23:00,Doubleword,dw-glm-5-2,zai-org/GLM-5.2-FP8,premium,False,0.0,0.0,1048576,11,11,0,3053,162631,8628,0.0,277.55,0.0,11,11,11,9,9,10,11,11,201fbe7a-5089-4a7c-b828-e00b4378e8ee
 2026-07-29 13:43:21,Doubleword,dw-kimi-k3,moonshotai/kimi-k3,standard,False,0.0,0.0,262000,11,11,0,81,160488,8197,0.0,7.36,0.0,11,11,11,9,9,10,11,11,8c6fc885-a472-45b6-9a72-5dd5b2479e81
 2026-07-29 13:45:53,Doubleword,dw-gemma-4-26b-a4b-it,google/gemma-4-26B-A4B-it,standard,False,0.0,0.0,262000,11,11,0,235,187699,1706,0.0,21.36,0.0,11,11,11,10,10,10,11,11,a03799cf-8e15-48ec-81f5-d6e74c7b7fd4
+2026-08-09 01:29:48,Doubleword,dw-deepseek-v4-flash-0731,deepseek-ai/DeepSeek-V4-Flash-0731,standard,False,0.0,0.0,1048000,11,11,0,21,159835,1248,0.0,1.91,0.0,11,11,11,9,9,10,10,10,f1f87750-4bf1-41b8-9845-63f2ef0b637d
+2026-08-09 01:48:48,Doubleword,dw-hy3-fp8,tencent/Hy3-FP8,standard,False,0.0,0.0,262000,11,11,0,1155,161841,33860,0.0,105.0,0.0,11,11,11,8,8,10,11,11,048d8882-4fd0-4cf8-a903-066099251be5

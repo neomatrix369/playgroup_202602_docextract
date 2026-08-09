@@ -447,4 +447,29 @@ DOUBLEWORD_MODELS = {
         "auto_added": True,
     },
 
+    # ═══════════════════════════════════════════════════════════
+    #  AUTO-ADDED 2026-08-09 — prices/tier/ctx need review
+    # ═══════════════════════════════════════════════════════════
+
+    "dw-deepseek-v4-flash-0731": {
+        "model":      "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "multimodal": False,
+        "modalities": ["text"],
+        "tier":       "standard",       # TODO: verify
+        "price_in":   0.00, "price_out": 0.00,  # TODO: fill from pricing page
+        "ctx":        1_048_000,
+        "notes":      "",
+        "auto_added": True,
+    },
+    "dw-hy3-fp8": {
+        "model":      "tencent/Hy3-FP8",
+        "multimodal": False,
+        "modalities": ["text"],
+        "tier":       "standard",       # TODO: verify
+        "price_in":   0.00, "price_out": 0.00,  # TODO: fill from pricing page
+        "ctx":        262_000,
+        "notes":      "",
+        "auto_added": True,
+    },
+
 }
