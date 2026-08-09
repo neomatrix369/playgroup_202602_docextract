@@ -10,7 +10,8 @@ data/.v7_checkpoints.json
 data/.v7_failed_rows.json
 data/.v7_unavailable_models.json
 
-.claude/
+.claude/*
+!.claude/skills/
 .playwright-mcp/
 
 DW_FB.md
