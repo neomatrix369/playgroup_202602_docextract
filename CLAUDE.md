@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a **multi-model LLM benchmark** that extracts structured fields from UK charity financial PDFs. It compares dozens of models across three backends:
 - **OpenRouter** (~33 models, sync)
-- **Doubleword Batch API** (25 models, async with checkpoints)
+- **Doubleword Batch API** (29 models, async with checkpoints)
 - **V7 Go** (32 models, async entity API with checkpoints)
 
 The benchmark scores each model using F1/Precision/Recall and generates an interactive HTML playground for analysis.
@@ -104,7 +104,7 @@ All backends share a common interface in `extractor.py` but have different execu
 | File | Backend | Auto-sync? | Model Count |
 |------|---------|------------|-------------|
 | `config_models_openrouter.py` | OpenRouter | ❌ Manual | ~33 |
-| `config_models_doubleword.py` | Doubleword | ⚠️ **Partial** (new-model stubs auto-added; pricing manual) | 21 |
+| `config_models_doubleword.py` | Doubleword | ⚠️ **Partial** (new-model stubs auto-added; pricing manual) | 29 |
 | `config_models_v7.py` | V7 Go | ❌ Manual | 32 |
 
 **Doubleword sync — two independent mechanisms:**
