@@ -65,6 +65,16 @@ python score.py data/playgroup_dev_extracted__v7__v7-go-agent-v2__claude-sonnet.
 
 # Regenerate interactive playground HTML
 python playground.py
+
+# After regenerate: verify tab numbers vs CSV/TSV and table↔chart sync
+# (mandatory for agents — see /docextract-workflow → Playground Data Integrity Gate)
+# Detailed checklist: .claude/skills/docextract-workflow/playground-integrity.md
+```
+
+### Project workflow skill
+```bash
+# Session orientation + cadence (extract → score → playground → integrity gate → docs)
+# Invoke in Claude Code / Cursor as: /docextract-workflow
 ```
 
 ### Syncing configs
@@ -136,8 +146,22 @@ score.py  (computes F1/Precision/Recall)
     ↓
 playground.py  (generates interactive HTML)
     ↓
-which-models-extracted-playground.html  (8 tabs: Rankings, Heatmap, Errors, etc.)
+which-models-extracted-playground.html  (8 tabs)
+    ↓
+/docextract-workflow Playground Data Integrity Gate
+  (numbers match CSV/TSV; tables ↔ charts in sync — then docs/commit)
 ```
+
+### Scoring views in the playground
+
+The playground embeds **two** views (do not equate them):
+
+| View | Source | Tabs |
+|------|--------|------|
+| **Semantic F1** | `score.py` (exact IDs/dates, 0.5% numeric tolerance, fuzzy text) | Rankings, Provider Analysis |
+| **Exact-match** | Strict string equality vs `playgroup_dev_expected.tsv` | Field Heatmap, Document Analysis, Errors, Deep Dive |
+
+Time/cost come from `data/extraction_stats.csv`. Shared row builders (`rankRows`, `errorBreakdownRows`, `providerAggRows`, …) keep each tab’s table and chart on the same data. After `python playground.py`, run the integrity gate in `/docextract-workflow` (checklist: `.claude/skills/docextract-workflow/playground-integrity.md`).
 
 ### Checkpoint and Resume
 
@@ -197,7 +221,8 @@ Per-document F1 is computed from field-level TP/FP/FN, then averaged across all 
 | `llm_doubleword.py` | Doubleword Batch API client (async batch: submit → poll → download) |
 | `llm_v7.py` | V7 Go entity API client (async: create entity per row or Go Agent v2 flow with PDF upload) |
 | `score.py` | F1/Precision/Recall scorer with field-level similarity. No args → leaderboard; pass filename → verbose diff |
-| `playground.py` | Generates `which-models-extracted-playground.html` from `data/` |
+| `playground.py` | Generates `which-models-extracted-playground.html` from `data/`. Paired table/chart views per tab; F1 + exact-match dual scoring. After regenerate, agents must run `/docextract-workflow` Playground Data Integrity Gate. |
+| `.claude/skills/docextract-workflow/` | Project workflow skill (`/docextract-workflow`): stage detection, cadence, and playground integrity checklist (`playground-integrity.md`). |
 | `config_models_*.py` | Model registries (OpenRouter manual, Doubleword manually corrected, V7 manual) |
 | `sync_doubleword_models.py` | Sync Doubleword pricing from docs endpoint (disabled by default via `SKIP_DOUBLEWORD_SYNC=1`). At extractor startup, `sync_from_api(write=True)` auto-appends stubs for new API models. Run with `--diff` for a dry-run report; `--probe-api` to dump the raw API model list. |
 | `sync_v7_go_agent_template.py` | Refresh `v7_go_agent_v2_template.json` from V7 API after UI property changes |
@@ -246,6 +271,7 @@ See `docs/v7-go.md` for V7-specific setup details and `QUICKSTART.md` for full e
 - **Runs are idempotent**: `extractor.py` skips models whose output files already exist under `data/`
 - **Graceful shutdown**: Ctrl-C during Doubleword or V7 polling preserves checkpoints and resumes on next run
 - **All providers scored together**: `score.py` and `playground.py` automatically include any `data/playgroup_dev_extracted__*.tsv` files regardless of backend
+- **Playground integrity**: After `python playground.py`, numbers in every tab must match `score.py` / `extraction_stats.csv` / TSVs, and tables must stay in sync with charts — enforce via `/docextract-workflow` (do not hand-edit the HTML)
 - **Short labels in UI**: When all `__`-suffixed models share the same agent prefix, leaderboards and playground show shortened names (e.g., `gpt4-1`), but filenames and CSV stay full-length
 - **OpenRouter tiers** (in `config_models_openrouter.py`): `free`, `ultra_cheap` (<$0.30/M), `great_value` ($0.30–$1.00/M), `premium` (>$1.00/M)
 - **Doubleword tiers** (in `config_models_doubleword.py`): `budget`, `standard`, `premium`; pricing is for 1h batch (24h is 30-50% cheaper via `--completion-window 24h`)
