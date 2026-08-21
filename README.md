@@ -47,7 +47,7 @@ Doubleword’s snapshot **average** F1 among active models (0.826) edges OpenRou
 **Takeaways:**
 
 - **Doubleword now holds 8 of the global top 10.** `dw-qwen3.8-27b` ranks 2nd overall (F1=0.943); `dw-qwen3-5-397b-a17b-dottxt` and `dw-kimi-k3` both rank 3rd (F1=0.942); `dw-glm-5-2` (0.935), `dw-hy3-fp8` (0.933), `dw-qwen3-5-35b-a3b-dottxt` (0.930), `dw-qwen3-6-35b-a3b` (0.929), and `dw-inkling` (0.927) round out the DW top-10 contingent. Doubleword’s best models outperform all OpenRouter models except `gemini-3-pro`.
-- **35 of 38 Doubleword models produced usable results.** Standard text LLMs score F1 0.820–0.943. Three OCR-specialist models were benchmarked: `dw-olmocr-2-7b-1025` (F1=0.090), `dw-lightonocr-2-1b-bbox-soup` (F1=0.000), and `dw-deepseek-ocr-2` (F1=0.000 — confirmed pure-OCR model; returns markdown, cannot follow JSON extraction instructions). Three models returned empty/zero-F1 results: `dw-qwen3.5-397b`, `dw-deepseek-ocr-2`, and `dw-lightonocr-2-1b-bbox-soup`.
+- **35 of 38 Doubleword models produced usable results.** Standard text LLMs score F1 0.820–0.943. Three OCR-specialist models were benchmarked: `dw-olmocr-2-7b-1025` (F1=0.090), `dw-lightonocr-2-1b-bbox-soup` (F1=0.000), and `dw-deepseek-ocr-2` (F1=0.000 on the last published run — pure-OCR; returns markdown and ignores JSON instructions). `dw-deepseek-ocr-2` now supports a **two-step OCR→extract** path (`two_step_ocr` + `ocr_extract_model` in `config_models_doubleword.py`); re-run and re-score before treating a new F1 as published. Three models returned empty/zero-F1 results on the 2026-08-21 snapshot: `dw-qwen3.5-397b`, `dw-deepseek-ocr-2`, and `dw-lightonocr-2-1b-bbox-soup`.
 - **Free-tier models universally failed** on this task — all 14 zero-score models are either free-tier or had context/format issues. This includes `llama-3.3-70b-free`, `gemma-3-27b-free`, `gemma-3n-free`, and others.
 - **Precision is consistently high across scoring models** (0.96–0.97), meaning when models extract a field, they're usually correct. The differentiator is recall — whether they find all fields.
 - **The hardest fields** are `income_annually_in_british_pounds` and `spending_annually_in_british_pounds` — even top models miss these on some documents.
@@ -346,7 +346,7 @@ Prefixed with `dw-`. **31** extraction models, maintained manually (auto-sync di
 | `standard` (19) | `dw-deepseek-v4-flash-0731`, `dw-gemma-4-26b-a4b-it`, `dw-gemma-4-31b-it`, `dw-gpt-oss-20b`, `dw-gpt-oss-120b`, `dw-hy3-fp8`, `dw-inkling`, `dw-kimi-k3`, `dw-muse-glimmer-30b`, `dw-nemotron-3-super-120b-a12b`, `dw-qwen3-5-35b-a3b`, `dw-qwen3-5-35b-a3b-dottxt`, `dw-qwen3-5-4b`, `dw-qwen3-5-9b`, `dw-qwen3-5-9b-dottxt`, `dw-qwen3-6-35b-a3b`, `dw-qwen3-vl-235b-a22b-instruct`, `dw-qwen3-vl-30b-a3b-instruct`, `dw-qwen3.8-27b` |
 | `premium` (8) | `dw-deepseek-v4-flash`, `dw-deepseek-v4-pro`, `dw-glm-5-1`, `dw-glm-5-2`, `dw-kimi-k2-6`, `dw-nemotron-3-ultra-550b-a55b`, `dw-qwen3-5-397b-a17b`, `dw-qwen3-5-397b-a17b-dottxt` |
 
-Each model entry includes: model ID (manually corrected from API), `multimodal` flag, supported modalities, context length, `intelligence` score, `quantization` (FP8/FP4/INT4/NVFP4), API modes (`batch`/`async`/`realtime`), `params_total`/`params_active`, `thinking_default` (reasoning on by default?), `dottxt` flag (structured generation variant), `ocr` flag with OCR-specific config (`ocr_prompt`, `ocr_max_image_dim`), `description`, and `usage_notes`.
+Each model entry includes: model ID (manually corrected from API), `multimodal` flag, supported modalities, context length, `intelligence` score, `quantization` (FP8/FP4/INT4/NVFP4), API modes (`batch`/`async`/`realtime`), `params_total`/`params_active`, `thinking_default` (reasoning on by default?), `dottxt` flag (structured generation variant), `ocr` flag with OCR-specific config (`ocr_prompt`, `ocr_max_image_dim`), optional `two_step_ocr` + `ocr_extract_model` (OCR batch then text JSON extraction for pure-OCR models), `description`, and `usage_notes`.
 
 <a id="v7-registry"></a>
 
@@ -401,6 +401,7 @@ To list keys from the shell: `python -c "from config_models_v7 import V7_MODELS;
 | File | Description |
 |---|---|
 | `process_pdf.py` | PDF processing helper |
+| `render_log_scroll.py` | Render a fixed-viewport `tail -f` style MP4 from a dropped log (see `media/log-scrolls/README.md`) |
 | `extract_copy_kleister_charity.sh` | Shell script to copy/prepare data from the full Kleister Charity dataset |
 
 ---
