@@ -9,6 +9,7 @@ dimensions, JPEG quality); Doubleword rejects JSONL lines over 5MB, so payloads
 may adaptively lower quality/scale until under budget.
 """
 
+import asyncio
 import base64
 import io
 import json
