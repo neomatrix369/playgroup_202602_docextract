@@ -261,6 +261,7 @@ DOUBLEWORD_MODELS = {
         "usage_notes": "Thinking Mode: enabled by default. To disable: chat_template_kwargs: {enable_thinking: false}. dottxt structured generation enabled.",
     },
     "dw-qwen3-5-35b-a3b": {
+        "potentially_deprecated": True,
         "model":      "Qwen/Qwen3.5-35B-A3B-FP8",
         "multimodal": True,
         "modalities": ["text","image"],
@@ -375,7 +376,7 @@ DOUBLEWORD_MODELS = {
         "ctx":        16834,
         "apis":       ["batch", "async"],
         "ocr":        True,
-        "ocr_prompt": "<|grounding|>Convert the document to markdown.",
+        "ocr_prompt": "Free OCR.",
         "ocr_max_image_dim": 1540,
         "ocr_max_pages": 10,
         "ocr_jpeg_quality": 75,
@@ -468,6 +469,31 @@ DOUBLEWORD_MODELS = {
         "tier":       "standard",       # TODO: verify
         "price_in":   0.00, "price_out": 0.00,  # TODO: fill from pricing page
         "ctx":        262_000,
+        "notes":      "",
+        "auto_added": True,
+    },
+
+    # ═══════════════════════════════════════════════════════════
+    #  AUTO-ADDED 2026-08-21 — prices/tier/ctx need review
+    # ═══════════════════════════════════════════════════════════
+
+    "dw-qwen3.8-27b": {
+        "model":      "Qwen/Qwen3.8-27B-FP8",
+        "multimodal": False,
+        "modalities": ["text"],
+        "tier":       "standard",       # TODO: verify
+        "price_in":   0.00, "price_out": 0.00,  # TODO: fill from pricing page
+        "ctx":        262_000,          # TODO: verify
+        "notes":      "",
+        "auto_added": True,
+    },
+    "dw-muse-glimmer-30b": {
+        "model":      "meta-models/Muse-Glimmer-30B",
+        "multimodal": False,
+        "modalities": ["text"],
+        "tier":       "standard",       # TODO: verify
+        "price_in":   0.00, "price_out": 0.00,  # TODO: fill from pricing page
+        "ctx":        262_000,          # TODO: verify
         "notes":      "",
         "auto_added": True,
     },
