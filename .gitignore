@@ -5,6 +5,9 @@ brief.md
 .env
 playgroup_email.txt
 
+.coverage
+.test-results/
+
 data/.doubleword_checkpoints.json
 data/.v7_checkpoints.json
 data/.v7_failed_rows.json

@@ -55,6 +55,8 @@ Doubleword’s snapshot **average** F1 among active models (0.795) edges OpenRou
 
 For the full interactive breakdown (field heatmaps, per-document analysis, error patterns, provider comparisons), open the **[Model Extraction Playground](which-models-extracted-playground.html)** locally in a browser. It has 8 tabs: Rankings, Field Heatmap, Document Analysis, Error Breakdown, Deep Dive, Recommendations, Provider Analysis, and Project Evolution.
 
+**Two scoring views in the playground:** Rankings / Provider Analysis use **semantic F1** from `score.py`; Field Heatmap, Document Analysis, Errors, and Deep Dive use **exact-match** vs the expected TSV. F1 can be higher than exact-match when values are close but not identical — that is expected. After regenerating with `python playground.py`, confirm every tab’s numbers match the CSV/TSV sources and that each table stays in sync with its chart (agents: `/docextract-workflow` → Playground Data Integrity Gate).
+
 ### Doubleword Batch API — Timing and Cost
 
 Doubleword batch stats (elapsed time, tokens, cost) were backfilled by querying batch metadata via `batches.list()`. The pipeline now uses API-reported `created_at`/`completed_at` timestamps for accurate elapsed time and stores `batch_id` for traceability. Per-request cost is computed from token counts and config pricing. The only model without stats is `dw-qwen3.5-397b`, which returned empty results.
@@ -319,7 +321,7 @@ python score.py data/playgroup_dev_extracted__v7__v7-go-agent-v2__claude-sonnet.
 | `config_models_openrouter.py` | OpenRouter model registry — 33 models organised by tier. |
 | `config_models_doubleword.py` | Doubleword model registry — 29 extraction models (manually maintained; auto-sync disabled via `SKIP_DOUBLEWORD_SYNC=1`). |
 | `config_models_v7.py` | V7 Go model registry — short names (e.g. `v7-go-agent-v2/claude-sonnet`) mapped to display metadata; agent IDs and field slugs usually come from env (see “V7 Go” above). |
-| `playground.py` | Generates `which-models-extracted-playground.html` from extraction results. Chart/table **labels** use short model names when safe (shared `agent__` prefix); embedded JSON keys stay full ids. |
+| `playground.py` | Generates `which-models-extracted-playground.html` from extraction results. Chart/table **labels** use short model names when safe (shared `agent__` prefix); embedded JSON keys stay full ids. Rankings use F1; heatmaps/errors use exact-match. Tables and charts share one row builder per tab — after regenerate, verify integrity (see `/docextract-workflow`). |
 
 ### Model Tiers
 
@@ -392,7 +394,7 @@ To list keys from the shell: `python -c "from config_models_v7 import V7_MODELS;
 
 | File | Description |
 |---|---|
-| [which-models-extracted-playground.html](which-models-extracted-playground.html) | Interactive leaderboard — open in browser for rankings, field heatmap, document analysis, error breakdown, deep dive, recommendations, provider analysis, and project evolution. Regenerate after scoring with `python playground.py`. |
+| [which-models-extracted-playground.html](which-models-extracted-playground.html) | Interactive leaderboard — open in browser for rankings, field heatmap, document analysis, error breakdown, deep dive, recommendations, provider analysis, and project evolution. Regenerate after scoring with `python playground.py`, then verify tab numbers vs CSV/TSV and table↔chart sync (`/docextract-workflow`). |
 
 ### Utility Scripts (`utility/`)
 
