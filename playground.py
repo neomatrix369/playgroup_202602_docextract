@@ -479,6 +479,8 @@ tr:hover td{background:var(--surface2)}
 .chart-wrap{position:relative;height:340px}
 .chart-wrap-lg{position:relative;height:460px}
 .chart-wrap-sm{position:relative;height:240px}
+.chart-scroll{max-height:70vh;overflow-y:auto;border:1px solid var(--border);border-radius:8px;background:var(--surface)}
+.chart-scroll .chart-wrap{height:auto;min-height:340px}
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px}
 @media(max-width:768px){.two-col{grid-template-columns:1fr}}
 select,button.ctrl{padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:13px;cursor:pointer}
@@ -529,7 +531,7 @@ select,button.ctrl{padding:6px 12px;border:1px solid var(--border);border-radius
       <h2>Model Leaderboard</h2>
       <div class="ctrl-row">
         <label>Sort by:
-          <select id="rank-sort" onchange="renderRankTable()">
+          <select id="rank-sort" onchange="renderRankingsViews()">
             <option value="f1">F1 Score</option>
             <option value="accuracy">Exact-Match Accuracy</option>
             <option value="correct">Correct Extractions</option>
@@ -538,7 +540,7 @@ select,button.ctrl{padding:6px 12px;border:1px solid var(--border);border-radius
           </select>
         </label>
         <label>Filter:
-          <select id="rank-filter" onchange="renderRankTable()">
+          <select id="rank-filter" onchange="renderRankingsViews()">
             <option value="all">All Models</option>
             <option value="active">Functional Only</option>
             <option value="free">Free tier only</option>
@@ -549,16 +551,17 @@ select,button.ctrl{padding:6px 12px;border:1px solid var(--border);border-radius
           </select>
         </label>
         <label>Provider:
-          <select id="rank-provider" onchange="renderRankTable()">
+          <select id="rank-provider" onchange="renderRankingsViews()">
             <option value="all">All Providers</option>
           </select>
         </label>
       </div>
-      <div id="rank-table-wrap" style="overflow-x:auto"></div>
+      <div id="rank-table-wrap" style="overflow-x:auto;max-height:70vh"></div>
     </div>
     <div class="card" style="min-width:0">
       <h2>F1 Score Overview</h2>
-      <div class="chart-wrap"><canvas id="chart-accuracy"></canvas></div>
+      <p id="rank-chart-note" style="font-size:12px;color:var(--muted);margin:-6px 0 10px">Same models, order, and F1 values as the leaderboard (scroll to see all).</p>
+      <div class="chart-scroll"><div class="chart-wrap" id="chart-accuracy-wrap"><canvas id="chart-accuracy"></canvas></div></div>
     </div>
   </div>
   <div class="card">
@@ -580,7 +583,7 @@ select,button.ctrl{padding:6px 12px;border:1px solid var(--border);border-radius
     <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Each cell shows how accurately a model extracted that field across all 11 documents. Click a cell for details.</p>
     <div class="ctrl-row">
       <label>Show:
-        <select id="hm-filter" onchange="renderFieldHeatmap()">
+        <select id="hm-filter" onchange="renderFieldTabViews()">
           <option value="all">All models</option>
           <option value="active">Functional only</option>
         </select>
@@ -591,12 +594,14 @@ select,button.ctrl{padding:6px 12px;border:1px solid var(--border);border-radius
   <div class="two-col">
     <div class="card">
       <h2>Best Model per Field</h2>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Exact-match accuracy among functional models (F1 &gt; 0).</p>
       <div id="best-per-field"></div>
     </div>
     <div class="card">
       <h2>Field Difficulty Ranking</h2>
-      <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Average accuracy across all functional models</p>
-      <div class="chart-wrap-sm"><canvas id="chart-field-diff"></canvas></div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Average exact-match accuracy across functional models — table and chart share the same rows.</p>
+      <div id="field-diff-table" style="overflow-x:auto;margin-bottom:12px"></div>
+      <div class="chart-scroll" style="max-height:320px"><div class="chart-wrap" id="chart-field-diff-wrap"><canvas id="chart-field-diff"></canvas></div></div>
     </div>
   </div>
 </div>
@@ -608,7 +613,7 @@ select,button.ctrl{padding:6px 12px;border:1px solid var(--border);border-radius
     <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Each cell shows accuracy for a specific document/model pair.</p>
     <div class="ctrl-row">
       <label>Models:
-        <select id="doc-hm-filter" onchange="renderDocHeatmap()">
+        <select id="doc-hm-filter" onchange="renderDocTabViews()">
           <option value="active">Functional only</option>
           <option value="all">All</option>
         </select>
@@ -617,21 +622,31 @@ select,button.ctrl{padding:6px 12px;border:1px solid var(--border);border-radius
     <div class="heatmap" id="doc-heatmap"></div>
   </div>
   <div class="card">
-    <h2>Document Difficulty (avg accuracy across functional models)</h2>
-    <div class="chart-wrap-sm"><canvas id="chart-doc-diff"></canvas></div>
+    <h2>Document Difficulty</h2>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Average exact-match accuracy across functional models (error rows excluded from the average). Table and chart share the same rows.</p>
+    <div id="doc-diff-table" style="overflow-x:auto;margin-bottom:12px"></div>
+    <div class="chart-scroll" style="max-height:360px"><div class="chart-wrap" id="chart-doc-diff-wrap"><canvas id="chart-doc-diff"></canvas></div></div>
   </div>
 </div>
 
 <!-- ══════════════════════════ ERROR BREAKDOWN ════════════════════════════ -->
 <div id="tab-errors" class="tab-panel">
-  <div class="card">
-    <h2>Error Category Breakdown per Model</h2>
-    <div class="legend">
-      <div class="legend-item"><div class="legend-dot" style="background:var(--correct)"></div>Correct</div>
-      <div class="legend-item"><div class="legend-dot" style="background:var(--wrong)"></div>Wrong value</div>
-      <div class="legend-item"><div class="legend-dot" style="background:var(--missing)"></div>Missing</div>
+  <div class="two-col">
+    <div class="card" style="min-width:0">
+      <h2>Error Category Breakdown per Model</h2>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Exact-match correct / wrong / missing shares — same order and values as the chart.</p>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--correct)"></div>Correct</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--wrong)"></div>Wrong value</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--missing)"></div>Missing</div>
+      </div>
+      <div id="error-table-wrap" style="overflow:auto;max-height:70vh"></div>
     </div>
-    <div class="chart-wrap-lg"><canvas id="chart-errors"></canvas></div>
+    <div class="card" style="min-width:0">
+      <h2>Stacked share (exact-match)</h2>
+      <p id="error-chart-note" style="font-size:12px;color:var(--muted);margin:-6px 0 10px">Same models and percentages as the table (scroll to see all).</p>
+      <div class="chart-scroll"><div class="chart-wrap" id="chart-errors-wrap"><canvas id="chart-errors"></canvas></div></div>
+    </div>
   </div>
   <div class="card">
     <h2>Common Error Patterns</h2>
@@ -698,8 +713,9 @@ select,button.ctrl{padding:6px 12px;border:1px solid var(--border);border-radius
   <div class="two-col">
     <div class="card">
       <h2>Provider Comparison</h2>
-      <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Side-by-side comparison across all providers (active models only).</p>
-      <div class="chart-wrap"><canvas id="chart-provider-f1"></canvas></div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Active models only — same aggregates as Rankings → Provider Summary (Avg/Best F1).</p>
+      <div id="provider-f1-table" style="overflow-x:auto;margin-bottom:12px"></div>
+      <div class="chart-wrap" id="chart-provider-f1-wrap"><canvas id="chart-provider-f1"></canvas></div>
     </div>
     <div class="card">
       <h2>Tier Distribution by Provider</h2>
@@ -861,9 +877,9 @@ function switchTab(id){
   if(!initialized.has(id)){
     initialized.add(id)
     if(id==='rankings') renderRankings()
-    if(id==='field-heatmap') renderFieldHeatmap(), renderBestPerField(), renderFieldDifficulty()
-    if(id==='doc-analysis') renderDocHeatmap(), renderDocDifficulty()
-    if(id==='errors') renderErrorChart(), renderErrorPatterns()
+    if(id==='field-heatmap') renderFieldTabViews()
+    if(id==='doc-analysis') renderDocTabViews()
+    if(id==='errors') renderErrorBreakdownViews(), renderErrorPatterns()
     if(id==='deepdive') initDeepDive()
     if(id==='recommendations') renderRecommendations(), renderInsights(), renderImprovements()
     if(id==='provider-analysis') renderProviderAnalysis()
@@ -874,6 +890,13 @@ function switchTab(id){
 // ── ① Rankings ────────────────────────────────────────────────────────────
 
 let chartAccuracy = null
+
+/** Size a Chart.js category axis so every label has room (prevents autoSkip misalignment). */
+function sizeCategoryChartWrap(wrapId, nCategories, pxPer=18, minH=240){
+  const wrap = document.getElementById(wrapId)
+  if(!wrap) return
+  wrap.style.height = Math.max(minH, nCategories * pxPer) + 'px'
+}
 
 function f1Score(m){ return RAW.f1_scores?.[m]?.f1 || 0 }
 function bestF1(){
@@ -896,17 +919,25 @@ function renderRankings(){
     <div class="stat-card"><div class="val">${topF1.toFixed(3)}</div><div class="lbl">Best F1 (${modelDisplayName(topModel)})</div></div>
     <div class="stat-card"><div class="val">${mods.length - active.length}</div><div class="lbl">Failed (F1=0)</div></div>
   `
-  // Populate provider dropdown
+  // Populate provider dropdown once
   const provSel = document.getElementById('rank-provider')
-  providers.forEach(p=>{
-    const opt = document.createElement('option')
-    opt.value = p; opt.text = p === 'v7' ? 'V7 Go' : (p.charAt(0).toUpperCase() + p.slice(1))
-    provSel.appendChild(opt)
-  })
-  renderRankTable()
-  renderAccuracyChart()
+  if(provSel.options.length <= 1){
+    providers.forEach(p=>{
+      const opt = document.createElement('option')
+      opt.value = p; opt.text = p === 'v7' ? 'V7 Go' : (p.charAt(0).toUpperCase() + p.slice(1))
+      provSel.appendChild(opt)
+    })
+  }
+  renderRankingsViews()
   renderProviderSummary()
   renderScoringNotes()
+}
+
+/** Table + F1 chart must always share the same rankRows() result. */
+function renderRankingsViews(){
+  const rows = rankRows()
+  renderRankTable(rows)
+  renderAccuracyChart(rows)
 }
 
 function rankRows(){
@@ -950,8 +981,8 @@ function fmtCost(usd, est){
   if(usd < 0.01) return prefix+'<$0.01'
   return prefix+'$'+usd.toFixed(3)
 }
-function renderRankTable(){
-  const rows = rankRows()
+function renderRankTable(rows){
+  rows = rows || rankRows()
   const bestF1Val = rows[0]?.f1 || 1
   let html = `<table><thead><tr>
     <th>#</th><th>Model</th><th>Provider</th><th>F1</th><th>Prec</th><th>Recall</th><th>Score bar</th>
@@ -984,8 +1015,11 @@ function renderRankTable(){
   document.getElementById('rank-table-wrap').innerHTML = html
 }
 
-function renderAccuracyChart(){
-  const rows = rankRows()
+function renderAccuracyChart(rows){
+  rows = rows || rankRows()
+  sizeCategoryChartWrap('chart-accuracy-wrap', rows.length, 18, 340)
+  const note = document.getElementById('rank-chart-note')
+  if(note) note.textContent = `${rows.length} models — same set, order, and F1 as the leaderboard (scroll to see all).`
   const ctx = document.getElementById('chart-accuracy').getContext('2d')
   if(chartAccuracy) chartAccuracy.destroy()
   chartAccuracy = new Chart(ctx, {
@@ -1005,60 +1039,82 @@ function renderAccuracyChart(){
       indexAxis:'y',
       responsive:true,
       maintainAspectRatio:false,
+      animation:false,
       plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`F1: ${(ctx.parsed.x/100).toFixed(3)}`}}},
       scales:{
         x:{min:0,max:100,ticks:{callback:v=>v+'%'},grid:{color:'#e2e8f0'}},
-        y:{ticks:{font:{size:11}}}
+        y:{
+          ticks:{
+            autoSkip:false,
+            font:{size:10},
+            callback:function(val){
+              const label = this.getLabelForValue(val)
+              return label.length > 28 ? label.slice(0, 26) + '…' : label
+            }
+          }
+        }
       }
     }
   })
 }
 
 function renderProviderSummary(){
-  const providers = allProviders()
+  const rows = providerAggRows()
   let html = `<table><thead><tr>
     <th>Provider</th><th>All</th><th>Active</th><th>Failed</th>
     <th>Avg F1</th><th>Best F1</th><th>Best Model</th>
     <th>Avg Fields</th><th>Avg Time</th><th>Avg Cost</th>
   </tr></thead><tbody>`
-  providers.sort().forEach(p=>{
-    const models = allModels().filter(m=>(RAW.model_providers?.[m]||'unknown')===p)
-    const active = models.filter(m=>f1Score(m)>0)
-    const failed = models.length - active.length
-    const avgF1 = active.length ? active.reduce((s,m)=>s+f1Score(m),0)/active.length : 0
-    const best = models.reduce((b,m)=>f1Score(m)>f1Score(b)?m:b, models[0])
-    const avgFF = active.length ? active.reduce((s,m)=>s+(RAW.f1_scores?.[m]?.fields_found||0),0)/active.length : 0
-    const avgFT = active.length ? active.reduce((s,m)=>s+(RAW.f1_scores?.[m]?.fields_total||0),0)/active.length : 0
-    const fieldsStr = avgFT > 0 ? `${avgFF.toFixed(1)}/${avgFT.toFixed(0)} (${(100*avgFF/avgFT).toFixed(0)}%)` : '—'
-    const times = active.map(m=>RAW.extraction_stats?.[m]?.total_elapsed_secs||0).filter(t=>t>0)
-    const avgTime = times.length ? times.reduce((s,t)=>s+t,0)/times.length : 0
-    const allEst = times.length>0 && active.every(m=>RAW.extraction_stats?.[m]?.estimated)
-    const costs = active.map(m=>RAW.extraction_stats?.[m]?.total_cost_usd||0).filter(c=>c>0)
-    const avgCost = costs.length ? costs.reduce((s,c)=>s+c,0)/costs.length : 0
-    const allCostEst = costs.length>0 && active.filter(m=>(RAW.extraction_stats?.[m]?.total_cost_usd||0)>0).every(m=>RAW.extraction_stats?.[m]?.estimated)
+  rows.forEach(r=>{
+    const fieldsStr = r.avgFT > 0 ? `${r.avgFF.toFixed(1)}/${r.avgFT.toFixed(0)} (${(100*r.avgFF/r.avgFT).toFixed(0)}%)` : '—'
     html += `<tr>
-      <td>${providerBadge(models[0])}</td>
-      <td>${models.length}</td>
-      <td style="color:var(--correct);font-weight:600">${active.length}</td>
-      <td style="color:${failed?'var(--red)':'var(--muted)'}">${failed}</td>
-      <td><strong style="color:${hsl(avgF1)}">${avgF1.toFixed(3)}</strong></td>
-      <td style="color:${hsl(f1Score(best))};font-weight:600">${f1Score(best).toFixed(3)}</td>
-      <td><strong>${modelDisplayName(best)}</strong></td>
+      <td>${providerBadge(r.sampleModel)}</td>
+      <td>${r.allCount}</td>
+      <td style="color:var(--correct);font-weight:600">${r.activeCount}</td>
+      <td style="color:${r.failed?'var(--red)':'var(--muted)'}">${r.failed}</td>
+      <td><strong style="color:${hsl(r.avgF1)}">${r.avgF1.toFixed(3)}</strong></td>
+      <td style="color:${hsl(r.bestF1)};font-weight:600">${r.bestF1.toFixed(3)}</td>
+      <td><strong>${modelDisplayName(r.bestModel)}</strong></td>
       <td style="font-size:12px">${fieldsStr}</td>
-      <td>${fmtTime(avgTime, allEst)}</td>
-      <td>${fmtCost(avgCost, allCostEst)}</td>
+      <td>${fmtTime(r.avgTime, r.allTimeEst)}</td>
+      <td>${fmtCost(r.avgCost, r.allCostEst)}</td>
     </tr>`
   })
   html += '</tbody></table>'
   document.getElementById('provider-summary').innerHTML = html
 
-  // Notes
   let notes = '<div style="font-size:12px;color:var(--muted)">'
   notes += '<p>~ = estimated from config pricing × avg tokens. '
   notes += 'Failed = models with F1=0 (extraction failed or no parseable output). '
   notes += 'Fields = avg fields found/total per model (out of '+RAW.fields.length+' per doc × '+RAW.doc_names.length+' docs).</p>'
   notes += '</div>'
   document.getElementById('provider-notes').innerHTML = notes
+}
+
+/** Single source of truth for per-provider aggregates (Rankings summary + Provider Analysis). */
+function providerAggRows(){
+  return allProviders().sort().map(p=>{
+    const models = allModels().filter(m=>(RAW.model_providers?.[m]||'unknown')===p)
+    const active = models.filter(m=>f1Score(m)>0)
+    const failed = models.length - active.length
+    const avgF1 = active.length ? active.reduce((s,m)=>s+f1Score(m),0)/active.length : 0
+    const bestModel = models.length
+      ? models.reduce((b,m)=>f1Score(m)>f1Score(b)?m:b, models[0])
+      : ''
+    const bestF1 = bestModel ? f1Score(bestModel) : 0
+    const avgFF = active.length ? active.reduce((s,m)=>s+(RAW.f1_scores?.[m]?.fields_found||0),0)/active.length : 0
+    const avgFT = active.length ? active.reduce((s,m)=>s+(RAW.f1_scores?.[m]?.fields_total||0),0)/active.length : 0
+    const times = active.map(m=>RAW.extraction_stats?.[m]?.total_elapsed_secs||0).filter(t=>t>0)
+    const avgTime = times.length ? times.reduce((s,t)=>s+t,0)/times.length : 0
+    const allTimeEst = times.length>0 && active.every(m=>RAW.extraction_stats?.[m]?.estimated)
+    const costs = active.map(m=>RAW.extraction_stats?.[m]?.total_cost_usd||0).filter(c=>c>0)
+    const avgCost = costs.length ? costs.reduce((s,c)=>s+c,0)/costs.length : 0
+    const allCostEst = costs.length>0 && active.filter(m=>(RAW.extraction_stats?.[m]?.total_cost_usd||0)>0).every(m=>RAW.extraction_stats?.[m]?.estimated)
+    return {
+      p, sampleModel: models[0]||'', allCount: models.length, activeCount: active.length, failed,
+      avgF1, bestF1, bestModel, avgFF, avgFT, avgTime, allTimeEst, avgCost, allCostEst,
+    }
+  })
 }
 
 function renderScoringNotes(){
@@ -1076,6 +1132,28 @@ function renderScoringNotes(){
 }
 
 // ── ② Field Heatmap ───────────────────────────────────────────────────────
+
+function fieldExactAcc(m, f){
+  const fd = RAW.models[m].per_field[f] || {correct:0,missing:0,wrong:0}
+  const total = fd.correct + fd.missing + fd.wrong
+  return total > 0 ? fd.correct/total : 0
+}
+
+/** Exact-match field averages over functional models — drives difficulty table + chart. */
+function fieldDifficultyRows(){
+  const models = activeModels()
+  return RAW.fields.map(f=>{
+    const accs = models.map(m=>fieldExactAcc(m, f))
+    const avg = accs.length ? accs.reduce((s,v)=>s+v,0)/accs.length : 0
+    return {f, avg}
+  }).sort((a,b)=>a.avg-b.avg)
+}
+
+function renderFieldTabViews(){
+  renderFieldHeatmap()
+  renderBestPerField()
+  renderFieldDifficultyViews()
+}
 
 function renderFieldHeatmap(){
   const filter = document.getElementById('hm-filter').value
@@ -1111,17 +1189,13 @@ function renderBestPerField(){
   const fields = RAW.fields
   let html = '<table><thead><tr><th>Field</th><th>Best Model</th><th>Accuracy</th><th>Runner-up</th></tr></thead><tbody>'
   for(const f of fields){
-    const scores = models.map(m=>{
-      const fd = RAW.models[m].per_field[f] || {correct:0,missing:0,wrong:0}
-      const total = fd.correct+fd.missing+fd.wrong
-      return {m, acc: total>0 ? fd.correct/total : 0}
-    }).sort((a,b)=>b.acc-a.acc)
+    const scores = models.map(m=>({m, acc: fieldExactAcc(m, f)})).sort((a,b)=>b.acc-a.acc)
     const best = scores[0]
     const runner = scores[1]
     html += `<tr>
       <td>${RAW.field_labels[f]}</td>
-      <td><strong>${modelDisplayName(best.m)}</strong></td>
-      <td style="color:${hsl(best.acc)};font-weight:600">${pct(best.acc)}</td>
+      <td><strong>${best?modelDisplayName(best.m):'—'}</strong></td>
+      <td style="color:${hsl(best?.acc||0)};font-weight:600">${best?pct(best.acc):'—'}</td>
       <td style="color:var(--muted)">${runner?`${modelDisplayName(runner.m)} (${pct(runner.acc)})`:'—'}</td>
     </tr>`
   }
@@ -1130,44 +1204,69 @@ function renderBestPerField(){
 }
 
 let chartFieldDiff = null
-function renderFieldDifficulty(){
-  const models = activeModels()
-  const fields = RAW.fields
-  const avgAcc = fields.map(f=>{
-    const accs = models.map(m=>{
-      const fd = RAW.models[m].per_field[f]||{correct:0,missing:0,wrong:0}
-      const total = fd.correct+fd.missing+fd.wrong
-      return total>0 ? fd.correct/total : 0
-    })
-    return {f, avg: accs.reduce((s,v)=>s+v,0)/accs.length}
-  }).sort((a,b)=>a.avg-b.avg)
+function renderFieldDifficultyViews(){
+  const rows = fieldDifficultyRows()
+  let tbl = '<table><thead><tr><th>#</th><th>Field</th><th>Avg exact-match</th></tr></thead><tbody>'
+  rows.forEach((r,i)=>{
+    tbl += `<tr>
+      <td style="color:var(--muted)">${i+1}</td>
+      <td>${RAW.field_labels[r.f]}</td>
+      <td style="color:${hsl(r.avg)};font-weight:600">${pct(r.avg)}</td>
+    </tr>`
+  })
+  tbl += '</tbody></table>'
+  document.getElementById('field-diff-table').innerHTML = tbl
+  renderFieldDifficultyChart(rows)
+}
 
+function renderFieldDifficultyChart(rows){
+  rows = rows || fieldDifficultyRows()
+  sizeCategoryChartWrap('chart-field-diff-wrap', rows.length, 28, 200)
   const ctx = document.getElementById('chart-field-diff').getContext('2d')
   if(chartFieldDiff) chartFieldDiff.destroy()
   chartFieldDiff = new Chart(ctx,{
     type:'bar',
     data:{
-      labels: avgAcc.map(x=>RAW.field_labels[x.f]),
+      labels: rows.map(x=>RAW.field_labels[x.f]),
       datasets:[{
         label:'Avg accuracy',
-        data: avgAcc.map(x=>+(x.avg*100).toFixed(1)),
-        backgroundColor: avgAcc.map(x=>bgAlpha(x.avg)),
-        borderColor: avgAcc.map(x=>hsl(x.avg)),
+        data: rows.map(x=>+(x.avg*100).toFixed(1)),
+        backgroundColor: rows.map(x=>bgAlpha(x.avg)),
+        borderColor: rows.map(x=>hsl(x.avg)),
         borderWidth:1, borderRadius:4
       }]
     },
     options:{
-      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      indexAxis:'y', responsive:true, maintainAspectRatio:false, animation:false,
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.parsed.x.toFixed(1)}%`}}},
       scales:{
         x:{min:0,max:100,ticks:{callback:v=>v+'%'},grid:{color:'#e2e8f0'}},
-        y:{ticks:{font:{size:11}}}
+        y:{ticks:{autoSkip:false, font:{size:11}}}
       }
     }
   })
 }
 
 // ── ③ Document Analysis ───────────────────────────────────────────────────
+
+/** Per-doc avg exact-match over functional models; error runs excluded from the mean. */
+function docDifficultyRows(){
+  const models = activeModels()
+  return RAW.doc_names.map((name,di)=>{
+    const accs = []
+    for(const m of models){
+      const pd = RAW.models[m].per_doc[di]
+      if(pd && !pd.is_error) accs.push(pd.accuracy)
+    }
+    const avg = accs.length ? accs.reduce((s,v)=>s+v,0)/accs.length : 0
+    return {name, di, avg, n: accs.length}
+  }).sort((a,b)=>a.avg-b.avg)
+}
+
+function renderDocTabViews(){
+  renderDocHeatmap()
+  renderDocDifficultyViews()
+}
 
 function renderDocHeatmap(){
   const filter = document.getElementById('doc-hm-filter').value
@@ -1195,37 +1294,46 @@ function renderDocHeatmap(){
 }
 
 let chartDocDiff = null
-function renderDocDifficulty(){
-  const models = activeModels()
-  const docs = RAW.doc_names
-  const avgs = docs.map((name,di)=>{
-    const accs = models.map(m=>{
-      const pd = RAW.models[m].per_doc[di]
-      return (pd && !pd.is_error) ? pd.accuracy : 0
-    })
-    return {name, avg: accs.reduce((s,v)=>s+v,0)/accs.length}
+function renderDocDifficultyViews(){
+  const rows = docDifficultyRows()
+  let tbl = '<table><thead><tr><th>#</th><th>Document</th><th>Avg exact-match</th><th>Models in avg</th></tr></thead><tbody>'
+  rows.forEach((r,i)=>{
+    const label = r.name.length>40 ? r.name.slice(0,38)+'…' : r.name
+    tbl += `<tr>
+      <td style="color:var(--muted)">${i+1}</td>
+      <td title="${r.name}">${label}</td>
+      <td style="color:${hsl(r.avg)};font-weight:600">${pct(r.avg)}</td>
+      <td style="color:var(--muted)">${r.n}</td>
+    </tr>`
   })
-  const sorted = [...avgs].sort((a,b)=>a.avg-b.avg)
+  tbl += '</tbody></table>'
+  document.getElementById('doc-diff-table').innerHTML = tbl
+  renderDocDifficultyChart(rows)
+}
+
+function renderDocDifficultyChart(rows){
+  rows = rows || docDifficultyRows()
+  sizeCategoryChartWrap('chart-doc-diff-wrap', rows.length, 26, 240)
   const ctx = document.getElementById('chart-doc-diff').getContext('2d')
   if(chartDocDiff) chartDocDiff.destroy()
   chartDocDiff = new Chart(ctx,{
     type:'bar',
     data:{
-      labels: sorted.map(x=>x.name.length>30?x.name.slice(0,28)+'…':x.name),
+      labels: rows.map(x=>x.name.length>30?x.name.slice(0,28)+'…':x.name),
       datasets:[{
         label:'Avg accuracy',
-        data: sorted.map(x=>+(x.avg*100).toFixed(1)),
-        backgroundColor: sorted.map(x=>bgAlpha(x.avg)),
-        borderColor: sorted.map(x=>hsl(x.avg)),
+        data: rows.map(x=>+(x.avg*100).toFixed(1)),
+        backgroundColor: rows.map(x=>bgAlpha(x.avg)),
+        borderColor: rows.map(x=>hsl(x.avg)),
         borderWidth:1, borderRadius:4
       }]
     },
     options:{
-      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      indexAxis:'y', responsive:true, maintainAspectRatio:false, animation:false,
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.parsed.x.toFixed(1)}%`}}},
       scales:{
         x:{min:0,max:100,ticks:{callback:v=>v+'%'},grid:{color:'#e2e8f0'}},
-        y:{ticks:{font:{size:10}}}
+        y:{ticks:{autoSkip:false, font:{size:10}}}
       }
     }
   })
@@ -1234,7 +1342,13 @@ function renderDocDifficulty(){
 // ── ④ Error Breakdown ─────────────────────────────────────────────────────
 
 let chartErrors = null
-function renderErrorChart(){
+function renderErrorBreakdownViews(){
+  const rows = errorBreakdownRows()
+  renderErrorTable(rows)
+  renderErrorChart(rows)
+}
+
+function errorBreakdownRows(){
   const models = Object.keys(RAW.models).sort((a,b)=>{
     const da = RAW.models[a], db = RAW.models[b]
     let ca=0,cb=0
@@ -1242,33 +1356,74 @@ function renderErrorChart(){
     for(const f of Object.values(db.per_field)) cb+=f.correct
     return cb-ca
   })
-
-  const corrects=[], wrongs=[], missings=[], totals=[]
-  for(const m of models){
+  return models.map(m=>{
     let c=0,w=0,ms=0
     for(const f of Object.values(RAW.models[m].per_field)){c+=f.correct;w+=f.wrong;ms+=f.missing}
-    corrects.push(c); wrongs.push(w); missings.push(ms)
-    totals.push(c+w+ms)
-  }
+    const total = c+w+ms
+    return {
+      m,
+      correct:c, wrong:w, missing:ms, total,
+      correctPct: total>0 ? c/total*100 : 0,
+      wrongPct: total>0 ? w/total*100 : 0,
+      missingPct: total>0 ? ms/total*100 : 0,
+    }
+  })
+}
 
+function renderErrorTable(rows){
+  rows = rows || errorBreakdownRows()
+  let html = `<table><thead><tr>
+    <th>#</th><th>Model</th><th>Provider</th><th>Correct %</th><th>Wrong %</th><th>Missing %</th><th>Counts (C/W/M)</th>
+  </tr></thead><tbody>`
+  rows.forEach((r,i)=>{
+    html += `<tr>
+      <td style="color:var(--muted)">${i+1}</td>
+      <td><strong>${modelDisplayName(r.m)}</strong></td>
+      <td>${providerBadge(r.m)}</td>
+      <td style="color:var(--correct);font-weight:600">${r.correctPct.toFixed(1)}%</td>
+      <td style="color:var(--orange);font-weight:600">${r.wrongPct.toFixed(1)}%</td>
+      <td style="color:var(--red);font-weight:600">${r.missingPct.toFixed(1)}%</td>
+      <td style="color:var(--muted);font-size:12px">${r.correct}/${r.wrong}/${r.missing}</td>
+    </tr>`
+  })
+  html += '</tbody></table>'
+  document.getElementById('error-table-wrap').innerHTML = html
+}
+
+function renderErrorChart(rows){
+  rows = rows || errorBreakdownRows()
+  sizeCategoryChartWrap('chart-errors-wrap', rows.length, 18, 340)
+  const note = document.getElementById('error-chart-note')
+  if(note) note.textContent = `${rows.length} models — same set, order, and % shares as the table (scroll to see all).`
   const ctx = document.getElementById('chart-errors').getContext('2d')
   if(chartErrors) chartErrors.destroy()
   chartErrors = new Chart(ctx,{
     type:'bar',
     data:{
-      labels: models.map(m=>modelDisplayName(m)),
+      labels: rows.map(r=>modelDisplayName(r.m)),
       datasets:[
-        {label:'Correct', data:corrects.map((c,i)=>totals[i]>0?(c/totals[i]*100).toFixed(1):0), backgroundColor:'rgba(16,185,129,0.7)', borderRadius:4},
-        {label:'Wrong value', data:wrongs.map((w,i)=>totals[i]>0?(w/totals[i]*100).toFixed(1):0), backgroundColor:'rgba(249,115,22,0.7)'},
-        {label:'Missing', data:missings.map((ms,i)=>totals[i]>0?(ms/totals[i]*100).toFixed(1):0), backgroundColor:'rgba(239,68,68,0.7)'},
+        {label:'Correct', data:rows.map(r=>+r.correctPct.toFixed(1)), backgroundColor:'rgba(16,185,129,0.7)', borderRadius:4},
+        {label:'Wrong value', data:rows.map(r=>+r.wrongPct.toFixed(1)), backgroundColor:'rgba(249,115,22,0.7)'},
+        {label:'Missing', data:rows.map(r=>+r.missingPct.toFixed(1)), backgroundColor:'rgba(239,68,68,0.7)'},
       ]
     },
     options:{
-      responsive:true, maintainAspectRatio:false,
-      plugins:{tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y}%`}}},
+      indexAxis:'y',
+      responsive:true, maintainAspectRatio:false, animation:false,
+      plugins:{tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.x}%`}}},
       scales:{
-        x:{stacked:true,ticks:{font:{size:10},maxRotation:45}},
-        y:{stacked:true,max:100,ticks:{callback:v=>v+'%'},grid:{color:'#e2e8f0'}}
+        x:{stacked:true, max:100, ticks:{callback:v=>v+'%'}, grid:{color:'#e2e8f0'}},
+        y:{
+          stacked:true,
+          ticks:{
+            autoSkip:false,
+            font:{size:10},
+            callback:function(val){
+              const label = this.getLabelForValue(val)
+              return label.length > 28 ? label.slice(0, 26) + '…' : label
+            }
+          }
+        }
       }
     }
   })
@@ -1322,7 +1477,7 @@ function renderErrorPatterns(){
 function initDeepDive(){
   const modelSel = document.getElementById('dd-model')
   const docSel = document.getElementById('dd-doc')
-  for(const m of Object.keys(RAW.models)){
+  for(const m of Object.keys(RAW.models).sort((a,b)=>f1Score(b)-f1Score(a))){
     const opt = document.createElement('option'); opt.value=m; opt.text=modelDisplayName(m)
     modelSel.appendChild(opt)
   }
@@ -1432,44 +1587,36 @@ function renderInsights(){
   const models = activeModels()
   const allM = allModels()
   const failedModels = allM.filter(m=>!isActive(m))
-  const fields = RAW.fields
 
-  // Best overall
-  const sorted = models.map(m=>({m,acc:RAW.models[m].accuracy})).sort((a,b)=>b.acc-a.acc)
-  const best = sorted[0], second = sorted[1]
+  // Top performer by semantic F1 (same as Rankings leaderboard) — not exact-match accuracy
+  const sortedF1 = models.map(m=>({m, f1:f1Score(m)})).sort((a,b)=>b.f1-a.f1)
+  const best = sortedF1[0], second = sortedF1[1]
 
-  // Hardest field (lowest avg across active models)
-  const fieldAvg = fields.map(f=>{
-    const accs = models.map(m=>{const fd=RAW.models[m].per_field[f]||{correct:0,wrong:0,missing:0};const t=fd.correct+fd.wrong+fd.missing;return t>0?fd.correct/t:0})
-    return {f, avg:accs.reduce((s,v)=>s+v,0)/accs.length}
-  })
-  const hardest = fieldAvg.sort((a,b)=>a.avg-b.avg)[0]
-  const easiest = [...fieldAvg].sort((a,b)=>b.avg-a.avg)[0]
+  // Hardest / easiest fields — same rows as Field Difficulty chart
+  const fieldAvg = fieldDifficultyRows()
+  const hardest = fieldAvg[0]
+  const easiest = fieldAvg[fieldAvg.length-1]
 
-  // Financial consistency — std dev of income/spending accuracy
   const financialConsistency = models.map(m=>{
-    const inc = RAW.models[m].per_field['income_annually_in_british_pounds']||{correct:0,wrong:0,missing:0}
-    const sp = RAW.models[m].per_field['spending_annually_in_british_pounds']||{correct:0,wrong:0,missing:0}
-    const t1=inc.correct+inc.wrong+inc.missing, t2=sp.correct+sp.wrong+sp.missing
-    const a1=t1>0?inc.correct/t1:0, a2=t2>0?sp.correct/t2:0
+    const a1 = fieldExactAcc(m, 'income_annually_in_british_pounds')
+    const a2 = fieldExactAcc(m, 'spending_annually_in_british_pounds')
     return {m, financialAcc:(a1+a2)/2}
   }).sort((a,b)=>b.financialAcc-a.financialAcc)
 
   let html = ''
-  html += `<div class="insight insight-tip"><strong>Top performer:</strong> ${modelDisplayName(best.m)} leads with ${pct(best.acc)} overall accuracy. ${second?`${modelDisplayName(second.m)} follows at ${pct(second.acc)}.`:''}</div>`
-  html += `<div class="insight"><strong>Hardest field:</strong> "${RAW.field_labels[hardest.f]}" averages only ${pct(hardest.avg)} accuracy across functional models — indicating consistent extraction difficulty.</div>`
-  html += `<div class="insight insight-tip"><strong>Easiest field:</strong> "${RAW.field_labels[easiest.f]}" is most reliably extracted at ${pct(easiest.avg)} average accuracy.</div>`
-  html += `<div class="insight"><strong>Financial data leader:</strong> ${modelDisplayName(financialConsistency[0].m)} is best for income/spending extraction at ${pct(financialConsistency[0].financialAcc)} combined accuracy.</div>`
+  html += `<div class="insight insight-tip"><strong>Top performer (F1):</strong> ${modelDisplayName(best.m)} leads with F1=${best.f1.toFixed(3)}. ${second?`${modelDisplayName(second.m)} follows at F1=${second.f1.toFixed(3)}.`:''}</div>`
+  html += `<div class="insight"><strong>Hardest field (exact-match):</strong> "${RAW.field_labels[hardest.f]}" averages only ${pct(hardest.avg)} across functional models — same ranking as Field Heatmap → Difficulty.</div>`
+  html += `<div class="insight insight-tip"><strong>Easiest field (exact-match):</strong> "${RAW.field_labels[easiest.f]}" at ${pct(easiest.avg)} average accuracy.</div>`
+  html += `<div class="insight"><strong>Financial data leader (exact-match):</strong> ${modelDisplayName(financialConsistency[0].m)} is best for income/spending at ${pct(financialConsistency[0].financialAcc)} combined.</div>`
   if(failedModels.length){
-    html += `<div class="insight insight-warn"><strong>Failed models (${failedModels.length}):</strong> ${failedModels.map(modelDisplayName).join(', ')} — F1=0, extraction failed or returned no parseable output. May be rate-limited, misconfigured, or unable to handle the document format.</div>`
+    html += `<div class="insight insight-warn"><strong>Failed models (${failedModels.length}):</strong> ${failedModels.map(modelDisplayName).join(', ')} — F1=0, extraction failed or returned no parseable output.</div>`
   }
 
-  // Check if any model is better on smaller tasks
   const smallModelBest = models.filter(m=>m.includes('7b')||m.includes('8b'))
   if(smallModelBest.length){
-    const bestSmall = smallModelBest.map(m=>({m,acc:RAW.models[m].accuracy})).sort((a,b)=>b.acc-a.acc)[0]
-    if(bestSmall.acc > 0.5){
-      html += `<div class="insight insight-tip"><strong>Small model worth noting:</strong> ${modelDisplayName(bestSmall.m)} achieves ${pct(bestSmall.acc)} — a cost-effective option for high-throughput pipelines.</div>`
+    const bestSmall = smallModelBest.map(m=>({m,f1:f1Score(m)})).sort((a,b)=>b.f1-a.f1)[0]
+    if(bestSmall.f1 > 0.5){
+      html += `<div class="insight insight-tip"><strong>Small model worth noting:</strong> ${modelDisplayName(bestSmall.m)} achieves F1=${bestSmall.f1.toFixed(3)} — a cost-effective option for high-throughput pipelines.</div>`
     }
   }
 
@@ -1522,14 +1669,20 @@ function renderProviderAnalysis(){
     <div class="stat-card"><div class="val">${v7Count}</div><div class="lbl">V7 Go</div></div>
   `
 
-  // Provider F1 comparison chart
-  const provData = providers.map(p=>{
-    const pModels = activeModels().filter(m=>(RAW.model_providers?.[m]||'')=== p)
-    const f1s = pModels.map(m=>f1Score(m))
-    const avg = f1s.length ? f1s.reduce((s,v)=>s+v,0)/f1s.length : 0
-    const best = f1s.length ? Math.max(...f1s) : 0
-    return {p, avg, best, count: pModels.length}
+  // Provider F1 comparison — same aggregates as Rankings Provider Summary
+  const provData = providerAggRows()
+  let pTbl = `<table><thead><tr><th>Provider</th><th>Active</th><th>Avg F1</th><th>Best F1</th><th>Best Model</th></tr></thead><tbody>`
+  provData.forEach(d=>{
+    pTbl += `<tr>
+      <td>${providerBadge(d.sampleModel)}</td>
+      <td>${d.activeCount}</td>
+      <td style="color:${hsl(d.avgF1)};font-weight:600">${d.avgF1.toFixed(3)}</td>
+      <td style="color:${hsl(d.bestF1)};font-weight:600">${d.bestF1.toFixed(3)}</td>
+      <td><strong>${modelDisplayName(d.bestModel)}</strong></td>
+    </tr>`
   })
+  pTbl += '</tbody></table>'
+  document.getElementById('provider-f1-table').innerHTML = pTbl
 
   const ctx1 = document.getElementById('chart-provider-f1').getContext('2d')
   if(chartProviderF1) chartProviderF1.destroy()
@@ -1538,14 +1691,17 @@ function renderProviderAnalysis(){
     data:{
       labels: provData.map(d=>providerChartLabel(d.p)),
       datasets:[
-        {label:'Avg F1', data:provData.map(d=>+(d.avg*100).toFixed(1)), backgroundColor:'rgba(99,102,241,0.6)', borderRadius:4},
-        {label:'Best F1', data:provData.map(d=>+(d.best*100).toFixed(1)), backgroundColor:'rgba(16,185,129,0.6)', borderRadius:4}
+        {label:'Avg F1', data:provData.map(d=>+(d.avgF1*100).toFixed(1)), backgroundColor:'rgba(99,102,241,0.6)', borderRadius:4},
+        {label:'Best F1', data:provData.map(d=>+(d.bestF1*100).toFixed(1)), backgroundColor:'rgba(16,185,129,0.6)', borderRadius:4}
       ]
     },
     options:{
-      responsive:true, maintainAspectRatio:false,
+      responsive:true, maintainAspectRatio:false, animation:false,
       plugins:{tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${(c.parsed.y/100).toFixed(3)}`}}},
-      scales:{y:{min:0,max:100,ticks:{callback:v=>v+'%'},grid:{color:'#e2e8f0'}}}
+      scales:{
+        x:{ticks:{autoSkip:false}},
+        y:{min:0,max:100,ticks:{callback:v=>v+'%'},grid:{color:'#e2e8f0'}}
+      }
     }
   })
 
@@ -1569,9 +1725,9 @@ function renderProviderAnalysis(){
     type:'bar',
     data:{labels: providers.map(p=>providerChartLabel(p)), datasets},
     options:{
-      responsive:true, maintainAspectRatio:false,
+      responsive:true, maintainAspectRatio:false, animation:false,
       plugins:{legend:{position:'top'}},
-      scales:{x:{stacked:true},y:{stacked:true,ticks:{stepSize:1},grid:{color:'#e2e8f0'}}}
+      scales:{x:{stacked:true, ticks:{autoSkip:false}},y:{stacked:true,ticks:{stepSize:1},grid:{color:'#e2e8f0'}}}
     }
   })
 
@@ -1626,13 +1782,15 @@ function renderProviderAnalysis(){
   modHtml += '</tbody></table>'
   document.getElementById('modality-breakdown').innerHTML = modHtml
 
-  // Populate catalog provider dropdown
+  // Populate catalog provider dropdown once
   const catSel = document.getElementById('catalog-provider')
-  providers.forEach(p=>{
-    const opt = document.createElement('option')
-    opt.value = p; opt.text = p === 'v7' ? 'V7 Go' : (p.charAt(0).toUpperCase() + p.slice(1))
-    catSel.appendChild(opt)
-  })
+  if(catSel.options.length <= 1){
+    providers.forEach(p=>{
+      const opt = document.createElement('option')
+      opt.value = p; opt.text = p === 'v7' ? 'V7 Go' : (p.charAt(0).toUpperCase() + p.slice(1))
+      catSel.appendChild(opt)
+    })
+  }
   renderModelCatalog()
 }
 
@@ -1751,7 +1909,7 @@ function renderEvolution(){
     </table>`
   document.getElementById('evolution-stats').innerHTML = statsHtml
 
-  // Cost & Speed table from extraction_stats
+  // Cost & Speed table from extraction_stats (include F1 when model was scored)
   const stats = RAW.extraction_stats || {}
   const statModels = Object.keys(stats).filter(m=>stats[m].total_elapsed_secs > 0)
   if(statModels.length === 0){
@@ -1759,14 +1917,16 @@ function renderEvolution(){
     return
   }
   statModels.sort((a,b)=>stats[a].total_elapsed_secs - stats[b].total_elapsed_secs)
-  let tbl = `<table><thead><tr>
-    <th>Model</th><th>Provider</th><th>Total Time</th><th>Avg/Doc</th><th>Total Cost</th><th>Avg/Doc</th><th>Prompt Tokens</th><th>Completion Tokens</th>
+  let tbl = `<div style="max-height:70vh;overflow:auto"><table><thead><tr>
+    <th>Model</th><th>Provider</th><th>F1</th><th>Total Time</th><th>Avg/Doc</th><th>Total Cost</th><th>Avg/Doc</th><th>Prompt Tokens</th><th>Completion Tokens</th>
   </tr></thead><tbody>`
   statModels.forEach(m=>{
     const s = stats[m]
+    const f1 = f1Score(m)
     tbl += `<tr>
       <td><strong>${modelDisplayName(m)}</strong></td>
       <td>${providerBadge(m)}</td>
+      <td style="color:${hsl(f1)};font-weight:600">${f1?f1.toFixed(3):'—'}</td>
       <td>${fmtTime(s.total_elapsed_secs, s.estimated)}</td>
       <td>${fmtTime(s.avg_secs_per_row, s.estimated)}</td>
       <td>${fmtCost(s.total_cost_usd, s.estimated)}</td>
@@ -1775,9 +1935,9 @@ function renderEvolution(){
       <td>${s.total_completion_tokens.toLocaleString()}</td>
     </tr>`
   })
-  tbl += '</tbody></table>'
+  tbl += '</tbody></table></div>'
   const hasEstimates = statModels.some(m=>stats[m].estimated)
-  if(hasEstimates) tbl += '<p style="font-size:11px;color:var(--muted);margin-top:8px">~ = estimated from config pricing × avg tokens</p>'
+  if(hasEstimates) tbl += '<p style="font-size:11px;color:var(--muted);margin-top:8px">~ = estimated from config pricing × avg tokens. F1 from score.py when the model has a scored TSV.</p>'
   document.getElementById('cost-speed-table').innerHTML = tbl
 }
 
