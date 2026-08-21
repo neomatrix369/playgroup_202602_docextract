@@ -380,10 +380,13 @@ DOUBLEWORD_MODELS = {
         "ocr_max_image_dim": 1540,
         "ocr_max_pages": 10,
         "ocr_jpeg_quality": 75,
+        # Two-step pipeline: OCR pass → text extraction pass (pure-OCR models ignore JSON instructions)
+        "two_step_ocr": True,
+        "ocr_extract_model": "dw-qwen3-5-4b",
         "thinking_default": False,
         "notes":      "APIs: Batch/Async, Layout-aware OCR",
         "description": "DeepSeek-OCR-2: layout-aware OCR with causal vision encoder that captures reading order for structured extraction.",
-        "usage_notes": "Use 'Free OCR.' for plain text extraction. Use '<|grounding|>Convert the document to markdown.' for structured markdown output.",
+        "usage_notes": "Pure-OCR model — outputs markdown text, ignores JSON instructions. Uses two_step_ocr pipeline: step 1=OCR via this model, step 2=JSON extraction via ocr_extract_model.",
     },
     "dw-lightonocr-2-1b-bbox-soup": {
         "model":      "lightonai/LightOnOCR-2-1B-bbox-soup",

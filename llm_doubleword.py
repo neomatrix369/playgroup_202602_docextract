@@ -179,6 +179,7 @@ def _build_ocr_messages(
     jpeg_quality = model_cfg.get("ocr_jpeg_quality", 80)
     no_system = model_cfg.get("ocr_no_system_prompt", False)
     ocr_prompt = model_cfg.get("ocr_prompt")
+    two_step_ocr = model_cfg.get("two_step_ocr", False)
 
     # Adaptive rendering: try progressively smaller settings if payload is too large
     attempts = [
@@ -194,6 +195,7 @@ def _build_ocr_messages(
         )
         messages = _assemble_ocr_messages(
             page_images, no_system, ocr_prompt, extraction_prompt,
+            two_step_ocr=two_step_ocr,
         )
         payload_size = len(json.dumps(messages).encode("utf-8"))
 
@@ -218,8 +220,14 @@ def _assemble_ocr_messages(
     no_system: bool,
     ocr_prompt: str | None,
     extraction_prompt: str,
+    two_step_ocr: bool = False,
 ) -> list[dict]:
-    """Assemble message dicts from pre-rendered page images."""
+    """Assemble message dicts from pre-rendered page images.
+
+    When two_step_ocr=True, only the ocr_prompt is included (no extraction
+    instructions) — the model acts as a pure transcriber. A second text-mode
+    batch handles JSON extraction from the OCR output.
+    """
     image_content = [
         {
             "type": "image_url",
@@ -235,10 +243,13 @@ def _assemble_ocr_messages(
     else:
         messages.append({"role": "system", "content": SYSTEM_MESSAGE})
         user_parts = list(image_content)
-        text_prompt = ""
-        if ocr_prompt:
-            text_prompt += ocr_prompt + "\n\n"
-        text_prompt += extraction_prompt
+        if two_step_ocr:
+            text_prompt = ocr_prompt or "Extract all text from this document."
+        else:
+            text_prompt = ""
+            if ocr_prompt:
+                text_prompt += ocr_prompt + "\n\n"
+            text_prompt += extraction_prompt
         user_parts.append({"type": "text", "text": text_prompt})
         messages.append({"role": "user", "content": user_parts})
 
@@ -415,3 +426,79 @@ async def download_results(client: AsyncOpenAI, output_file_id: str) -> dict[int
                 results[row_num] = {"error": "No choices in response"}
 
     return results
+
+
+async def submit_text_extraction_batch(
+    client: AsyncOpenAI,
+    step2_name: str,
+    extract_model_full_name: str,
+    ocr_results: dict[int, dict],
+    rows: list[tuple[int, str, str]],
+    prompt_template: str,
+    completion_window: str = "1h",
+    extra_params: dict | None = None,
+) -> str:
+    """Submit a text-mode extraction batch using OCR output as input (step 2 of two_step_ocr).
+
+    Args:
+        step2_name: unique name for checkpoint tracking (e.g. "dw-deepseek-ocr-2::step2")
+        extract_model_full_name: HuggingFace model id for the extraction LLM
+        ocr_results: {row_num: {"text": ocr_text, ...}} from step-1 OCR batch
+        rows: original rows list [(row_num, pdf_filename, text_combined), ...]
+        prompt_template: extraction JSON prompt to prepend to each OCR text
+    """
+    lines = []
+    for row_num, _pdf_filename, _orig_text in rows:
+        ocr_result = ocr_results.get(row_num, {})
+        if "error" in ocr_result:
+            continue  # skip rows that failed in OCR step
+        ocr_text = ocr_result.get("text", "")
+        prompt = prompt_template + "\n\n" + ocr_text
+        body: dict = {
+            "model": extract_model_full_name,
+            "messages": [
+                {"role": "system", "content": SYSTEM_MESSAGE},
+                {"role": "user", "content": prompt},
+            ],
+        }
+        if extra_params:
+            body.update(extra_params)
+        lines.append(json.dumps({
+            "custom_id": f"row_{row_num}",
+            "method": "POST",
+            "url": "/v1/chat/completions",
+            "body": body,
+        }))
+
+    content = "\n".join(lines)
+    file_response = await client.files.create(
+        file=(f"batch-{step2_name}.jsonl", content.encode("utf-8")),
+        purpose="batch",
+    )
+    logger.info("Uploaded step-2 extraction batch file {} for {}", file_response.id, step2_name)
+
+    batch_response = await client.batches.create(
+        input_file_id=file_response.id,
+        endpoint="/v1/chat/completions",
+        completion_window=completion_window,
+    )
+    logger.info("Submitted step-2 extraction batch {} for {} ({} rows)",
+                batch_response.id, step2_name, len(lines))
+    logger.info("  → Track progress: https://app.doubleword.ai/batches/{}", batch_response.id)
+    return batch_response.id
+
+
+async def poll_until_complete(
+    client: AsyncOpenAI,
+    batch_id: str,
+    label: str,
+    poll_interval: int = 30,
+) -> tuple[str, str | None, str | None, dict]:
+    """Poll a batch until terminal state. Returns (status, output_file_id, error_file_id, counts)."""
+    while True:
+        status, output_file_id, error_file_id, counts = await poll_batch(client, batch_id)
+        if status in ("completed", "failed", "expired", "cancelled"):
+            return status, output_file_id, error_file_id, counts
+        logger.info("[{}] step-2 batch {}: {}/{} done, waiting {}s…",
+                    label, batch_id, counts["completed"], counts["total"], poll_interval)
+        await asyncio.sleep(poll_interval)
