@@ -4,6 +4,8 @@ description: >-
   Project-specific orientation and workflow map for the playgroup_202602_docextract
   multi-model LLM benchmark. Invoke manually (/docextract-workflow) at the start of
   a session or task — detects the current stage and tells you exactly where to continue.
+  When regenerating or auditing the playground dashboard, enforces that every tab's
+  numbers match raw CSV/TSV data and that tables stay in sync with their charts.
 metadata:
   author: Mani Sarkar
   surfaces: [claude-code]
@@ -55,11 +57,14 @@ ls -lt data/extraction_stats.csv
 ```
 - New TSVs present but not yet reflected in stats → run `python score.py` to confirm F1
 
-### Step 4 — Check playground freshness
+### Step 4 — Check playground freshness **and data integrity**
 ```bash
-ls -lt which-models-extracted-playground.html data/playgroup_dev_extracted__*.tsv | head -10
+ls -lt which-models-extracted-playground.html data/playgroup_dev_extracted__*.tsv data/extraction_stats.csv | head -10
 ```
-- Playground older than any TSV → run `python playground.py`
+- Playground older than any TSV or `extraction_stats.csv` → run `python playground.py`
+- **After every regenerate (mandatory):** complete the **Playground Data Integrity Gate**
+  below. Fresh HTML alone is not enough — numbers must match raw data and tabs must
+  be internally consistent. Do not proceed to `/sync-docs` or commit until the gate passes.
 
 ### Step 5 — Check docs drift
 - README Key Findings stats (scored runs count, provider table, top-5 table) out of sync with
@@ -138,7 +143,7 @@ After routing, remind: runs are idempotent — existing TSVs are skipped.
 
 Route:
 - **1** → re-run the same extractor command to resume polling (checkpoint will pick up)
-- **2** → `python score.py` to verify F1, then continue cadence (playground → sync-docs → commit)
+- **2** → `python score.py` to verify F1, then playground → **Playground Data Integrity Gate** → sync-docs → commit
 - **3** → `python extractor.py --retry-failed` to resubmit failed rows and merge results
 - **4** → re-run the same extractor command; checkpoint file will resume where it left off
 
@@ -156,8 +161,8 @@ Route:
 
 Route:
 - **1** → start from top of cadence: `python score.py`
-- **2** → `python playground.py`, then `/sync-docs`
-- **3** → `/sync-docs`
+- **2** → `python playground.py`, then **Playground Data Integrity Gate**, then `/sync-docs`
+- **3** → `/sync-docs` (only if playground integrity gate already passed this session)
 - **4** → `/clean-commit` (data files first, docs second) → `/update-pr`
 
 ---
@@ -175,7 +180,8 @@ Route:
 | Retry failed rows (DW or V7) | `python extractor.py --retry-failed` |
 | Leaderboard (all models) | `python score.py` |
 | Verbose diff for one model | `python score.py data/playgroup_dev_extracted__<provider>__<model>.tsv` |
-| Regenerate playground HTML | `python playground.py` |
+| Regenerate playground HTML | `python playground.py` **then** Playground Data Integrity Gate |
+| Audit playground numbers vs CSV/TSV | Playground Data Integrity Gate (below) + [playground-integrity.md](playground-integrity.md) |
 | Check DW API vs local diff | `python sync_doubleword_models.py --diff` |
 | List raw DW API models | `python sync_doubleword_models.py --probe-api` |
 | Commit changes cleanly | `/clean-commit` |
@@ -191,11 +197,121 @@ When new model extractions complete, follow this sequence:
 
 1. **Score** — `python score.py` to verify F1 and confirm results look sane
 2. **Playground** — `python playground.py` to regenerate `which-models-extracted-playground.html`
-3. **Sync docs** — `/sync-docs` + README audit (see section below) to update stats, counts, tables
-4. **Commit** — `/clean-commit` for data files first, then docs (separate logical commits)
-5. **Push + PR** — `/update-pr` to push branch and refresh PR title/body
+3. **Integrity gate** — run the **Playground Data Integrity Gate** (hard stop on any mismatch)
+4. **Sync docs** — `/sync-docs` + README audit (see section below) to update stats, counts, tables
+5. **Commit** — `/clean-commit` for data files first, then docs (separate logical commits)
+6. **Push + PR** — `/update-pr` to push branch and refresh PR title/body
 
 Always commit data TSVs and stats CSVs before docs — they are the evidence the docs describe.
+
+---
+
+## Playground Data Integrity Gate
+
+**Hard rule:** After `python playground.py` (or when auditing an existing
+`which-models-extracted-playground.html`), the playground is **not done** until this
+gate passes. Advise the user that every visible number must match raw data; enforce by
+spot-checking and fixing before `/sync-docs` or commit. On any mismatch: stop, diagnose,
+regenerate or fix `playground.py` / data — do **not** hand-edit the HTML to "make numbers look right".
+
+Full per-tab checklist and commands: **[playground-integrity.md](playground-integrity.md)**.
+
+### Advise (tell the user / yourself up front)
+
+- Rankings F1 comes from **`score.py`** (semantic scoring), not from exact string equality.
+- Heatmaps / Errors / Document Analysis use **exact-match** vs `playgroup_dev_expected.tsv`.
+- Time / cost / token / fill-rate numbers come from **`data/extraction_stats.csv`**
+  (with call-log / pricing fallbacks already baked into `playground.py`).
+- **F1 ≠ exact-match accuracy is expected** — never "fix" that gap by changing scoring
+  or by forcing heatmap cells to equal F1. That would be a regression.
+
+### Enforce — source of truth map
+
+| Metric family | Source of truth | Playground consumers |
+|---|---|---|
+| F1 / Precision / Recall / fields_found | `python score.py` (from expected + extracted TSVs) | Rankings table + bar chart; Provider Analysis avg/best F1 |
+| Exact-match accuracy, per-field correct/missing/wrong | `data/playgroup_dev_expected.tsv` + each `data/playgroup_dev_extracted__*.tsv` | Field Heatmap, Document Analysis, Errors, Deep Dive |
+| Time, cost, tokens, rows_with_values, per-field fill counts | `data/extraction_stats.csv` (primary) | Rankings time/cost cols; Provider Analysis; Evolution cost/speed |
+| Model tier / pricing / modality labels | `config_models_*.py` via `playground.py` meta | Filters, badges, Recommendations catalog |
+
+### Enforce — table ↔ visual sync (every tab)
+
+For each tab that has both a table and a chart/visual:
+
+1. Pick 2–3 models (or providers) that appear in both.
+2. Confirm the **same underlying value** drives both (e.g. Rankings bar length = F1 × 100
+   from the same `RAW.f1_scores[m].f1` as the table cell).
+3. Confirm sort order / filters apply to **both** the table and the chart.
+4. Confirm shortened display labels (V7 `agent__` prefix stripped) still resolve to the
+   same full model id used in filenames and `extraction_stats.csv`.
+
+Tabs today: Rankings · Field Heatmap · Document Analysis · Errors · Deep Dive ·
+Recommendations · Provider Analysis · Evolution.
+
+### Enforce — minimum verification (must run)
+
+```bash
+# 1. Freshness: HTML not older than inputs
+ls -lt which-models-extracted-playground.html data/extraction_stats.csv data/playgroup_dev_extracted__*.tsv | head -15
+
+# 2. Leaderboard F1 must match score.py (sample top models)
+python score.py 2>/dev/null | head -40
+
+# 3. Spot-check embedded RAW vs CSV + score.py (brace-match — do NOT use naive regex)
+python - <<'PY'
+import csv, json
+from pathlib import Path
+from score import score_all_models
+
+html = Path("which-models-extracted-playground.html").read_text()
+idx = html.find("const RAW = ")
+assert idx >= 0, "RAW payload missing — regenerate with playground.py"
+i = html.find("{", idx)
+depth = 0
+for j, ch in enumerate(html[i:], start=i):
+    if ch == "{":
+        depth += 1
+    elif ch == "}":
+        depth -= 1
+        if depth == 0:
+            raw = json.loads(html[i : j + 1])
+            break
+else:
+    raise SystemExit("FAIL: unbalanced RAW JSON")
+
+assert raw.get("f1_scores") and raw.get("models"), "FAIL: empty RAW scores"
+MODEL = max(raw["f1_scores"], key=lambda m: raw["f1_scores"][m]["f1"])
+scored = {r["model_name"]: r for r in score_all_models("data/playgroup_dev_expected.tsv", verbose=False)}
+stats = {r["model_short_name"]: r for r in csv.DictReader(open("data/extraction_stats.csv"))}
+emb_f1 = raw["f1_scores"][MODEL]["f1"]
+src_f1 = scored[MODEL]["f1"]
+assert abs(emb_f1 - src_f1) < 1e-9, f"FAIL F1 {MODEL}: html={emb_f1} score.py={src_f1}"
+st, emb = stats.get(MODEL), raw.get("extraction_stats", {}).get(MODEL)
+assert st and emb, f"FAIL stats missing for {MODEL}"
+for k in ("total_elapsed_secs", "total_cost_usd", "total_prompt_tokens"):
+    assert abs(float(st[k]) - float(emb[k])) < 1e-9, f"FAIL {k} {MODEL}: csv={st[k]} html={emb[k]}"
+print(f"PASS spot-check {MODEL}: F1={emb_f1:.4f} matches score.py; time/cost/tokens match CSV")
+PY
+```
+
+Then open the HTML and walk **all eight tabs**: for each, confirm headline numbers and
+table↔chart pairs against the sources above (details in `playground-integrity.md`).
+
+### Pass / fail
+
+- **PASS** — freshness OK; sampled F1 matches `score.py`; sampled time/cost match CSV;
+  every tab's table and visual agree; no hand-edited HTML.
+- **FAIL** — any mismatch. Report tab + metric + expected (file) vs actual (UI/RAW).
+  Regenerate or fix the generator; re-run this gate. Do not continue the cadence.
+
+### Anti-regression (do not)
+
+- Do not equate Rankings F1 with heatmap exact-match %.
+- Do not rewrite `extraction_stats.csv` or TSVs to match a stale HTML file.
+- Do not patch only `which-models-extracted-playground.html` — always fix `playground.py`
+  (or regenerate) so the next run stays correct.
+- Do not change `score.py` field similarity rules unless the user explicitly asks — that
+  would shift every F1 and invalidate historical comparisons.
 
 ---
 
