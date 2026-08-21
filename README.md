@@ -16,7 +16,7 @@ Extract structured fields from UK charity financial PDFs using LLMs via [OpenRou
 
 ## Key Findings
 
-> **Provider aggregates below** match `python score.py` over every `data/*_dev_extracted__*.tsv` file present on **2026-08-09** (**109** scored runs: **40** counted as OpenRouter — 33 under `playgroup_dev_extracted__openrouter__*.tsv` plus **7** legacy paths without a provider segment, which `score.py` treats as OpenRouter — plus **36** Doubleword and **33** V7). **Registries:** 33 OpenRouter keys, 29 Doubleword models (4 auto-added stubs: `dw-kimi-k3`, `dw-gemma-4-26b-a4b-it`, `dw-deepseek-v4-flash-0731`, `dw-hy3-fp8`), 32 V7 keys — see `config_models_*.py`. Refresh numbers and [which-models-extracted-playground.html](which-models-extracted-playground.html) after new extractions: `python score.py` (check the printed **Provider summary**), then `python playground.py`.
+> **Provider aggregates below** match `python score.py` over every `data/*_dev_extracted__*.tsv` file present on **2026-08-21** (**111** scored runs: **40** counted as OpenRouter — 33 under `playgroup_dev_extracted__openrouter__*.tsv` plus **7** legacy paths without a provider segment, which `score.py` treats as OpenRouter — plus **38** Doubleword and **33** V7). **Registries:** 33 OpenRouter keys, 31 Doubleword models (auto-added stubs have tier `standard`, price `$0.00` until reviewed), 32 V7 keys — see `config_models_*.py`. Refresh numbers and [which-models-extracted-playground.html](which-models-extracted-playground.html) after new extractions: `python score.py` (check the printed **Provider summary**), then `python playground.py`.
 
 **V7 Go** is a third extraction backend (optional). Completed runs write `data/playgroup_dev_extracted__v7__*.tsv`; `python score.py` and the playground score them like OpenRouter and Doubleword.
 
@@ -24,30 +24,30 @@ Extract structured fields from UK charity financial PDFs using LLMs via [OpenRou
 
 | Provider | Models | Active | Failed | Avg F1 | Best F1 | Best Model | Avg Fields | Avg Time(s) | Avg Cost($) |
 |----------|--------|--------|--------|--------|---------|------------|------------|-------------|-------------|
-| Doubleword | 36 | 34 | 2 | 0.795 | 0.942 | dw-qwen3-5-397b-a17b-dottxt | 62.3/85 (73%) | 797.9 | 0.0365 |
+| Doubleword | 38 | 35 | 3 | 0.826 | 0.943 | dw-qwen3.8-27b | 64.9/85 (76%) | 783.4 | 0.0365 |
 | OpenRouter | 40 | 27 | 13 | 0.753 | 0.946 | gemini-3-pro | 56.0/85 (66%) | 1,404.1 | 0.0922 |
 | V7 Go | 33 | 33 | 0 | 0.833 | 0.852 | gpt4-1† | 62.8/85 (74%) | 123.8 | 0.0000 |
 
 † Same short label as `score.py` / the playground; TSV filenames and `extraction_stats.csv` use the full id `v7-go-agent-v2__gpt4-1`. **V7 cost** stays **0** in these aggregates until you set `price_in` / `price_out` in `config_models_v7.py`; **`batch_id`** in CSV is synthetic — see [V7 Go — Timing and cost](#v7-go--timing-and-cost).
 
-Doubleword’s snapshot **average** F1 among active models (0.795) edges OpenRouter’s (0.753); OpenRouter still has the highest **single-model** F1 (`gemini-3-pro`, 0.946), but Doubleword’s `dw-qwen3-5-397b-a17b-dottxt` and `dw-kimi-k3` both rank 2nd overall at 0.942. **V7** in this dataset averages **0.833** F1 with **no** failed (F1=0) runs among the 33 scored files. OpenRouter’s average is dragged down by free-tier failures; Doubleword’s average cost per active model (~$0.037) is lower than OpenRouter’s (~$0.092). V7 dollar totals stay at zero until pricing is mirrored into config (see [Auto-Sync Pricing](#auto-sync-pricing)).
+Doubleword’s snapshot **average** F1 among active models (0.826) edges OpenRouter’s (0.753); OpenRouter still has the highest **single-model** F1 (`gemini-3-pro`, 0.946), but Doubleword’s `dw-qwen3.8-27b` ranks 2nd overall at 0.943; `dw-qwen3-5-397b-a17b-dottxt` and `dw-kimi-k3` both rank 3rd at 0.942. **V7** in this dataset averages **0.833** F1 with **no** failed (F1=0) runs among the 33 scored files. OpenRouter’s average is dragged down by free-tier failures; Doubleword’s average cost per active model (~$0.037) is lower than OpenRouter’s (~$0.092). V7 dollar totals stay at zero until pricing is mirrored into config (see [Auto-Sync Pricing](#auto-sync-pricing)).
 
 **Top 5 models by F1 score:**
 
 | Rank | Model | Provider | F1 | Precision | Recall | Fields Found |
 |------|-------|----------|----|-----------|--------|-------------|
 | 1 | gemini-3-pro | OpenRouter | 0.946 | 0.975 | 0.918 | 78/85 (92%) |
-| 2= | dw-qwen3-5-397b-a17b-dottxt | Doubleword | 0.942 | 0.975 | 0.911 | 77/85 (91%) |
-| 2= | dw-kimi-k3 | Doubleword | 0.942 | 0.975 | 0.911 | 77/85 (91%) |
-| 4 | qwen3-235b | OpenRouter | 0.937 | 0.975 | 0.902 | 77/85 (90%) |
-| 5 | dw-glm-5-2 | Doubleword | 0.935 | 0.974 | 0.899 | 76/85 (90%) |
+| 2 | dw-qwen3.8-27b | Doubleword | 0.943 | 0.987 | 0.903 | 77/85 (90%) |
+| 3= | dw-qwen3-5-397b-a17b-dottxt | Doubleword | 0.942 | 0.975 | 0.911 | 77/85 (91%) |
+| 3= | dw-kimi-k3 | Doubleword | 0.942 | 0.975 | 0.911 | 77/85 (91%) |
+| 5 | qwen3-235b | OpenRouter | 0.937 | 0.975 | 0.902 | 77/85 (90%) |
 
-*(No V7 model in the global top five on 2026-08-09; best V7 run is **gpt4-1** at F1 **0.852**, ranked just below the OpenRouter / Doubleword leaders — run `python score.py` for the full sort.)*
+*(No V7 model in the global top five on 2026-08-21; best V7 run is **gpt4-1** at F1 **0.852**, ranked just below the OpenRouter / Doubleword leaders — run `python score.py` for the full sort.)*
 
 **Takeaways:**
 
-- **Doubleword now holds 8 of the global top 10.** `dw-qwen3-5-397b-a17b-dottxt` and `dw-kimi-k3` both rank 2nd (F1=0.942); `dw-glm-5-2` (0.935), `dw-hy3-fp8` (0.933), `dw-qwen3-5-35b-a3b-dottxt` (0.930), `dw-qwen3-6-35b-a3b` (0.929), `dw-inkling` (0.927), and `dw-qwen3.5-9b` (0.927) follow. Doubleword’s best models outperform all OpenRouter models except `gemini-3-pro`.
-- **34 of 36 Doubleword models produced usable results.** Standard text LLMs score F1 0.820–0.942. Three OCR-specialist models were benchmarked: `dw-olmocr-2-7b-1025` (F1=0.090), `dw-lightonocr-2-1b-bbox-soup` (F1=0.000, nearly all docs failed), and `dw-deepseek-ocr-2` (F1=0.006, near-complete failure). Two models returned empty results: `dw-qwen3.5-397b` and `dw-deepseek-ocr-2`.
+- **Doubleword now holds 8 of the global top 10.** `dw-qwen3.8-27b` ranks 2nd overall (F1=0.943); `dw-qwen3-5-397b-a17b-dottxt` and `dw-kimi-k3` both rank 3rd (F1=0.942); `dw-glm-5-2` (0.935), `dw-hy3-fp8` (0.933), `dw-qwen3-5-35b-a3b-dottxt` (0.930), `dw-qwen3-6-35b-a3b` (0.929), and `dw-inkling` (0.927) round out the DW top-10 contingent. Doubleword’s best models outperform all OpenRouter models except `gemini-3-pro`.
+- **35 of 38 Doubleword models produced usable results.** Standard text LLMs score F1 0.820–0.943. Three OCR-specialist models were benchmarked: `dw-olmocr-2-7b-1025` (F1=0.090), `dw-lightonocr-2-1b-bbox-soup` (F1=0.000), and `dw-deepseek-ocr-2` (F1=0.000 — confirmed pure-OCR model; returns markdown, cannot follow JSON extraction instructions). Three models returned empty/zero-F1 results: `dw-qwen3.5-397b`, `dw-deepseek-ocr-2`, and `dw-lightonocr-2-1b-bbox-soup`.
 - **Free-tier models universally failed** on this task — all 14 zero-score models are either free-tier or had context/format issues. This includes `llama-3.3-70b-free`, `gemma-3-27b-free`, `gemma-3n-free`, and others.
 - **Precision is consistently high across scoring models** (0.96–0.97), meaning when models extract a field, they're usually correct. The differentiator is recall — whether they find all fields.
 - **The hardest fields** are `income_annually_in_british_pounds` and `spending_annually_in_british_pounds` — even top models miss these on some documents.
@@ -319,7 +319,7 @@ python score.py data/playgroup_dev_extracted__v7__v7-go-agent-v2__claude-sonnet.
 | `score.py` | Scorer with F1/Precision/Recall. No args → ranked leaderboard; pass a filename → verbose field-by-field diff. Leaderboard **Model** column uses the same short display rule as the playground when shared `agent__` prefixes apply (see [Results](#results)). |
 | `utils.py` | Shared helpers (`extract_from_triple_backticks` — strips `<think>` blocks from reasoning models before extraction, `sanitize_error_message`, `get_logger`). |
 | `config_models_openrouter.py` | OpenRouter model registry — 33 models organised by tier. |
-| `config_models_doubleword.py` | Doubleword model registry — 29 extraction models (manually maintained; auto-sync disabled via `SKIP_DOUBLEWORD_SYNC=1`). |
+| `config_models_doubleword.py` | Doubleword model registry — 31 extraction models (manually maintained; auto-sync disabled via `SKIP_DOUBLEWORD_SYNC=1`). |
 | `config_models_v7.py` | V7 Go model registry — short names (e.g. `v7-go-agent-v2/claude-sonnet`) mapped to display metadata; agent IDs and field slugs usually come from env (see “V7 Go” above). |
 | `playground.py` | Generates `which-models-extracted-playground.html` from extraction results. Chart/table **labels** use short model names when safe (shared `agent__` prefix); embedded JSON keys stay full ids. Rankings use F1; heatmaps/errors use exact-match. Tables and charts share one row builder per tab — after regenerate, verify integrity (see `/docextract-workflow`). |
 
@@ -338,12 +338,12 @@ Models are grouped into four tiers by cost (per million input tokens):
 
 #### Doubleword Batch API (`config_models_doubleword.py`)
 
-Prefixed with `dw-`. **29** extraction models, maintained manually (auto-sync disabled via `SKIP_DOUBLEWORD_SYNC=1` because Doubleword's docs show model identifiers that don't match their batch API — see [Auto-Sync Pricing](#auto-sync-pricing)). Pricing is for the 1h batch tier (24h is 30-50% cheaper). Embedding models are excluded (not used for extraction). OCR models receive PDF pages as base64-encoded images rendered via PyMuPDF.
+Prefixed with `dw-`. **31** extraction models, maintained manually (auto-sync disabled via `SKIP_DOUBLEWORD_SYNC=1` because Doubleword's docs show model identifiers that don't match their batch API — see [Auto-Sync Pricing](#auto-sync-pricing)). Pricing is for the 1h batch tier (24h is 30-50% cheaper). Embedding models are excluded (not used for extraction). OCR models receive PDF pages as base64-encoded images rendered via PyMuPDF.
 
 | Tier | Examples |
 |---|---|
 | `budget` (4) | `dw-deepseek-ocr-2`, `dw-lightonocr-2-1b-bbox-soup`, `dw-olmocr-2-7b-1025`, `dw-qwen3-14b` |
-| `standard` (13) | `dw-gemma-4-31b-it`, `dw-gpt-oss-20b`, `dw-gpt-oss-120b`, `dw-inkling`, `dw-nemotron-3-super-120b-a12b`, `dw-qwen3-5-35b-a3b`, `dw-qwen3-5-35b-a3b-dottxt`, `dw-qwen3-5-4b`, `dw-qwen3-5-9b`, `dw-qwen3-5-9b-dottxt`, `dw-qwen3-6-35b-a3b`, `dw-qwen3-vl-235b-a22b-instruct`, `dw-qwen3-vl-30b-a3b-instruct` |
+| `standard` (19) | `dw-deepseek-v4-flash-0731`, `dw-gemma-4-26b-a4b-it`, `dw-gemma-4-31b-it`, `dw-gpt-oss-20b`, `dw-gpt-oss-120b`, `dw-hy3-fp8`, `dw-inkling`, `dw-kimi-k3`, `dw-muse-glimmer-30b`, `dw-nemotron-3-super-120b-a12b`, `dw-qwen3-5-35b-a3b`, `dw-qwen3-5-35b-a3b-dottxt`, `dw-qwen3-5-4b`, `dw-qwen3-5-9b`, `dw-qwen3-5-9b-dottxt`, `dw-qwen3-6-35b-a3b`, `dw-qwen3-vl-235b-a22b-instruct`, `dw-qwen3-vl-30b-a3b-instruct`, `dw-qwen3.8-27b` |
 | `premium` (8) | `dw-deepseek-v4-flash`, `dw-deepseek-v4-pro`, `dw-glm-5-1`, `dw-glm-5-2`, `dw-kimi-k2-6`, `dw-nemotron-3-ultra-550b-a55b`, `dw-qwen3-5-397b-a17b`, `dw-qwen3-5-397b-a17b-dottxt` |
 
 Each model entry includes: model ID (manually corrected from API), `multimodal` flag, supported modalities, context length, `intelligence` score, `quantization` (FP8/FP4/INT4/NVFP4), API modes (`batch`/`async`/`realtime`), `params_total`/`params_active`, `thinking_default` (reasoning on by default?), `dottxt` flag (structured generation variant), `ocr` flag with OCR-specific config (`ocr_prompt`, `ocr_max_image_dim`), `description`, and `usage_notes`.
