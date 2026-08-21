@@ -5,7 +5,8 @@ description: >-
   multi-model LLM benchmark. Invoke manually (/docextract-workflow) at the start of
   a session or task — detects the current stage and tells you exactly where to continue.
   When regenerating or auditing the playground dashboard, enforces that every tab's
-  numbers match raw CSV/TSV data and that tables stay in sync with their charts.
+  numbers match raw CSV/TSV data, tables stay in sync with charts, and any sync/drift
+  bugs are corrected in playground.py (not only reported).
 metadata:
   author: Mani Sarkar
   surfaces: [claude-code]
@@ -234,16 +235,46 @@ Full per-tab checklist and commands: **[playground-integrity.md](playground-inte
 | Time, cost, tokens, rows_with_values, per-field fill counts | `data/extraction_stats.csv` (primary) | Rankings time/cost cols; Provider Analysis; Evolution cost/speed |
 | Model tier / pricing / modality labels | `config_models_*.py` via `playground.py` meta | Filters, badges, Recommendations catalog |
 
-### Enforce — table ↔ visual sync (every tab)
+### Enforce — table ↔ visual sync (every tab) — audit **and correct**
 
-For each tab that has both a table and a chart/visual:
+**Hard rule:** Finding a mismatch is not enough. Fix it in `playground.py`, regenerate
+`which-models-extracted-playground.html`, and re-verify. Do not ship known sync bugs.
 
-1. Pick 2–3 models (or providers) that appear in both.
-2. Confirm the **same underlying value** drives both (e.g. Rankings bar length = F1 × 100
-   from the same `RAW.f1_scores[m].f1` as the table cell).
-3. Confirm sort order / filters apply to **both** the table and the chart.
-4. Confirm shortened display labels (V7 `agent__` prefix stripped) still resolve to the
-   same full model id used in filenames and `extraction_stats.csv`.
+For **each** of the eight tabs, enforce:
+
+1. Pair every table with its adjacent chart/visual (see matrix in
+   [playground-integrity.md](playground-integrity.md)).
+2. Confirm the **same underlying rows and values** drive both (same order, same metric).
+3. Confirm filter/sort controls refresh **every** paired view together (shared `*Views()`
+   helpers — never `onchange` that updates only the table or only the chart).
+4. Confirm Chart.js category axes use `ticks.autoSkip: false` and a wrap height that
+   fits every category (`sizeCategoryChartWrap`). Crowded fixed-height charts with
+   default autoSkip make labels look like the wrong models.
+5. Confirm shortened display labels still map to full model ids in filenames / CSV.
+
+**Mandatory static scan of `playground.py` before PASS** (must be clean or fixed):
+
+```bash
+# Fail if multi-view tabs still use one-sided renderers or missing shared builders
+python - <<'PY'
+from pathlib import Path
+src = Path("playground.py").read_text()
+for name in (
+    "sizeCategoryChartWrap", "renderRankingsViews()", "renderErrorBreakdownViews()",
+    "renderFieldTabViews()", "renderDocTabViews()", "providerAggRows()",
+    "fieldDifficultyRows()", "docDifficultyRows()",
+):
+    assert name in src, f"missing {name}"
+assert 'onchange="renderRankTable()"' not in src
+assert 'onchange="renderFieldHeatmap()"' not in src
+assert 'onchange="renderDocHeatmap()"' not in src
+assert src.count("autoSkip:false") + src.count("autoSkip: false") >= 4
+print("PASS: playground.py chart sync guards present")
+PY
+```
+
+If the scan fails or a tab walk finds drift: **correct in `playground.py`**, run
+`python playground.py`, re-run the scan and the per-tab checklist. Only then PASS.
 
 Tabs today: Rankings · Field Heatmap · Document Analysis · Errors · Deep Dive ·
 Recommendations · Provider Analysis · Evolution.
@@ -300,9 +331,11 @@ table↔chart pairs against the sources above (details in `playground-integrity.
 ### Pass / fail
 
 - **PASS** — freshness OK; sampled F1 matches `score.py`; sampled time/cost match CSV;
-  every tab's table and visual agree; no hand-edited HTML.
-- **FAIL** — any mismatch. Report tab + metric + expected (file) vs actual (UI/RAW).
-  Regenerate or fix the generator; re-run this gate. Do not continue the cadence.
+  static chart-sync scan clean; every tab's table and visual agree; no hand-edited HTML;
+  any prior sync bugs were **fixed in `playground.py`** and regenerated.
+- **FAIL** — any mismatch. Report tab + metric + expected (file) vs actual (UI/RAW),
+  **then correct** the generator (or data), regenerate, and re-run this gate. Do not
+  continue the cadence with known drift.
 
 ### Anti-regression (do not)
 
@@ -310,6 +343,9 @@ table↔chart pairs against the sources above (details in `playground-integrity.
 - Do not rewrite `extraction_stats.csv` or TSVs to match a stale HTML file.
 - Do not patch only `which-models-extracted-playground.html` — always fix `playground.py`
   (or regenerate) so the next run stays correct.
+- Do not leave Chart.js category charts with default `autoSkip` when many models/docs
+  are plotted — that recreates the Rankings/Errors label↔bar misalignment.
+- Do not wire `onchange` to only one half of a table/chart pair.
 - Do not change `score.py` field similarity rules unless the user explicitly asks — that
   would shift every F1 and invalidate historical comparisons.
 
