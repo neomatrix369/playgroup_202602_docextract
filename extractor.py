@@ -891,6 +891,33 @@ async def _retry_failed_rows_doubleword(models_to_retry, completion_window="1h")
                                                     model_short_name, detected_ctx, cfg_ctx)
                                         _sync.update_model_ctx(model_short_name, detected_ctx)
                                     break
+                    retry_model_cfg = DOUBLEWORD_MODELS[model_short_name]
+                    if retry_model_cfg.get("two_step_ocr") and retry_model_cfg.get("ocr_extract_model"):
+                        extract_key = retry_model_cfg["ocr_extract_model"]
+                        extract_model_cfg = DOUBLEWORD_MODELS[extract_key]
+                        log.info("[Retry][{}] two_step_ocr: submitting step-2 extraction via {}…",
+                                 model_short_name, extract_key)
+                        try:
+                            step2_batch_id = await llm_doubleword.submit_text_extraction_batch(
+                                client, f"{model_short_name}::step2", extract_model_cfg["model"],
+                                new_results, row_subsets[model_short_name], PROMPT_TEMPLATE,
+                                completion_window=completion_window,
+                                extra_params=extract_model_cfg.get("extra_params"),
+                            )
+                            s2_status, s2_out_fid, s2_err_fid, _ = await llm_doubleword.poll_until_complete(
+                                client, step2_batch_id, model_short_name, poll_interval=DOUBLEWORD_POLL_INTERVAL,
+                            )
+                            if s2_status == "completed" and s2_out_fid:
+                                new_results = await llm_doubleword.download_results(client, s2_out_fid)
+                                if s2_err_fid:
+                                    s2_pre_errs = await llm_doubleword.download_error_file(client, s2_err_fid)
+                                    for rn, emsg in s2_pre_errs.items():
+                                        if rn not in new_results:
+                                            new_results[rn] = {"error": emsg}
+                            else:
+                                log.error("[Retry][{}] step-2 batch {}: {}", model_short_name, step2_batch_id, s2_status)
+                        except Exception as s2_e:
+                            log.error("[Retry][{}] step-2 extraction failed: {}", model_short_name, s2_e)
                     rows_fixed, still_failed = _merge_doubleword_results(
                         model_short_name, new_results, row_subsets[model_short_name]
                     )
@@ -1251,7 +1278,44 @@ async def _run_all_doubleword(models_to_run, completion_window="1h"):
                                                     model_short_name, detected_ctx, cfg_ctx)
                                         _sync.update_model_ctx(model_short_name, detected_ctx)
                                     break  # one correction per model per batch
-                    _write_doubleword_results(model_short_name, results, rows, elapsed, batch_id=batch_id)
+                    model_cfg = DOUBLEWORD_MODELS[model_short_name]
+                    if model_cfg.get("two_step_ocr") and model_cfg.get("ocr_extract_model"):
+                        # Step-1 done: OCR text extracted. Now run step-2: JSON extraction batch.
+                        extract_key = model_cfg["ocr_extract_model"]
+                        extract_model_cfg = DOUBLEWORD_MODELS[extract_key]
+                        log.info("[{}] two_step_ocr: step-1 OCR done ({} rows). "
+                                 "Submitting step-2 extraction via {}…",
+                                 model_short_name, len(results), extract_key)
+                        step2_name = f"{model_short_name}::step2"
+                        try:
+                            step2_batch_id = await llm_doubleword.submit_text_extraction_batch(
+                                client, step2_name, extract_model_cfg["model"],
+                                results, rows, PROMPT_TEMPLATE,
+                                completion_window=completion_window,
+                                extra_params=extract_model_cfg.get("extra_params"),
+                            )
+                            # Poll step-2 synchronously (blocking until done)
+                            s2_status, s2_out_fid, s2_err_fid, s2_counts = await llm_doubleword.poll_until_complete(
+                                client, step2_batch_id, model_short_name, poll_interval=DOUBLEWORD_POLL_INTERVAL,
+                            )
+                            if s2_status == "completed" and s2_out_fid:
+                                step2_results = await llm_doubleword.download_results(client, s2_out_fid)
+                                if s2_err_fid:
+                                    s2_pre_errs = await llm_doubleword.download_error_file(client, s2_err_fid)
+                                    for rn, emsg in s2_pre_errs.items():
+                                        if rn not in step2_results:
+                                            step2_results[rn] = {"error": emsg}
+                                _write_doubleword_results(model_short_name, step2_results, rows, elapsed, batch_id=batch_id)
+                            else:
+                                log.error("[{}] step-2 batch {}: {} — writing step-1 OCR text as fallback",
+                                          model_short_name, step2_batch_id, s2_status)
+                                _write_doubleword_results(model_short_name, results, rows, elapsed, batch_id=batch_id)
+                        except Exception as s2_e:
+                            log.error("[{}] step-2 extraction failed: {} — writing step-1 OCR text as fallback",
+                                      model_short_name, s2_e)
+                            _write_doubleword_results(model_short_name, results, rows, elapsed, batch_id=batch_id)
+                    else:
+                        _write_doubleword_results(model_short_name, results, rows, elapsed, batch_id=batch_id)
                     llm_doubleword.remove_checkpoint_entry(model_short_name)
                     done.append(model_short_name)
                     completed_models += 1

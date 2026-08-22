@@ -18,3 +18,10 @@ data/.v7_unavailable_models.json
 .playwright-mcp/
 
 DW_FB.md
+
+# Log-scroll media: ignore bulky drops/outputs; keep README + folder scaffolding
+media/log-scrolls/outputs/*
+!media/log-scrolls/outputs/.gitkeep
+media/log-scrolls/inputs/*
+!media/log-scrolls/inputs/.gitkeep
+.gate-cache/
