@@ -2,12 +2,23 @@
 
 Extract structured fields from UK charity financial PDFs using LLMs via [OpenRouter](https://openrouter.ai/), the [Doubleword Batch API](https://docs.doubleword.ai/batches/getting-started-with-batched-api), or [V7 Go](https://docs.go.v7labs.com/) (agent/entity API), then score and rank the results across every extracted run in `data/` (dozens of models across OpenRouter, Doubleword, and optional V7). V7 is an optional third backend for product-style runs (e.g. Doc Risk Auditor).
 
-**Jump to:** [Key Findings](#key-findings) | [Setup](#setup) | [Workflow](#end-to-end-workflow) | [V7 Go](#v7-go-optional-backend) | [Results](#results) | [Repo Reference](#whats-in-this-repo) | [Dataset](#dataset) | [V7 doc (short)](docs/v7-go.md)
+**Jump to:** [Hosted demos](#hosted-demos) | [Key Findings](#key-findings) | [Setup](#setup) | [Workflow](#end-to-end-workflow) | [V7 Go](#v7-go-optional-backend) | [Results](#results) | [Repo Reference](#whats-in-this-repo) | [Dataset](#dataset) | [V7 doc (short)](docs/v7-go.md)
+
+## Hosted demos
+
+Browse results **without cloning** — mirrors of this repo’s playground on [neomatrix369.github.io](https://neomatrix369.github.io/):
+
+| What | Link |
+|------|------|
+| **Playground archive** (21 snapshots, embedded viewer) | [Open archive](https://neomatrix369.github.io/demos/playgroup-202602-docextract/) |
+| **Latest playground** (111 scored runs) | [Latest snapshot](https://neomatrix369.github.io/demos/playgroup-202602-docextract/2026-08-22T0830Z-which-models-extracted-playground.html) |
+| **Project write-up** (findings & methodology) | [Project page](https://neomatrix369.github.io/pages/playgroup-202602-docextract.html) |
+| **Doubleword extraction guide** (video + walkthrough) | [Guide](https://neomatrix369.github.io/demos/playgroup-202602-docextract/extractor-all-doubleword.html) |
 
 > **Who is this for?**
 >
 > - **Playgroup attendees** — start with [QUICKSTART.md](QUICKSTART.md), then follow the [Workflow](#end-to-end-workflow) section below.
-> - **Curious explorers** — read the [Key Findings](#key-findings) and open the [interactive playground](which-models-extracted-playground.html) to browse results without running any code.
+> - **Curious explorers** — read the [Key Findings](#key-findings) and open the [interactive playground](which-models-extracted-playground.html) locally, or use the **[hosted playground archive](https://neomatrix369.github.io/demos/playgroup-202602-docextract/)** (no install).
 > - **Contributors / extenders** — see [Repo Reference](#whats-in-this-repo) for the full file map and how pieces connect.
 > - **Doubleword team** — see [Key Findings](#key-findings) for benchmark results, the [Doubleword Batch API](#doubleword-batch-api-configmodelsdoublewordpy) tier table, and note the [timing and cost](#doubleword-batch-api--timing-and-cost) details. V7 rows show up in the same `score.py` / playground outputs once `data/playgroup_dev_extracted__v7__*.tsv` exist — see [V7 Go — Timing and cost](#v7-go--timing-and-cost) and [pricing](#auto-sync-pricing) below.
 > - **V7 Go users** — see [V7 Go (optional backend)](#v7-go-optional-backend), the [V7 registry](#v7-registry) table, and the focused guide [docs/v7-go.md](docs/v7-go.md).
@@ -53,7 +64,7 @@ Doubleword’s snapshot **average** F1 among active models (0.812) edges OpenRou
 - **The hardest fields** are `income_annually_in_british_pounds` and `spending_annually_in_british_pounds` — even top models miss these on some documents.
 - **V7 Go** uses the same field schema and scorer; quality depends on your deployed agent and template. Use `--all-v7` or a single `v7-*` key, then compare F1 side-by-side with OpenRouter and Doubleword in `score.py` and the playground.
 
-For the full interactive breakdown (field heatmaps, per-document analysis, error patterns, provider comparisons), open the **[Model Extraction Playground](which-models-extracted-playground.html)** locally in a browser. It has 8 tabs: Rankings, Field Heatmap, Document Analysis, Error Breakdown, Deep Dive, Recommendations, Provider Analysis, and Project Evolution.
+For the full interactive breakdown (field heatmaps, per-document analysis, error patterns, provider comparisons), open the **[Model Extraction Playground](which-models-extracted-playground.html)** locally in a browser, or the **[hosted archive](https://neomatrix369.github.io/demos/playgroup-202602-docextract/)** on neomatrix369.github.io. It has 8 tabs: Rankings, Field Heatmap, Document Analysis, Error Breakdown, Deep Dive, Recommendations, Provider Analysis, and Project Evolution.
 
 **Two scoring views in the playground:** Rankings / Provider Analysis use **semantic F1** from `score.py`; Field Heatmap, Document Analysis, Errors, and Deep Dive use **exact-match** vs the expected TSV. F1 can be higher than exact-match when values are close but not identical — that is expected. After regenerating with `python playground.py`, confirm every tab’s numbers match the CSV/TSV sources and that each table stays in sync with its chart (agents: `/docextract-workflow` → Playground Data Integrity Gate).
 
