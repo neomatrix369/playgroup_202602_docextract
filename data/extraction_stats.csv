@@ -124,3 +124,7 @@ datetime,provider,model_short_name,model_full_name,tier,multimodal,price_in,pric
 2026-08-21 23:12:52,Doubleword,dw-muse-glimmer-30b,meta-models/Muse-Glimmer-30B,standard,False,0.0,0.0,262000,11,11,0,407,157854,15062,0.0,37.0,0.0,11,11,11,8,8,10,11,11,be42d998-8344-416b-9a17-233a89c3e53f
 2026-08-21 23:36:21,Doubleword,dw-deepseek-ocr-2,deepseek-ai/DeepSeek-OCR-2,budget,True,0.05,0.05,16834,11,0,11,132,25844,14509,0.002018,12.0,0.000183,0,0,0,0,0,0,0,0,61e80306-ba30-453c-9a5b-d94a5c47e686
 2026-08-22 00:50:40,Doubleword,dw-deepseek-ocr-2,deepseek-ai/DeepSeek-OCR-2,budget,True,0.05,0.05,16834,11,7,4,59,12939,298516,0.015573,5.36,0.001416,3,6,5,1,1,2,2,2,2c32613a-14c1-4ced-a9a1-63970261a22a
+2026-09-10 00:41:45,Doubleword,dw-mimo-v2.5-pro,XiaomiMiMo/MiMo-V2.5-Pro,standard,False,0.0,0.0,1048000,11,11,0,97,176825,27814,0.0,8.82,0.0,11,11,11,8,8,10,11,11,15bc734a-36c8-4cb9-bd11-295b3fe09c08
+2026-09-10 00:50:23,Doubleword,dw-glm-5.3,zai-org/GLM-5.3,standard,False,0.0,0.0,1048000,11,11,0,614,162631,35669,0.0,55.82,0.0,11,11,11,9,9,10,11,11,c93dabc9-924e-4128-9e2d-9f15a9c0e138
+2026-09-10 00:50:38,Doubleword,dw-deepseek-v4-pro-0813,deepseek-ai/DeepSeek-V4-Pro-0813,standard,False,0.0,0.0,1048000,11,11,0,620,159846,17084,0.0,56.36,0.0,11,11,11,9,9,10,11,11,1af8f5c4-0459-458c-ba22-0279c20ebbd1
+2026-09-10 00:50:43,Doubleword,dw-glm-5.3-flash,zai-org/GLM-5.3-Flash,standard,False,0.0,0.0,262000,11,10,1,720,162632,24294,0.0,65.45,0.0,10,10,10,8,8,9,10,10,04751d97-13d7-40af-a2ab-77ccfec94963
