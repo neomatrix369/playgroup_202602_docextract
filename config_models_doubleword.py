@@ -501,4 +501,49 @@ DOUBLEWORD_MODELS = {
         "auto_added": True,
     },
 
+    # ═══════════════════════════════════════════════════════════
+    #  AUTO-ADDED 2026-09-10 — prices/tier/ctx need review
+    # ═══════════════════════════════════════════════════════════
+
+    "dw-mimo-v2.5-pro": {
+        "model":      "XiaomiMiMo/MiMo-V2.5-Pro",
+        "multimodal": False,
+        "modalities": ["text"],
+        "tier":       "standard",       # TODO: verify
+        "price_in":   0.00, "price_out": 0.00,  # TODO: fill from pricing page
+        "ctx":        1_048_000,
+        "notes":      "",
+        "auto_added": True,
+    },
+    "dw-deepseek-v4-pro-0813": {
+        "model":      "deepseek-ai/DeepSeek-V4-Pro-0813",
+        "multimodal": False,
+        "modalities": ["text"],
+        "tier":       "standard",       # TODO: verify
+        "price_in":   0.00, "price_out": 0.00,  # TODO: fill from pricing page
+        "ctx":        1_048_000,
+        "notes":      "",
+        "auto_added": True,
+    },
+    "dw-glm-5.3": {
+        "model":      "zai-org/GLM-5.3",
+        "multimodal": False,
+        "modalities": ["text"],
+        "tier":       "standard",       # TODO: verify
+        "price_in":   0.00, "price_out": 0.00,  # TODO: fill from pricing page
+        "ctx":        1_048_000,
+        "notes":      "",
+        "auto_added": True,
+    },
+    "dw-glm-5.3-flash": {
+        "model":      "zai-org/GLM-5.3-Flash",
+        "multimodal": False,
+        "modalities": ["text"],
+        "tier":       "standard",       # TODO: verify
+        "price_in":   0.00, "price_out": 0.00,  # TODO: fill from pricing page
+        "ctx":        262_000,
+        "notes":      "",
+        "auto_added": True,
+    },
+
 }
