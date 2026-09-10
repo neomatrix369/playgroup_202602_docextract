@@ -38,6 +38,8 @@ def sanitize_error_message(msg):
     """Strip sensitive fields (user_id, api keys) from API error messages."""
     msg = re.sub(r"'user_id':\s*'[^']*'", "'user_id': '<redacted>'", msg)
     msg = re.sub(r"\"user_id\":\s*\"[^\"]*\"", '"user_id": "<redacted>"', msg)
+    msg = re.sub(r"(?i)(api[_-]?key|authorization|x-api-key)(['\"\s:=]+)[^'\"\s,}]+", r"\1\2<redacted>", msg)
+    msg = re.sub(r"(/keys/)[A-Fa-f0-9]{32,}", r"\1<redacted>", msg)
     return msg
 
 def extract_from_triple_backticks(text):

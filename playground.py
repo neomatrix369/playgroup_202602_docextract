@@ -102,6 +102,10 @@ def load_model_meta() -> dict:
             "dottxt":     cfg.get("dottxt", False),
             "ocr":        cfg.get("ocr", False),
             "description": cfg.get("description", ""),
+            "potentially_deprecated": cfg.get("potentially_deprecated", False),
+            "deprecated": cfg.get("deprecated", False),
+            "deprecation_reason": cfg.get("deprecation_reason", ""),
+            "successor":  cfg.get("successor", ""),
         }
     # TSV filenames use __ where V7 registry keys use / (e.g. v7-go-agent-v2__gpt4-1)
     for short_name, block in list(meta.items()):
@@ -125,7 +129,10 @@ def load_model_meta() -> dict:
                 "modalities": overrides.get("modalities", []),
                 "ctx": overrides.get("ctx"),
                 "notes": overrides.get("notes", ""),
+                "potentially_deprecated": overrides.get("potentially_deprecated", False),
                 "deprecated": overrides.get("deprecated", False),
+                "deprecation_reason": overrides.get("deprecation_reason", ""),
+                "successor": overrides.get("successor", ""),
                 "ocr": overrides.get("ocr", False),
             }
 
@@ -225,23 +232,21 @@ def load_extraction_stats() -> dict:
         except ImportError:
             all_models = {}
         for model_name, cfg in all_models.items():
-            if model_name not in stats:
+            current = stats.get(model_name)
+            if current is None or current.get("estimated"):
                 price_in = cfg.get("price_in", 0)
                 price_out = cfg.get("price_out", 0)
                 est_cost = (avg_prompt * price_in + avg_completion * price_out) / 1_000_000
                 if est_cost > 0:
                     n = 11  # expected rows
                     stats[model_name] = {
+                        **(current or {}),
                         "total_elapsed_secs": avg_elapsed,
                         "total_cost_usd": est_cost,
                         "total_prompt_tokens": avg_prompt,
                         "total_completion_tokens": avg_completion,
-                        "rows_with_values": 0,
-                        "rows_empty": 0,
-                        "total_rows": 0,
                         "avg_secs_per_row": avg_elapsed / n,
                         "avg_cost_per_row": est_cost / n,
-                        "field_counts": {},
                         "estimated": True,
                     }
 
@@ -1825,8 +1830,10 @@ function renderModelCatalog(){
     const flags = [meta.dottxt?'dottxt':'', meta.ocr?'OCR':''].filter(Boolean).join(' ')
     const desc = meta.description || ''
     const descShort = desc.length > 120 ? desc.slice(0,117)+'…' : desc
+    const depr = (meta.potentially_deprecated || meta.deprecated) ? ' <span class="badge badge-orange">Potentially deprecated</span>' : ''
+    const deprReason = (meta.potentially_deprecated || meta.deprecated) && meta.deprecation_reason ? '<div style="font-size:10px;color:var(--muted);margin-top:2px">' + meta.deprecation_reason + (meta.successor ? ' → ' + meta.successor : '') + '</div>' : ''
     html += `<tr>
-      <td><strong>${modelDisplayName(m)}</strong>${flags?' <span class="badge badge-blue" style="font-size:9px">'+flags+'</span>':''}</td>
+      <td><strong>${modelDisplayName(m)}</strong>${flags?' <span class="badge badge-blue" style="font-size:9px">'+flags+'</span>':''}${depr}${deprReason}</td>
       <td>${providerBadge(m)}</td>
       <td style="color:${hsl(f1)};font-weight:600">${f1?f1.toFixed(3):'<span style="color:var(--red)">0</span>'}</td>
       <td>${costTierBadge(m)}</td>

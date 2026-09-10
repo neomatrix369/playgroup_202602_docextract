@@ -110,15 +110,6 @@ OPENROUTER_MODELS = {
     },
 
     # ── Ultra Cheap · Multimodal ──────────────────────────────
-    "gemini-2.5-flash": {
-        "model":      "google/gemini-2.5-flash",
-        "multimodal": True,
-        "modalities": ["text", "image", "video", "audio", "pdf"],
-        "tier":       "ultra_cheap",
-        "price_in":   0.15, "price_out": 0.60,
-        "ctx":        1_000_000,
-        "notes":      "Best-value thinking+vision model, 1M ctx",
-    },
     "gemini-2.0-flash": {
         "model":      "google/gemini-2.0-flash-001",
         "multimodal": True,
@@ -127,15 +118,20 @@ OPENROUTER_MODELS = {
         "price_in":   0.10, "price_out": 0.40,
         "ctx":        1_000_000,
         "notes":      "Production workhorse, full multimodal, 1M ctx",
+        "potentially_deprecated": True,
+        "first_noticed_missing": "2026-09-10",
+        "deprecation_reason": "OpenRouter model ID no longer present in the live catalog",
+        "successor":  "gemini-2.5-flash",
     },
-    "gemini-3-flash": {
-        "model":      "google/gemini-3-flash-preview",
+    "glm-5.3-flash": {
+        "model":      "z-ai/glm-5.3-flash",
         "multimodal": True,
-        "modalities": ["text", "image", "video", "audio", "pdf"],
+        "modalities": ["text", "image", "video"],
         "tier":       "ultra_cheap",
-        "price_in":   0.15, "price_out": 0.60,
-        "ctx":        1_000_000,
-        "notes":      "Near-Pro quality, configurable thinking levels",
+        "price_in":   0.15, "price_out": 0.50,
+        "ctx":        1_048_576,
+        "notes":      "Fast multimodal GLM with first-party endpoint context",
+        "require_complete_evidence": True,
     },
     "gpt-4o-mini": {
         "model":      "openai/gpt-4o-mini",
@@ -245,6 +241,44 @@ OPENROUTER_MODELS = {
     },
 
     # ── Great Value · Multimodal ──────────────────────────────
+    "gemini-2.5-flash": {
+        "model":      "google/gemini-2.5-flash",
+        "multimodal": True,
+        "modalities": ["text", "image", "video", "audio", "pdf"],
+        "tier":       "great_value",
+        "price_in":   0.30, "price_out": 2.50,
+        "ctx":        1_048_576,
+        "notes":      "Best-value thinking+vision model, 1M ctx",
+    },
+    "gemini-3-flash": {
+        "model":      "google/gemini-3-flash-preview",
+        "multimodal": True,
+        "modalities": ["text", "image", "video", "audio", "pdf"],
+        "tier":       "great_value",
+        "price_in":   0.50, "price_out": 3.00,
+        "ctx":        1_048_576,
+        "notes":      "Near-Pro quality, configurable thinking levels",
+    },
+    "gemini-3.8-flash": {
+        "model":      "google/gemini-3.8-flash",
+        "multimodal": True,
+        "modalities": ["text", "image", "video", "pdf", "audio"],
+        "tier":       "great_value",
+        "price_in":   0.75, "price_out": 3.75,
+        "ctx":        1_048_576,
+        "notes":      "Current Gemini Flash, full multimodal, 1M ctx",
+        "require_complete_evidence": True,
+    },
+    "kimi-k2.6": {
+        "model":      "moonshotai/kimi-k2.6",
+        "multimodal": True,
+        "modalities": ["text", "image"],
+        "tier":       "great_value",
+        "price_in":   0.95, "price_out": 4.00,
+        "ctx":        262_144,
+        "notes":      "Efficient Kimi multimodal model",
+        "require_complete_evidence": True,
+    },
     "qwen-2.5-vl-72b": {
         "model":      "qwen/qwen-2.5-vl-72b-instruct",
         "multimodal": True,
@@ -297,6 +331,16 @@ OPENROUTER_MODELS = {
     # ═══════════════════════════════════════════════════════════
 
     # ── Premium · Text-only ───────────────────────────────────
+    "glm-5.3": {
+        "model":      "z-ai/glm-5.3",
+        "multimodal": False,
+        "modalities": ["text"],
+        "tier":       "premium",
+        "price_in":   1.40, "price_out": 4.40,
+        "ctx":        1_048_576,
+        "notes":      "GLM flagship with first-party endpoint context",
+        "require_complete_evidence": True,
+    },
     "mistral-large": {
         "model":      "mistralai/mistral-large",
         "multimodal": False,
@@ -325,6 +369,30 @@ OPENROUTER_MODELS = {
         "price_in":   2.00, "price_out": 12.00,
         "ctx":        1_050_000,
         "notes":      "Frontier multimodal, 1M ctx, agentic coding",
+        "potentially_deprecated": True,
+        "first_noticed_missing": "2026-09-10",
+        "deprecation_reason": "OpenRouter model ID no longer present in the live catalog",
+        "successor":  "gemini-3.1-pro-preview",
+    },
+    "gemini-3.1-pro-preview": {
+        "model":      "google/gemini-3.1-pro-preview",
+        "multimodal": True,
+        "modalities": ["text", "image", "video", "pdf", "audio"],
+        "tier":       "premium",
+        "price_in":   2.00, "price_out": 12.00,
+        "ctx":        1_048_576,
+        "notes":      "Gemini Pro preview, full multimodal, 1M ctx",
+        "require_complete_evidence": True,
+    },
+    "kimi-k3": {
+        "model":      "moonshotai/kimi-k3",
+        "multimodal": True,
+        "modalities": ["text", "image", "video"],
+        "tier":       "premium",
+        "price_in":   3.00, "price_out": 15.00,
+        "ctx":        1_048_576,
+        "notes":      "Kimi flagship multimodal model, 1M ctx",
+        "require_complete_evidence": True,
     },
     "pixtral-large": {
         "model":      "mistralai/pixtral-large-2411",

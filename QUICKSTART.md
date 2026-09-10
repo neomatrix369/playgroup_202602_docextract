@@ -55,7 +55,7 @@ V7_GO_PDF_DIR=data
 # V7_GO_AUTO_ENSURE_PROPERTIES=1  # auto-create missing properties on the V7 agent
 ```
 
-The OpenRouter key is required for OpenRouter models. The Doubleword key is only needed for `DOUBLEWORD_MODELS` entries (e.g. `dw-qwen3.5-9b`). The V7 variables are only needed for `V7_MODELS` entries. **Registry sizes (for mental model):** ~33 OpenRouter models, 21 Doubleword extraction models (auto-sync **disabled** via `SKIP_DOUBLEWORD_SYNC=1` — model identifiers are manually corrected), 32 optional V7 keys — see [README — Key Findings](README.md#key-findings) and [Auto-Sync Pricing](README.md#auto-sync-pricing). For V7 setup detail, read [README.md](README.md) — **V7 Go (optional backend)** — especially **File property for Go Agent v2** and **V7_GO_PARENT_ENTITY_ID** if you use `agent_template_json` or child projects. A compact V7-only checklist is in [docs/v7-go.md](docs/v7-go.md).
+The OpenRouter key is required for OpenRouter models. The Doubleword key is only needed for `DOUBLEWORD_MODELS` entries (e.g. `dw-qwen3.5-9b`). The V7 variables are only needed for `V7_MODELS` entries. **Registry sizes (for mental model):** 39 OpenRouter models, 35 Doubleword extraction models (auto-sync **disabled** via `SKIP_DOUBLEWORD_SYNC=1` — model identifiers are manually corrected), 32 optional V7 keys — see [README — Key Findings](README.md#key-findings) and [Auto-Sync Pricing](README.md#auto-sync-pricing). For V7 setup detail, read [README.md](README.md) — **V7 Go (optional backend)** — especially **File property for Go Agent v2** and **V7_GO_PARENT_ENTITY_ID** if you use `agent_template_json` or child projects. A compact V7-only checklist is in [docs/v7-go.md](docs/v7-go.md).
 
 ---
 
@@ -70,7 +70,7 @@ $ python llm_openrouter.py
 Expected output — JSON extracted from a canned text snippet:
 
 ```
-Openrouter API key: %s sk-or-v1-8...
+OpenRouter API key: set (sk-o...)
 Using model: anthropic/claude-3.5-haiku
 {
     "Registered Charity Number": "1132766"
@@ -106,12 +106,11 @@ If submit fails, check console hints and `data/.v7_unavailable_models.json`. Ful
 
 Head to [README.md](README.md) for the full end-to-end workflow. The key commands follow a consistent pattern:
 
-- **Pass a model name** → run that model only (e.g. `python extractor.py gemini-2.0-flash`)
+- **Pass a model name** → run that model only (e.g. `python extractor.py gemini-3.8-flash`)
 - **Pass multiple model names** → run each in turn (backend auto-detected per model)
 - **Pass no args** → run all models from every registry (OpenRouter, Doubleword, and V7 if any are defined); already-completed runs are skipped (idempotent)
 - **Use `--all-openrouter`** → run only OpenRouter models
-- **Use `--all-doubleword`** → run only Doubleword batch models
-- **Use `--all-doubleword`** → run only Doubleword batch models (21 keys; auto-sync disabled — see [README — Auto-Sync Pricing](README.md#auto-sync-pricing))
+- **Use `--all-doubleword`** → run only Doubleword batch models (35 keys; auto-sync disabled — see [README — Auto-Sync Pricing](README.md#auto-sync-pricing))
 - **Use `--all-v7`** → run only V7 Go models from `config_models_v7.py` (32 keys; check with `python -c "from config_models_v7 import V7_MODELS; print(len(V7_MODELS))"`)
 - **Use `--v7-agent-template PATH`** together with any run that includes V7 models (e.g. `--all-v7`) to override `agent_template_json` with a Go export JSON for that run; see [README.md](README.md) examples
 - **V7 summary doc** → [docs/v7-go.md](docs/v7-go.md)

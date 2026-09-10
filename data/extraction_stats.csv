@@ -128,3 +128,9 @@ datetime,provider,model_short_name,model_full_name,tier,multimodal,price_in,pric
 2026-09-10 00:50:23,Doubleword,dw-glm-5.3,zai-org/GLM-5.3,standard,False,0.0,0.0,1048000,11,11,0,614,162631,35669,0.0,55.82,0.0,11,11,11,9,9,10,11,11,c93dabc9-924e-4128-9e2d-9f15a9c0e138
 2026-09-10 00:50:38,Doubleword,dw-deepseek-v4-pro-0813,deepseek-ai/DeepSeek-V4-Pro-0813,standard,False,0.0,0.0,1048000,11,11,0,620,159846,17084,0.0,56.36,0.0,11,11,11,9,9,10,11,11,1af8f5c4-0459-458c-ba22-0279c20ebbd1
 2026-09-10 00:50:43,Doubleword,dw-glm-5.3-flash,zai-org/GLM-5.3-Flash,standard,False,0.0,0.0,262000,11,10,1,720,162632,24294,0.0,65.45,0.0,10,10,10,8,8,9,10,10,04751d97-13d7-40af-a2ab-77ccfec94963
+2026-09-10 16:42:10,OpenRouter,gemini-3.8-flash,google/gemini-3.8-flash,great_value,True,0.75,3.75,1048576,11,11,0,46.57,187325,12178,0.186161,4.23,0.016924,11,11,11,9,9,10,11,11,
+2026-09-10 16:44:40,OpenRouter,gemini-3.1-pro-preview,google/gemini-3.1-pro-preview,premium,True,2.0,12.0,1048576,11,11,0,149.53,187325,18137,0.592294,13.59,0.053845,11,11,11,9,9,10,11,11,
+2026-09-10 16:48:57,OpenRouter,kimi-k3,moonshotai/kimi-k3,premium,True,3.0,15.0,1048576,11,11,0,256.5,160279,10505,0.638412,23.32,0.058037,11,11,11,9,9,10,11,11,
+2026-09-10 17:10:42,OpenRouter,kimi-k2.6,moonshotai/kimi-k2.6,great_value,True,0.95,4.0,262144,11,11,0,1305.45,159344,50715,0.354237,118.68,0.032203,11,11,11,9,9,10,11,11,
+2026-09-10 17:25:42,OpenRouter,glm-5.3,z-ai/glm-5.3,premium,False,1.4,4.4,1048576,11,11,0,899.8,162422,43834,0.42026,81.8,0.038205,11,11,11,9,9,10,11,11,
+2026-09-10 17:28:07,OpenRouter,glm-5.3-flash,z-ai/glm-5.3-flash,ultra_cheap,True,0.15,0.5,1048576,11,11,0,143.2,162422,17234,0.03298,13.02,0.002998,11,11,11,9,9,10,11,11,

@@ -26,6 +26,12 @@ def _get_providers(model_name):
         return ["atlas-cloud"]
     if model_name.startswith("z-ai/glm-4.7"):
         return ["z-ai"]
+    if model_name in ("google/gemini-3.8-flash", "google/gemini-3.1-pro-preview"):
+        return ["google-ai-studio"]
+    if model_name in ("moonshotai/kimi-k3", "moonshotai/kimi-k2.6"):
+        return ["moonshotai"]
+    if model_name in ("z-ai/glm-5.3", "z-ai/glm-5.3-flash"):
+        return ["z-ai"]
 
     # Known model families — None means no provider restriction (any provider)
     known_prefixes = ("anthropic", "openai", "deepseek", "google", "meta-llama",
@@ -37,7 +43,7 @@ def _get_providers(model_name):
     raise ValueError(f"No provider found for {model_name}, you need to set one in the code")
 
 def call_llm(model_name, prompt_template, extracted_text, max_ctx_tokens=None):
-    """Returns dict: {text, elapsed_secs, prompt_tokens, completion_tokens}."""
+    """Returns text, timing, token counts, and explicit usage availability."""
     instructions = "Follow the instructions in the prompt template.\n"
     if max_ctx_tokens:
         # Rough estimate: 1 token ≈ 4 chars. Reserve space for prompt template + response.
@@ -61,6 +67,7 @@ def call_llm(model_name, prompt_template, extracted_text, max_ctx_tokens=None):
     ]
     max_retries = 5
     t0 = time.time()
+    response = None
     for attempt in range(max_retries + 1):
         try:
             response = client.chat.completions.create(
@@ -80,14 +87,21 @@ def call_llm(model_name, prompt_template, extracted_text, max_ctx_tokens=None):
                 time.sleep(wait)
             else:
                 raise
+    if response is None:
+        raise RuntimeError(f"No valid JSON response from {model_name} after {max_retries + 1} attempts")
     elapsed_secs = round(time.time() - t0, 2)
 
     usage = getattr(response, "usage", None)
-    prompt_tokens = getattr(usage, "prompt_tokens", 0) or 0
-    completion_tokens = getattr(usage, "completion_tokens", 0) or 0
+    prompt_token_value = getattr(usage, "prompt_tokens", None)
+    completion_token_value = getattr(usage, "completion_tokens", None)
+    usage_available = (usage is not None
+                       and prompt_token_value is not None
+                       and completion_token_value is not None)
+    prompt_tokens = prompt_token_value or 0
+    completion_tokens = completion_token_value or 0
 
-    raw_text = response.choices[0].message.content
-    logger.info("[OpenRouter] Response from {}, len={}", model_name, len(raw_text) if raw_text else 0)
+    raw_text = response.choices[0].message.content or ""
+    logger.info("[OpenRouter] Response from {}, len={}", model_name, len(raw_text))
     extracted = utils.extract_from_triple_backticks(raw_text)
     logger.info("[OpenRouter] Extracted answer from {}:\n{}", model_name, extracted)
     return {
@@ -95,6 +109,7 @@ def call_llm(model_name, prompt_template, extracted_text, max_ctx_tokens=None):
         "elapsed_secs": elapsed_secs,
         "prompt_tokens": prompt_tokens,
         "completion_tokens": completion_tokens,
+        "usage_available": usage_available,
     }
 
 

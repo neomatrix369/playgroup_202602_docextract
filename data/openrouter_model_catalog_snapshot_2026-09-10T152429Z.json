@@ -1,0 +1,42 @@
+{
+  "retrieved_at": "2026-09-10T15:24:29Z",
+  "catalog_source": "https://openrouter.ai/api/v1/models",
+  "models": {
+    "google/gemini-3.8-flash": {
+      "catalog": {"canonical_slug": "google/gemini-3.8-flash-20260902", "context_length": 1048576, "input_modalities": ["text", "image", "video", "file", "audio"], "pricing": {"prompt": "0.00000075", "completion": "0.00000375"}},
+      "approved_provider_base_tag": "google-ai-studio",
+      "approved_endpoint": {"provider_name": "Google AI Studio", "tag": "google-ai-studio", "context_length": 1048576, "pricing": {"prompt": "0.00000075", "completion": "0.00000375"}},
+      "source": "https://openrouter.ai/api/v1/models/google/gemini-3.8-flash/endpoints"
+    },
+    "google/gemini-3.1-pro-preview": {
+      "catalog": {"canonical_slug": "google/gemini-3.1-pro-preview-20260219", "context_length": 1048576, "input_modalities": ["audio", "file", "image", "text", "video"], "pricing": {"prompt": "0.000002", "completion": "0.000012"}},
+      "approved_provider_base_tag": "google-ai-studio",
+      "approved_endpoint": {"provider_name": "Google AI Studio", "tag": "google-ai-studio", "context_length": 1048576, "pricing": {"prompt": "0.000002", "completion": "0.000012"}},
+      "source": "https://openrouter.ai/api/v1/models/google/gemini-3.1-pro-preview/endpoints"
+    },
+    "moonshotai/kimi-k3": {
+      "catalog": {"canonical_slug": "moonshotai/kimi-k3-20260715", "context_length": 1048576, "input_modalities": ["text", "image", "video"], "pricing": {"prompt": "0.000003", "completion": "0.000015"}},
+      "approved_provider_base_tag": "moonshotai",
+      "approved_endpoint": {"provider_name": "Moonshot AI", "tag": "moonshotai/mxfp4", "context_length": 1048576, "pricing": {"prompt": "0.000003", "completion": "0.000015"}},
+      "source": "https://openrouter.ai/api/v1/models/moonshotai/kimi-k3/endpoints"
+    },
+    "moonshotai/kimi-k2.6": {
+      "catalog": {"canonical_slug": "moonshotai/kimi-k2.6-20260420", "context_length": 262144, "input_modalities": ["text", "image"], "pricing": {"prompt": "0.00000095", "completion": "0.000004"}},
+      "approved_provider_base_tag": "moonshotai",
+      "approved_endpoint": {"provider_name": "Moonshot AI", "tag": "moonshotai/int4", "context_length": 262144, "pricing": {"prompt": "0.00000095", "completion": "0.000004"}},
+      "source": "https://openrouter.ai/api/v1/models/moonshotai/kimi-k2.6/endpoints"
+    },
+    "z-ai/glm-5.3": {
+      "catalog": {"canonical_slug": "z-ai/glm-5.3-20260816", "context_length": 1310720, "input_modalities": ["text"], "pricing": {"prompt": "0.0000014", "completion": "0.0000044"}},
+      "approved_provider_base_tag": "z-ai",
+      "approved_endpoint": {"provider_name": "Z.AI", "tag": "z-ai/fp8", "context_length": 1048576, "pricing": {"prompt": "0.0000014", "completion": "0.0000044"}},
+      "source": "https://openrouter.ai/api/v1/models/z-ai/glm-5.3/endpoints"
+    },
+    "z-ai/glm-5.3-flash": {
+      "catalog": {"canonical_slug": "z-ai/glm-5.3-flash-20260826", "context_length": 1310720, "input_modalities": ["text", "image", "video"], "pricing": {"prompt": "0.00000015", "completion": "0.0000005"}},
+      "approved_provider_base_tag": "z-ai",
+      "approved_endpoint": {"provider_name": "Z.AI", "tag": "z-ai/fp8", "context_length": 1048576, "pricing": {"prompt": "0.00000015", "completion": "0.0000005"}},
+      "source": "https://openrouter.ai/api/v1/models/z-ai/glm-5.3-flash/endpoints"
+    }
+  }
+}
