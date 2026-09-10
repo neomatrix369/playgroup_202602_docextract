@@ -127,15 +127,10 @@ def _append_call_log(row_data):
         writer.writerow(row_data)
 
 
-def _append_stats(provider, model_short_name, model_cfg, total, rows_with_values, rows_empty, field_counts,
-                   total_elapsed_secs=0.0, total_prompt_tokens=0, total_completion_tokens=0, total_cost_usd=0.0,
-                   batch_id=""):
-    fieldnames = (["datetime", "provider", "model_short_name", "model_full_name", "tier", "multimodal",
-                   "price_in", "price_out", "ctx",
-                   "total", "rows_with_values", "rows_empty",
-                   "total_elapsed_secs", "total_prompt_tokens", "total_completion_tokens", "total_cost_usd",
-                   "avg_secs_per_row", "avg_cost_per_row"] + ALL_FIELDS + ["batch_id"])
-    row = {
+def _stats_row(provider, model_short_name, model_cfg, total, rows_with_values, rows_empty, field_counts,
+               total_elapsed_secs=0.0, total_prompt_tokens=0, total_completion_tokens=0, total_cost_usd=0.0,
+               batch_id=""):
+    return {
         "datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "provider": provider,
         "model_short_name": model_short_name,
@@ -157,6 +152,18 @@ def _append_stats(provider, model_short_name, model_cfg, total, rows_with_values
         **{f: field_counts.get(f, 0) for f in ALL_FIELDS},
         "batch_id": batch_id,
     }
+
+
+def _append_stats(provider, model_short_name, model_cfg, total, rows_with_values, rows_empty, field_counts,
+                   total_elapsed_secs=0.0, total_prompt_tokens=0, total_completion_tokens=0, total_cost_usd=0.0,
+                   batch_id=""):
+    fieldnames = (["datetime", "provider", "model_short_name", "model_full_name", "tier", "multimodal",
+                   "price_in", "price_out", "ctx",
+                   "total", "rows_with_values", "rows_empty",
+                   "total_elapsed_secs", "total_prompt_tokens", "total_completion_tokens", "total_cost_usd",
+                   "avg_secs_per_row", "avg_cost_per_row"] + ALL_FIELDS + ["batch_id"])
+    row = _stats_row(provider, model_short_name, model_cfg, total, rows_with_values, rows_empty, field_counts,
+                     total_elapsed_secs, total_prompt_tokens, total_completion_tokens, total_cost_usd, batch_id)
     write_header = not os.path.exists(STATS_FILENAME)
     with open(STATS_FILENAME, "a", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -164,6 +171,41 @@ def _append_stats(provider, model_short_name, model_cfg, total, rows_with_values
             writer.writeheader()
         writer.writerow(row)
     log.debug("Stats appended to {}", STATS_FILENAME)
+
+
+def _atomic_upsert_rows(filename, fieldnames, provider, model_short_name, new_rows):
+    existing_rows = []
+    if os.path.exists(filename):
+        with open(filename, newline="") as f:
+            existing_rows = list(csv.DictReader(f))
+    identity = (provider.strip().lower(), model_short_name.strip().lower())
+    filtered_rows = [
+        row for row in existing_rows
+        if (row.get("provider", "").strip().lower(), row.get("model_short_name", "").strip().lower()) != identity
+    ]
+    tmp_filename = filename + ".tmp"
+    with open(tmp_filename, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(filtered_rows)
+        writer.writerows(new_rows)
+        f.flush()
+    os.replace(tmp_filename, filename)
+
+
+def _matching_evidence_rows(filename, provider, model_short_name):
+    if not os.path.exists(filename):
+        return []
+    identity = (provider.strip().lower(), model_short_name.strip().lower())
+    with open(filename, newline="") as f:
+        return [
+            row for row in csv.DictReader(f)
+            if (row.get("provider", "").strip().lower(), row.get("model_short_name", "").strip().lower()) == identity
+        ]
+
+
+def _matching_evidence_count(filename, provider, model_short_name):
+    return len(_matching_evidence_rows(filename, provider, model_short_name))
 
 
 def _print_summary(provider, model_short_name, multimodal, rows_with_values, rows_empty, field_counts,
@@ -201,10 +243,31 @@ def _run_openrouter(model_short_name):
     multimodal = model_cfg["multimodal"]
     max_ctx_tokens = model_cfg.get("ctx")
     out_filename = f"data/playgroup_dev_extracted__openrouter__{model_short_name}.tsv"
+    tmp_filename = out_filename + ".tmp"
 
+    with open(IN_FILENAME) as f:
+        expected_rows = sum(1 for _ in f)
     if os.path.exists(out_filename):
-        log.warning("[OpenRouter] Skipping {} {}: {} already exists", model_short_name, _mod_tag(multimodal), out_filename)
-        return "skipped"
+        if not model_cfg.get("require_complete_evidence"):
+            log.warning("[OpenRouter] Skipping {} {}: {} already exists",
+                        model_short_name, _mod_tag(multimodal), out_filename)
+            return "skipped"
+        with open(out_filename) as f:
+            output_rows = sum(1 for _ in f)
+        call_log_rows = _matching_evidence_rows(CALL_LOG_FILENAME, "OpenRouter", model_short_name)
+        stats_rows = _matching_evidence_rows(STATS_FILENAME, "OpenRouter", model_short_name)
+        complete = output_rows == expected_rows and len(call_log_rows) == expected_rows and len(stats_rows) == 1
+        usable = complete and int(stats_rows[0].get("rows_with_values", 0)) > 0
+        usage_complete = complete and all(row.get("error") != "usage unavailable from provider response" for row in call_log_rows)
+        if usable and usage_complete:
+            log.warning("[OpenRouter] Skipping {} {}: {} already exists with complete evidence",
+                        model_short_name, _mod_tag(multimodal), out_filename)
+            return "skipped"
+        raise RuntimeError(
+            f"[OpenRouter] Existing output for '{model_short_name}' is incomplete or unusable: "
+            f"TSV rows={output_rows}/{expected_rows}, call-log rows={len(call_log_rows)}/{expected_rows}, "
+            f"stats rows={len(stats_rows)}/1. Preserve the files and resolve or remove them explicitly before retrying."
+        )
 
     log.info("[OpenRouter] Model: {} ({}) {}", model_short_name, model, _mod_tag(multimodal))
     log.info("[OpenRouter] Output: {}", out_filename)
@@ -219,9 +282,11 @@ def _run_openrouter(model_short_name):
     total_prompt_tokens = 0
     total_completion_tokens = 0
     total_cost_usd = 0.0
+    call_log_rows = []
+    usage_omitted = False
 
     csv.field_size_limit(10 * 1024 * 1024)
-    with open(IN_FILENAME, "r") as infile, open(out_filename, "w") as outfile:
+    with open(IN_FILENAME, "r") as infile, open(tmp_filename, "w") as outfile:
         reader = csv.reader(infile, delimiter="\t", quoting=csv.QUOTE_NONE)
         for row_num, row in enumerate(reader):
             assert len(row) == 6, f"Expected 6 cols, got {len(row)} in row {row_num}"
@@ -247,9 +312,9 @@ def _run_openrouter(model_short_name):
                 outfile.write(line + "\n")
                 rows_empty += 1
                 log.error("[OpenRouter] -> ERROR: {}", error_msg[:120])
-                _append_call_log({**call_log_base, "status": "error", "elapsed_secs": 0,
-                                  "prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0,
-                                  "fields_extracted": 0, "error": error_msg[:500]})
+                call_log_rows.append({**call_log_base, "status": "error", "elapsed_secs": 0,
+                                      "prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0,
+                                      "fields_extracted": 0, "error": error_msg[:500]})
                 continue
 
             row_cost = (result["prompt_tokens"] * price_in + result["completion_tokens"] * price_out) / 1_000_000
@@ -270,17 +335,36 @@ def _run_openrouter(model_short_name):
                 rows_empty += 1
                 log.warning("  [OpenRouter] -> (no values extracted)  [{}s]", result['elapsed_secs'])
 
-            _append_call_log({**call_log_base, "status": "ok" if fields else "empty",
-                              "elapsed_secs": result["elapsed_secs"],
-                              "prompt_tokens": result["prompt_tokens"],
-                              "completion_tokens": result["completion_tokens"],
-                              "cost_usd": round(row_cost, 6),
-                              "fields_extracted": len(fields), "error": ""})
+            usage_available = result.get("usage_available", False)
+            usage_omitted = usage_omitted or not usage_available
+            call_log_rows.append({**call_log_base, "status": "ok" if fields else "empty",
+                                  "elapsed_secs": result["elapsed_secs"],
+                                  "prompt_tokens": result["prompt_tokens"],
+                                  "completion_tokens": result["completion_tokens"],
+                                  "cost_usd": round(row_cost, 6),
+                                  "fields_extracted": len(fields),
+                                  "error": "" if usage_available else "usage unavailable from provider response"})
+        outfile.flush()
 
     _print_summary("OpenRouter", model_short_name, multimodal, rows_with_values, rows_empty, field_counts,
                    total_elapsed_secs, total_prompt_tokens, total_completion_tokens, total_cost_usd)
-    _append_stats("OpenRouter", model_short_name, model_cfg, rows_with_values + rows_empty, rows_with_values, rows_empty,
-                  field_counts, total_elapsed_secs, total_prompt_tokens, total_completion_tokens, total_cost_usd)
+    stats_row = _stats_row("OpenRouter", model_short_name, model_cfg, rows_with_values + rows_empty,
+                           rows_with_values, rows_empty, field_counts, total_elapsed_secs, total_prompt_tokens,
+                           total_completion_tokens, total_cost_usd)
+    stats_fields = (["datetime", "provider", "model_short_name", "model_full_name", "tier", "multimodal",
+                     "price_in", "price_out", "ctx", "total", "rows_with_values", "rows_empty",
+                     "total_elapsed_secs", "total_prompt_tokens", "total_completion_tokens", "total_cost_usd",
+                     "avg_secs_per_row", "avg_cost_per_row"] + ALL_FIELDS + ["batch_id"])
+    _atomic_upsert_rows(CALL_LOG_FILENAME, CALL_LOG_FIELDS, "OpenRouter", model_short_name, call_log_rows)
+    _atomic_upsert_rows(STATS_FILENAME, stats_fields, "OpenRouter", model_short_name, [stats_row])
+    all_errors = all(row["status"] == "error" for row in call_log_rows)
+    with open(tmp_filename) as f:
+        all_error_lines = all(line.startswith("error=") for line in f)
+    if rows_with_values == 0 or all_errors or all_error_lines:
+        raise RuntimeError(f"[OpenRouter] '{model_short_name}' produced no usable rows; preserved temporary output and stopped before scoring")
+    if usage_omitted:
+        raise RuntimeError(f"[OpenRouter] '{model_short_name}' omitted usage data; preserved temporary output and stopped for review")
+    os.replace(tmp_filename, out_filename)
     return "completed"
 
 
@@ -1635,6 +1719,31 @@ def _print_run_summary(all_statuses):
 #  CLI — auto-detects backend from model prefix
 # ═══════════════════════════════════════════════════════════════════
 
+def _warn_potentially_deprecated(model_short_name, model_cfg):
+    if not model_cfg.get("potentially_deprecated"):
+        return
+    log.warning(
+        "[Extractor] '{}' ({}) is potentially_deprecated; first noticed missing: {}; reason: {}. "
+        "The model remains runnable.",
+        model_short_name, model_cfg["model"], model_cfg.get("first_noticed_missing", "unknown"),
+        model_cfg.get("deprecation_reason", "not specified"),
+    )
+
+
+def _announce_potentially_deprecated(provider, flagged_models):
+    if not flagged_models:
+        return
+    log.warning("=" * 60)
+    log.warning("⚠  {} POTENTIALLY DEPRECATED {} model(s) — still running:", len(flagged_models), provider)
+    for short_name, cfg in flagged_models.items():
+        log.warning("    • {} ({}) — first noticed missing: {}; reason: {}",
+                    short_name, cfg["model"], cfg.get("first_noticed_missing", "unknown"),
+                    cfg.get("deprecation_reason", "not specified"))
+    log.warning("  These models are included in runs — flag is informational only.")
+    log.warning("  Confirm and set 'deprecated': True manually to fully retire.")
+    log.warning("=" * 60)
+
+
 def _resolve_model(model_short_name):
     """Return backend string ('doubleword', 'v7', or 'openrouter') or exit with error.
 
@@ -1646,16 +1755,10 @@ def _resolve_model(model_short_name):
     if model_short_name in V7_MODELS or model_short_name.split("/")[0] in _v7_prefixes:
         return "v7"
     if model_short_name in DOUBLEWORD_MODELS:
-        cfg = DOUBLEWORD_MODELS[model_short_name]
-        if cfg.get("potentially_deprecated"):
-            first_seen = cfg.get("first_noticed_missing", "unknown")
-            log.warning(
-                "[Extractor] ⚠  '{}' is potentially_deprecated (first noticed missing: {}). "
-                "Running it anyway — confirm manually to fully retire.",
-                model_short_name, first_seen,
-            )
+        _warn_potentially_deprecated(model_short_name, DOUBLEWORD_MODELS[model_short_name])
         return "doubleword"
     if model_short_name in OPENROUTER_MODELS:
+        _warn_potentially_deprecated(model_short_name, OPENROUTER_MODELS[model_short_name])
         return "openrouter"
     available_or = ", ".join(f"{k}{_mod_tag(OPENROUTER_MODELS[k]['multimodal'])}" for k in OPENROUTER_MODELS)
     available_dw = ", ".join(f"{k}{_mod_tag(DOUBLEWORD_MODELS[k]['multimodal'])}" for k in DOUBLEWORD_MODELS)
@@ -1733,17 +1836,9 @@ async def main():
 
     # Announce potentially_deprecated models (informational — they still run)
     pdep_dw = {k: v for k, v in DOUBLEWORD_MODELS.items() if v.get("potentially_deprecated")}
-    if pdep_dw:
-        log.warning("=" * 60)
-        log.warning("⚠  {} POTENTIALLY DEPRECATED Doubleword model(s) — still running:",
-                    len(pdep_dw))
-        for short_name, cfg in pdep_dw.items():
-            first_seen = cfg.get("first_noticed_missing", "unknown")
-            log.warning("    • {} ({}) — first noticed missing: {}",
-                        short_name, cfg["model"], first_seen)
-        log.warning("  These models are included in runs — flag is informational only.")
-        log.warning("  Confirm and set 'deprecated': True manually to fully retire.")
-        log.warning("=" * 60)
+    pdep_or = {k: v for k, v in OPENROUTER_MODELS.items() if v.get("potentially_deprecated")}
+    _announce_potentially_deprecated("Doubleword", pdep_dw)
+    _announce_potentially_deprecated("OpenRouter", pdep_or)
 
     if args.models:
         models_to_run = args.models
