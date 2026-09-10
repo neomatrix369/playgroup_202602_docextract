@@ -15,6 +15,7 @@ data/.v7_unavailable_models.json
 
 .claude/*
 !.claude/skills/
+!.claude/skills/**
 .playwright-mcp/
 
 DW_FB.md
@@ -25,3 +26,9 @@ media/log-scrolls/outputs/*
 media/log-scrolls/inputs/*
 !media/log-scrolls/inputs/.gitkeep
 .gate-cache/
+.agents/
+.devin/
+.codex/
+.cursor/
+.gemini/
+.pi/
