@@ -10,8 +10,8 @@ Browse results **without cloning** — mirrors of this repo’s playground on [n
 
 | What | Link |
 |------|------|
-| **Playground archive** (21 snapshots, embedded viewer) | [Open archive](https://neomatrix369.github.io/demos/playgroup-202602-docextract/) |
-| **Latest playground** (111 scored runs) | [Latest snapshot](https://neomatrix369.github.io/demos/playgroup-202602-docextract/2026-08-22T0830Z-which-models-extracted-playground.html) |
+| **Playground archive** (22 snapshots, embedded viewer) | [Open archive](https://neomatrix369.github.io/demos/playgroup-202602-docextract/) |
+| **Latest playground** (115 scored runs) | [Latest snapshot](https://neomatrix369.github.io/demos/playgroup-202602-docextract/latest/) |
 | **Project write-up** (findings & methodology) | [Project page](https://neomatrix369.github.io/pages/playgroup-202602-docextract.html) |
 | **Doubleword extraction guide** (video + walkthrough) | [Guide](https://neomatrix369.github.io/demos/playgroup-202602-docextract/extractor-all-doubleword.html) |
 
