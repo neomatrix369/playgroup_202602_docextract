@@ -59,7 +59,7 @@ OPENROUTER_MODELS = {
         "multimodal": False,
         "modalities": ["text"],
         "tier":       "ultra_cheap",
-        "price_in":   0.27, "price_out": 1.10,
+        "price_in":   0.26, "price_out": 1.03,  # refreshed from OpenRouter API 2026-09-11
         "ctx":        164_000,
         "notes":      "DeepSeek V3, near GPT-4 quality",
     },
@@ -68,7 +68,7 @@ OPENROUTER_MODELS = {
         "multimodal": False,
         "modalities": ["text"],
         "tier":       "ultra_cheap",
-        "price_in":   0.21, "price_out": 0.79,
+        "price_in":   0.27, "price_out": 0.40,  # refreshed from OpenRouter API 2026-09-11
         "ctx":        164_000,
         "notes":      "GPT-5 class reasoning + sparse attention",
     },
@@ -77,7 +77,7 @@ OPENROUTER_MODELS = {
         "multimodal": False,
         "modalities": ["text"],
         "tier":       "ultra_cheap",
-        "price_in":   0.04, "price_out": 0.10,
+        "price_in":   0.10, "price_out": 0.20,  # refreshed from OpenRouter API 2026-09-11
         "ctx":        33_000,
         "notes":      "Tiny but mighty, good for high-volume agents",
     },
@@ -86,7 +86,7 @@ OPENROUTER_MODELS = {
         "multimodal": False,
         "modalities": ["text"],
         "tier":       "ultra_cheap",
-        "price_in":   0.02, "price_out": 0.05,
+        "price_in":   0.05, "price_out": 0.08,  # refreshed from OpenRouter API 2026-09-11
         "ctx":        131_000,
         "notes":      "Cheapest quality model, high-volume workhorse",
     },
@@ -95,7 +95,7 @@ OPENROUTER_MODELS = {
         "multimodal": False,
         "modalities": ["text"],
         "tier":       "ultra_cheap",
-        "price_in":   0.10, "price_out": 0.30,
+        "price_in":   0.35, "price_out": 0.56,  # refreshed from OpenRouter API 2026-09-11
         "ctx":        33_000,
         "notes":      "24B, 3x faster than 70B class, Apache 2.0",
     },
@@ -104,7 +104,7 @@ OPENROUTER_MODELS = {
         "multimodal": False,
         "modalities": ["text"],
         "tier":       "ultra_cheap",
-        "price_in":   0.14, "price_out": 0.40,
+        "price_in":   0.46, "price_out": 1.82,  # refreshed from OpenRouter API 2026-09-11
         "ctx":        41_000,
         "notes":      "235B MoE (22B active), frontier open-source reasoning",
     },
@@ -156,7 +156,7 @@ OPENROUTER_MODELS = {
         "multimodal": True,
         "modalities": ["text", "image", "video"],
         "tier":       "ultra_cheap",
-        "price_in":   0.08, "price_out": 0.50,
+        "price_in":   0.12, "price_out": 0.46,  # refreshed from OpenRouter API 2026-09-11
         "ctx":        131_000,
         "notes":      "Qwen3 VL 8B, 131K ctx, strong spatial reasoning",
     },
@@ -184,7 +184,7 @@ OPENROUTER_MODELS = {
         "multimodal": True,
         "modalities": ["text", "image"],
         "tier":       "ultra_cheap",
-        "price_in":   0.06, "price_out": 0.12,
+        "price_in":   0.05, "price_out": 0.15,  # refreshed from OpenRouter API 2026-09-11
         "ctx":        131_000,
         "notes":      "12B vision+text, 128K ctx, 140+ langs",
     },
@@ -199,7 +199,7 @@ OPENROUTER_MODELS = {
         "multimodal": False,
         "modalities": ["text"],
         "tier":       "great_value",
-        "price_in":   0.40, "price_out": 1.75,
+        "price_in":   0.70, "price_out": 2.50,  # refreshed from OpenRouter API 2026-09-11
         "ctx":        164_000,
         "notes":      "Full R1 reasoning, o1-class, open-source",
     },
@@ -208,7 +208,7 @@ OPENROUTER_MODELS = {
         "multimodal": False,
         "modalities": ["text"],
         "tier":       "great_value",
-        "price_in":   0.30, "price_out": 0.80,
+        "price_in":   0.36, "price_out": 0.40,  # refreshed from OpenRouter API 2026-09-11
         "ctx":        33_000,
         "notes":      "Top open-source generalist, strong code+math",
     },
@@ -217,7 +217,7 @@ OPENROUTER_MODELS = {
         "multimodal": False,
         "modalities": ["text"],
         "tier":       "great_value",
-        "price_in":   0.40, "price_out": 0.88,
+        "price_in":   0.10, "price_out": 0.32,  # refreshed from OpenRouter API 2026-09-11
         "ctx":        131_000,
         "notes":      "Strong multilingual 70B, 8 languages",
     },
@@ -226,7 +226,7 @@ OPENROUTER_MODELS = {
         "multimodal": False,
         "modalities": ["text"],
         "tier":       "great_value",
-        "price_in":   0.10, "price_out": 0.20,
+        "price_in":   0.66, "price_out": 1.00,  # refreshed from OpenRouter API 2026-09-11
         "ctx":        33_000,
         "notes":      "Best open-source coding model for price",
     },
@@ -293,7 +293,7 @@ OPENROUTER_MODELS = {
         "multimodal": True,
         "modalities": ["text", "image", "video"],
         "tier":       "great_value",
-        "price_in":   0.13, "price_out": 0.52,
+        "price_in":   0.15, "price_out": 0.60,  # refreshed from OpenRouter API 2026-09-11
         "ctx":        131_000,
         "notes":      "30B VL, spatial grounding, GUI automation",
     },
@@ -302,7 +302,7 @@ OPENROUTER_MODELS = {
         "multimodal": True,
         "modalities": ["text", "image", "video"],
         "tier":       "great_value",
-        "price_in":   0.13, "price_out": 0.52,
+        "price_in":   0.20, "price_out": 2.40,  # refreshed from OpenRouter API 2026-09-11
         "ctx":        131_000,
         "notes":      "Thinking variant — STEM/math reasoning over images",
     },
@@ -321,7 +321,7 @@ OPENROUTER_MODELS = {
         "multimodal": True,
         "modalities": ["text", "image"],
         "tier":       "great_value",
-        "price_in":   0.10, "price_out": 0.20,
+        "price_in":   0.08, "price_out": 0.45,  # refreshed from OpenRouter API 2026-09-11
         "ctx":        131_000,
         "notes":      "27B vision, 140+ langs, strong small VLM",
     },
