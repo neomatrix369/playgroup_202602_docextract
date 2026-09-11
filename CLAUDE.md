@@ -232,7 +232,7 @@ Per-document F1 is computed from field-level TP/FP/FN, then averaged across all 
 | `playground.py` | Generates `which-models-extracted-playground.html` from `data/`. Paired table/chart views per tab; F1 + exact-match dual scoring. After regenerate, agents must run `/docextract-workflow` Playground Data Integrity Gate. |
 | `.claude/skills/docextract-workflow/` | Project workflow skill (`/docextract-workflow`): stage detection, cadence, and playground integrity checklist (`playground-integrity.md`). |
 | `config_models_*.py` | Model registries (OpenRouter manual, Doubleword manually corrected, V7 manual) |
-| `sync_doubleword_models.py` | Sync Doubleword pricing from docs endpoint (disabled by default via `SKIP_DOUBLEWORD_SYNC=1`). At extractor startup, `sync_from_api(write=True)` auto-appends stubs for new API models. Run with `--diff` for a dry-run report; `--probe-api` to dump the raw API model list. |
+| `sync_doubleword_models.py` | Sync Doubleword pricing from docs endpoint (disabled by default via `SKIP_DOUBLEWORD_SYNC=1`; the old `model-pricing.md` URL 404s — live catalog is `/inference-api/models`). At extractor startup, `sync_from_api(write=True)` auto-appends stubs for new API models. Run with `--diff` for a dry-run report; `--probe-api` to dump the raw API model list. |
 | `sync_v7_go_agent_template.py` | Refresh `v7_go_agent_v2_template.json` from V7 API after UI property changes |
 | `utils.py` | Shared helpers: `get_logger`, `extract_from_triple_backticks` (strips `<think>` blocks from reasoning models), `sanitize_error_message` |
 | `v7_go_ensure.py` | V7 Go configuration validation utilities |
@@ -283,7 +283,7 @@ See `docs/v7-go.md` for V7-specific setup details and `QUICKSTART.md` for full e
 - **Playground integrity**: After `python playground.py`, numbers in every tab must match `score.py` / `extraction_stats.csv` / TSVs, and tables must stay in sync with charts — enforce via `/docextract-workflow` (do not hand-edit the HTML)
 - **Short labels in UI**: When all `__`-suffixed models share the same agent prefix, leaderboards and playground show shortened names (e.g., `gpt4-1`), but filenames and CSV stay full-length
 - **OpenRouter tiers** (in `config_models_openrouter.py`): `free`, `ultra_cheap` (<$0.30/M), `great_value` ($0.30–$1.00/M), `premium` (>$1.00/M)
-- **Doubleword tiers** (in `config_models_doubleword.py`): `budget`, `standard`, `premium`; pricing is for 1h batch (24h is 30-50% cheaper via `--completion-window 24h`)
+- **Doubleword tiers** (in `config_models_doubleword.py`): `budget`, `standard`, `premium`; prices are **Async** $/M from the live catalog at `docs.doubleword.ai/inference-api/models` (Batch 24h is cheaper; default extractor window remains `1h`)
 - **Doubleword config metadata**: Each entry has `intelligence` score, `quantization`, `apis` (batch/async/realtime), `params_total`/`params_active`, `thinking_default`, `dottxt` flag (structured gen), `ocr` flag with `ocr_prompt`/`ocr_max_image_dim`, optional `two_step_ocr` + `ocr_extract_model`, `description`, and `usage_notes`
 - **Reasoning model handling**: `<think>` blocks from reasoning models (GLM-5.1, Qwen3.5 family) are stripped by `utils.extract_from_triple_backticks` before JSON extraction
 - **OCR models**: Receive PDF pages as base64-encoded JPEG images via PyMuPDF (not OCR text); configured with `ocr: True` and model-specific prompts in the registry

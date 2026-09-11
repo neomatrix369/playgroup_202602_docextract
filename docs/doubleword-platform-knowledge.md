@@ -1,10 +1,10 @@
 # Doubleword AI — Platform Knowledge Base
 > Machine-readable reference. Distilled from docs.doubleword.ai, www.doubleword.ai, and github.com/doublewordai.
-> Last updated: 2026-03-31
+> Last updated: 2026-09-11
 
-**See also (same repo):** **OpenRouter** (~33 models, `config_models_openrouter.py`, manual pricing). **V7 Go** (32 optional keys, `config_models_v7.py`, manual pricing, entity API — no Doubleword-style batch id). Short V7 reference: [docs/v7-go.md](v7-go.md); full workflow: [README.md — V7 Go](../README.md#v7-go-optional-backend). Cross-backend stats and pricing: [README — Key Findings](../README.md#key-findings).
+**See also (same repo):** **OpenRouter** (39 models, `config_models_openrouter.py`, manual pricing — refreshed from live OR API 2026-09-11). **V7 Go** (32 optional keys, `config_models_v7.py`, manual pricing, entity API — no Doubleword-style batch id). Short V7 reference: [docs/v7-go.md](v7-go.md); full workflow: [README.md — V7 Go](../README.md#v7-go-optional-backend). Cross-backend stats and pricing: [README — Key Findings](../README.md#key-findings).
 
-> **Note (2026-05):** Doubleword auto-sync is **disabled** (`SKIP_DOUBLEWORD_SYNC=1`). The docs endpoint lists model identifiers that don't match the batch API (e.g. `DeepSeek/DeepSeek-V4-Pro` in docs vs `deepseek-ai/DeepSeek-V4-Pro` at the API). `config_models_doubleword.py` now has **21** manually corrected entries (up from 12). The model catalog below may not match the corrected identifiers — always defer to `config_models_doubleword.py` for the actual working names.
+> **Note (2026-09-11):** Doubleword full docs pricing sync remains **disabled** (`SKIP_DOUBLEWORD_SYNC=1`) because docs identifiers historically mismatched the batch API. Live catalog is https://docs.doubleword.ai/inference-api/models (Realtime / Async / Batch 24h). `config_models_doubleword.py` has **35** entries with **Async** $/M filled (including former auto-added `$0` stubs). Always defer to that file for working model ids and prices.
 
 ---
 
@@ -132,7 +132,7 @@ Model names use `dw-` prefix in this repo's registry. **21 extraction models** i
 | `dw-qwen3-vl-235b-a22b-instruct` | Vision/multimodal (standard) |
 | `dw-qwen3-vl-30b-a3b-instruct` | Vision/multimodal (standard) |
 
-> **Important:** Doubleword's docs endpoint lists model identifiers that don't match their batch API (e.g. `DeepSeek/DeepSeek-V4-Pro` in docs but `deepseek-ai/DeepSeek-V4-Pro` at the API). The registry keys above use manually corrected identifiers. Canonical pricing: https://docs.doubleword.ai/batches/model-pricing and https://www.doubleword.ai (may differ — verify both)
+> **Important:** Doubleword's docs endpoint historically listed model identifiers that don't match their batch API (e.g. `DeepSeek/DeepSeek-V4-Pro` in docs but `deepseek-ai/DeepSeek-V4-Pro` at the API). The registry keys above use manually corrected identifiers. Canonical pricing (Realtime / Async / Batch 24h): https://docs.doubleword.ai/inference-api/models — this repo stores **Async** $/M in `config_models_doubleword.py` (filled 2026-09-11 for former `$0` stubs). The old `…/model-pricing.md` endpoint 404s.
 
 **Registry metadata per model** (in `config_models_doubleword.py`):
 
@@ -318,8 +318,8 @@ These are confirmed gaps as of the last audit. Useful context when helping users
 |---|---|---|---|
 | 1 | No code on intro/overview page | docs.doubleword.ai intro | High — developers expect runnable hello-world immediately |
 | 2 | Nemotron overnight pricing discrepancy | docs ($0.00/$0.00) vs marketing ($0.15/$0.38) | Medium — misleading cost estimates |
-| 3 | OCR models absent from docs pricing page | docs.doubleword.ai/batches/model-pricing | Medium — OCR models only visible on marketing site |
-| 3a | No context window info for OCR models (or most models) | docs.doubleword.ai/inference-api/model-pricing.md | High — only 2 of 10 models expose `Max Total Tokens`; OCR models give no context limit at all. Real limits (olmOCR-2-7B ≈128K, LightOnOCR-2-1B ≈32K) must be inferred from upstream model cards. Oversized requests are silently dropped to the `error_file_id` with no in-output error message. |
+| 3 | OCR models absent from docs pricing page | docs.doubleword.ai/inference-api/models (old batches/model-pricing URL retired) | Medium — OCR models only visible on marketing site historically |
+| 3a | No context window info for OCR models (or most models) | docs.doubleword.ai/inference-api/models (`.md` pricing table 404s) | High — catalog HTML has pricing tiers; context still often omitted. Real limits (olmOCR-2-7B ≈128K, LightOnOCR-2-1B ≈32K) must be inferred from upstream model cards. Oversized requests are silently dropped to the `error_file_id` with no in-output error message. |
 | 4 | Analytics endpoints undocumented | No public docs page | High — no way to programmatically retrieve cost/token data without reverse-engineering |
 | 5 | Skills fragmentation, no cross-referencing | Docs only list official skill | Medium — users unaware of community alternatives |
 | 6 | Two separate blog locations | docs.doubleword.ai/blog AND blog.doubleword.ai | Low — confusing, content may diverge |
@@ -336,8 +336,8 @@ These are confirmed gaps as of the last audit. Useful context when helping users
 - Overview: https://docs.doubleword.ai
 - Batch inference: https://docs.doubleword.ai/inference-api/batch-inference
 - Async inference: https://docs.doubleword.ai/inference-api/async-inference
-- Model pricing: https://docs.doubleword.ai/batches/model-pricing
-- Autobatcher: https://docs.doubleword.ai/batches/autobatcher
+- Model catalog / pricing: https://docs.doubleword.ai/inference-api/models
+- Autobatcher: https://docs.doubleword.ai/inference-api/autobatcher
 - Tool calling: https://docs.doubleword.ai/inference-api/tool-calling
 - Structured outputs: https://docs.doubleword.ai/inference-api/structured-outputs
 - Vision: https://docs.doubleword.ai/inference-api/vision

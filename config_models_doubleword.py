@@ -1,7 +1,7 @@
 # Doubleword Batch API models — model names use HuggingFace conventions
 # Verify model availability at https://app.doubleword.ai/ before running
-# Pricing from https://docs.doubleword.ai/batches/model-pricing
-# Prices shown are "High" (1h) batch tier — "Standard" (24h) is ~30-50% cheaper
+# Pricing from https://docs.doubleword.ai/inference-api/models (Async $/M; Batch 24h is cheaper)
+# Historical configs tracked ~Async rates (default extractor window is 1h)
 #
 # ⚠️  MANUALLY EDITED — Auto-sync disabled via SKIP_DOUBLEWORD_SYNC=1
 # Model identifiers corrected to match actual Doubleword API (docs are out of sync)
@@ -65,8 +65,8 @@ DOUBLEWORD_MODELS = {
         "model":      "zai-org/GLM-5.2-FP8",
         "multimodal": False,
         "modalities": ["text"],
-        "tier":       "premium",           # TODO: verify price from DW pricing page
-        "price_in":   0.00, "price_out": 0.00,  # TODO: not yet on DW pricing page
+        "tier":       "premium",
+        "price_in":   0.70, "price_out": 2.25,  # Async $/M from DW catalog 2026-09-11
         "ctx":        1048576,
         "quantization": "FP8",
         "apis":       ["batch", "async", "realtime"],  # assumed same as GLM-5.1
@@ -74,7 +74,7 @@ DOUBLEWORD_MODELS = {
         "extra_params": {"temperature": 1.0, "top_p": 0.95},
         "notes":      "FP8, APIs: Batch/Async/Realtime (assumed — verify pricing)",
         "description": "GLM-5.2-FP8 is Z.ai's latest flagship with solid 1M-token context, advanced coding with flexible thinking effort levels, and an improved IndexShare MoE architecture (2.9× fewer per-token FLOPs at 1M ctx).",
-        "usage_notes": "⚠️ Price not yet on DW pricing page. Same calling convention as GLM-5.1: Thinking Mode enabled by default. To disable: chat_template_kwargs: {enable_thinking: false}. Temp=1.0, TopP=0.95.",
+        "usage_notes": "Same calling convention as GLM-5.1: Thinking Mode enabled by default. To disable: chat_template_kwargs: {enable_thinking: false}. Temp=1.0, TopP=0.95.",
     },
     "dw-nemotron-3-super-120b-a12b": {
         "model":      "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4",
@@ -97,8 +97,8 @@ DOUBLEWORD_MODELS = {
         "model":      "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4",
         "multimodal": False,
         "modalities": ["text"],
-        "tier":       "premium",           # TODO: verify price from DW pricing page
-        "price_in":   0.00, "price_out": 0.00,  # TODO: not yet on DW pricing page
+        "tier":       "premium",
+        "price_in":   0.38, "price_out": 1.65,  # Async $/M from DW catalog 2026-09-11
         "ctx":        262144,
         "quantization": "NVFP4",
         "apis":       ["batch", "async"],  # assumed same as Nemotron-Super (no realtime)
@@ -107,7 +107,7 @@ DOUBLEWORD_MODELS = {
         "extra_params": {"temperature": 1.0, "top_p": 0.95},
         "notes":      "NVFP4, APIs: Batch/Async (assumed — verify pricing)",
         "description": "NVIDIA Nemotron 3 Ultra 550B A55B: larger Mamba-Transformer LatentMoE variant with 550B total parameters and 55B active parameters, built for advanced agentic reasoning, coding, and planning.",
-        "usage_notes": "⚠️ Price not yet on DW pricing page. Same calling convention as Nemotron-Super: Temp=1.0, TopP=0.95. Thinking opt-in: extra_body={chat_template_kwargs: {enable_thinking: true}}. For low-effort mode add low_effort: true.",
+        "usage_notes": "Same calling convention as Nemotron-Super: Temp=1.0, TopP=0.95. Thinking opt-in: extra_body={chat_template_kwargs: {enable_thinking: true}}. For low-effort mode add low_effort: true.",
     },
     "dw-gpt-oss-20b": {
         "model":      "openai/gpt-oss-20b",
@@ -127,14 +127,14 @@ DOUBLEWORD_MODELS = {
         "model":      "openai/gpt-oss-120b",
         "multimodal": False,
         "modalities": ["text"],
-        "tier":       "standard",          # TODO: verify price from DW pricing page
-        "price_in":   0.00, "price_out": 0.00,  # TODO: not yet on DW pricing page
+        "tier":       "standard",
+        "price_in":   0.11, "price_out": 0.45,  # Async $/M from DW catalog 2026-09-11
         "ctx":        131072,
         "apis":       ["batch", "async", "realtime"],  # assumed same as gpt-oss-20b
         "thinking_default": False,
         "notes":      "APIs: Batch/Async/Realtime (assumed — verify pricing)",
         "description": "OpenAI gpt-oss-120b — larger MoE variant of gpt-oss-20b for higher-capability tasks (120B total parameters).",
-        "usage_notes": "⚠️ Price not yet on DW pricing page. No special params required — same standard calling convention as gpt-oss-20b.",
+        "usage_notes": "No special params required — same standard calling convention as gpt-oss-20b.",
     },
     "dw-qwen3-14b": {
         "model":      "Qwen/Qwen3-14B-FP8",
@@ -209,13 +209,13 @@ DOUBLEWORD_MODELS = {
         "model":      "thinkingmachines/Inkling-NVFP4",
         "multimodal": True,
         "modalities": ["text", "image"],   # also supports audio — not used in this benchmark
-        "tier":       "standard",          # TODO: verify price from DW pricing page
-        "price_in":   0.00, "price_out": 0.00,  # TODO: not yet on DW pricing page
-        "ctx":        262_000,             # TODO: verify — not in HF config
-        "thinking_default": False,         # TODO: verify — model has <|content_thinking|> token
-        "notes":      "MoE, APIs: unknown (verify pricing page)",
+        "tier":       "premium",
+        "price_in":   0.90, "price_out": 3.00,  # Async $/M from DW catalog 2026-09-11
+        "ctx":        262_000,  # not in HF config
+        "thinking_default": False,  # model has <|content_thinking|> token
+        "notes":      "MoE, APIs: Batch/Async/Realtime",
         "description": "Inkling (NVFP4) by Thinking Machines: general-purpose multimodal MoE model accepting text, image, and audio inputs. Designed for agentic systems, coding, RAG, and conversational tasks.",
-        "usage_notes": "⚠️ Price, context window, and API availability not yet confirmed on DW pricing page. Has reasoning capability via <|content_thinking|> token — verify if on by default. Audio input supported but not used in this benchmark. Verify API call format before running evals.",
+        "usage_notes": "Has reasoning capability via <|content_thinking|> token — verify if on by default. Audio input supported but not used in this benchmark. Verify API call format before running evals.",
     },
     "dw-qwen3-5-9b": {
         "model":      "Qwen/Qwen3.5-9B",
@@ -434,21 +434,19 @@ DOUBLEWORD_MODELS = {
         "model":      "google/gemma-4-26B-A4B-it",
         "multimodal": False,
         "modalities": ["text"],
-        "tier":       "standard",       # TODO: verify
-        "price_in":   0.00, "price_out": 0.00,  # TODO: fill from pricing page
+        "tier":       "budget",
+        "price_in":   0.08, "price_out": 0.25,  # Async $/M from DW catalog 2026-09-11
         "ctx":        262_000,
         "notes":      "",
-        "auto_added": True,
     },
     "dw-kimi-k3": {
         "model":      "moonshotai/kimi-k3",
         "multimodal": False,
         "modalities": ["text"],
-        "tier":       "standard",       # TODO: verify
-        "price_in":   0.00, "price_out": 0.00,  # TODO: fill from pricing page
+        "tier":       "premium",
+        "price_in":   2.15, "price_out": 11.25,  # Async $/M from DW catalog 2026-09-11
         "ctx":        262_000,
         "notes":      "",
-        "auto_added": True,
     },
 
     # ═══════════════════════════════════════════════════════════
@@ -459,21 +457,19 @@ DOUBLEWORD_MODELS = {
         "model":      "deepseek-ai/DeepSeek-V4-Flash-0731",
         "multimodal": False,
         "modalities": ["text"],
-        "tier":       "standard",       # TODO: verify
-        "price_in":   0.00, "price_out": 0.00,  # TODO: fill from pricing page
+        "tier":       "budget",
+        "price_in":   0.07, "price_out": 0.14,  # Async $/M from DW catalog 2026-09-11
         "ctx":        1_048_000,
         "notes":      "",
-        "auto_added": True,
     },
     "dw-hy3-fp8": {
         "model":      "tencent/Hy3-FP8",
         "multimodal": False,
         "modalities": ["text"],
-        "tier":       "standard",       # TODO: verify
-        "price_in":   0.00, "price_out": 0.00,  # TODO: fill from pricing page
+        "tier":       "standard",
+        "price_in":   0.11, "price_out": 0.44,  # Async $/M from DW catalog 2026-09-11
         "ctx":        262_000,
         "notes":      "",
-        "auto_added": True,
     },
 
     # ═══════════════════════════════════════════════════════════
@@ -484,21 +480,19 @@ DOUBLEWORD_MODELS = {
         "model":      "Qwen/Qwen3.8-27B-FP8",
         "multimodal": False,
         "modalities": ["text"],
-        "tier":       "standard",       # TODO: verify
-        "price_in":   0.00, "price_out": 0.00,  # TODO: fill from pricing page
-        "ctx":        262_000,          # TODO: verify
+        "tier":       "premium",
+        "price_in":   0.35, "price_out": 2.25,  # Async $/M from DW catalog 2026-09-11
+        "ctx":        262_000,
         "notes":      "",
-        "auto_added": True,
     },
     "dw-muse-glimmer-30b": {
         "model":      "meta-models/Muse-Glimmer-30B",
         "multimodal": False,
         "modalities": ["text"],
-        "tier":       "standard",       # TODO: verify
-        "price_in":   0.00, "price_out": 0.00,  # TODO: fill from pricing page
-        "ctx":        262_000,          # TODO: verify
+        "tier":       "budget",
+        "price_in":   0.07, "price_out": 0.24,  # Async $/M from DW catalog 2026-09-11
+        "ctx":        262_000,
         "notes":      "",
-        "auto_added": True,
     },
 
     # ═══════════════════════════════════════════════════════════
@@ -509,41 +503,37 @@ DOUBLEWORD_MODELS = {
         "model":      "XiaomiMiMo/MiMo-V2.5-Pro",
         "multimodal": False,
         "modalities": ["text"],
-        "tier":       "standard",       # TODO: verify
-        "price_in":   0.00, "price_out": 0.00,  # TODO: fill from pricing page
+        "tier":       "standard",
+        "price_in":   0.33, "price_out": 0.65,  # Async $/M from DW catalog 2026-09-11
         "ctx":        1_048_000,
         "notes":      "",
-        "auto_added": True,
     },
     "dw-deepseek-v4-pro-0813": {
         "model":      "deepseek-ai/DeepSeek-V4-Pro-0813",
         "multimodal": False,
         "modalities": ["text"],
-        "tier":       "standard",       # TODO: verify
-        "price_in":   0.00, "price_out": 0.00,  # TODO: fill from pricing page
+        "tier":       "premium",
+        "price_in":   0.99, "price_out": 2.97,  # Async $/M from DW catalog 2026-09-11
         "ctx":        1_048_000,
         "notes":      "",
-        "auto_added": True,
     },
     "dw-glm-5.3": {
         "model":      "zai-org/GLM-5.3",
         "multimodal": False,
         "modalities": ["text"],
-        "tier":       "standard",       # TODO: verify
-        "price_in":   0.00, "price_out": 0.00,  # TODO: fill from pricing page
+        "tier":       "premium",
+        "price_in":   1.05, "price_out": 3.30,  # Async $/M from DW catalog 2026-09-11
         "ctx":        1_048_000,
         "notes":      "",
-        "auto_added": True,
     },
     "dw-glm-5.3-flash": {
         "model":      "zai-org/GLM-5.3-Flash",
         "multimodal": False,
         "modalities": ["text"],
-        "tier":       "standard",       # TODO: verify
-        "price_in":   0.00, "price_out": 0.00,  # TODO: fill from pricing page
+        "tier":       "standard",
+        "price_in":   0.11, "price_out": 0.38,  # Async $/M from DW catalog 2026-09-11
         "ctx":        262_000,
         "notes":      "",
-        "auto_added": True,
     },
 
 }
