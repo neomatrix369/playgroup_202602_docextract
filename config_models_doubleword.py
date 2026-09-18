@@ -536,4 +536,29 @@ DOUBLEWORD_MODELS = {
         "notes":      "",
     },
 
+    # ═══════════════════════════════════════════════════════════
+    #  AUTO-ADDED 2026-09-18 — from DW Batch API /v1/models diff
+    # ═══════════════════════════════════════════════════════════
+
+    "dw-deepseek-v4.1-flash": {
+        "model":      "deepseek-ai/DeepSeek-V4.1-Flash",
+        "multimodal": True,  # docs: native vision; API stub had text-only
+        "modalities": ["text", "image"],
+        "tier":       "standard",
+        "price_in":   0.12, "price_out": 0.48,  # Async $/M from DW catalog 2026-09-18
+        "ctx":        1_048_576,
+        "apis":       ["batch", "async", "realtime"],
+        "params_total": "552B", "params_active": "8B in / 16B out",
+        "thinking_default": True,
+        "notes":      "APIs: Batch/Async/Realtime; reasoning + native vision; Sep 2026 release",
+        "description": (
+            "DeepSeek-V4.1-Flash: 552B MoE (8B active in / 16B out) with native vision, "
+            "1M-token context, thinking/non-thinking modes, and continuous reasoning effort."
+        ),
+        "usage_notes": (
+            "Thinking enabled by default. Supports DSML tool calling and JSON output. "
+            "KV cache ~0.25× V4-Flash per token."
+        ),
+    },
+
 }
