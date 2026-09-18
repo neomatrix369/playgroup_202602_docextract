@@ -134,3 +134,4 @@ datetime,provider,model_short_name,model_full_name,tier,multimodal,price_in,pric
 2026-09-10 17:10:42,OpenRouter,kimi-k2.6,moonshotai/kimi-k2.6,great_value,True,0.95,4.0,262144,11,11,0,1305.45,159344,50715,0.354237,118.68,0.032203,11,11,11,9,9,10,11,11,
 2026-09-10 17:25:42,OpenRouter,glm-5.3,z-ai/glm-5.3,premium,False,1.4,4.4,1048576,11,11,0,899.8,162422,43834,0.42026,81.8,0.038205,11,11,11,9,9,10,11,11,
 2026-09-10 17:28:07,OpenRouter,glm-5.3-flash,z-ai/glm-5.3-flash,ultra_cheap,True,0.15,0.5,1048576,11,11,0,143.2,162422,17234,0.03298,13.02,0.002998,11,11,11,9,9,10,11,11,
+2026-09-18 07:45:52,Doubleword,dw-deepseek-v4.1-flash,deepseek-ai/DeepSeek-V4.1-Flash,standard,True,0.12,0.48,1048576,11,11,0,620,160121,26356,0.031865,56.36,0.002897,11,11,11,9,9,10,11,11,72271e50-6a8e-4ccc-89d2-e410fc22cd2f
