@@ -18,7 +18,9 @@ fail() {
 [[ -f "$DOCEXTRACT_ROOT/which-models-extracted-playground.html" ]] || fail "source playground missing"
 [[ -f "$DOCEXTRACT_ROOT/.claude/skills/docextract-workflow/playground-integrity.md" ]] || fail "integrity checklist missing"
 
-python3 "$SKILL_ROOT/scripts/sync.py"
+PYTHON3="${DOCEXTRACT_ROOT}/.venv/bin/python3"
+[[ -x "$PYTHON3" ]] || PYTHON3="python3"
+"$PYTHON3" "$SKILL_ROOT/scripts/sync.py"
 
 echo "Preview: cd \"$PAGES_ROOT\" && python3 -m http.server 8080"
 echo "Latest: http://localhost:8080/demos/playgroup-202602-docextract/latest/"

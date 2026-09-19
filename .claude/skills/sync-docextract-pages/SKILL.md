@@ -35,25 +35,25 @@ Defaults:
 bash .devin/skills/sync-docextract-pages/scripts/sync.sh
 ```
 
-The script validates repositories, identifies the committed playground snapshot, copies it append-only, updates `versions.json`, writes the stable latest redirect, and checks archive invariants.
+The script:
+1. Validates repositories and the committed playground source.
+2. Copies the snapshot append-only, updates `versions.json`, writes the stable latest redirect, and checks archive invariants.
+3. **Automatically updates all site pages** from live data (no manual edits required):
+   - `demos/playgroup-202602-docextract/index.html` — scored-run count, stamp, historic count
+   - `pages/playgroup-202602-docextract.html` — snapshot line, key findings, provider table, leaderboard, takeaways, latest snapshot row, footer date
+   - `pages/manifest.json` — scored-run and historic counts
+   - `assets/js/site.js` — FALLBACK_PAGES descriptions
+   - root `index.html` — hero text
+   - `README.md` (pages repo) — snapshot count
+   - `README.md` (source repo) — archive and scored-run counts
 
-Then reconcile the current snapshot metadata from the source README and generated playground across:
+The script imports `score.py`'s own `_load_stats` so time/cost figures in the project page exactly match `python score.py` Provider Summary output. It is idempotent — run it twice and the second run reports all files already current.
 
-- `demos/playgroup-202602-docextract/index.html`
-- `pages/playgroup-202602-docextract.html`
-- `pages/manifest.json`
-- `assets/js/site.js`
-- root `index.html`
-- `pages/projects.html`
-- both repository READMEs
-
-Verify scored-run, provider, canonical-snapshot, historic-snapshot, latest-stamp, leaderboard, and provider-summary values. Historical prose remains historical. Run the script a second time and require no additional diff.
-
-After synchronization:
+After synchronization, verify manually:
 
 ```bash
 cd "$PAGES_ROOT"
 python3 -m http.server 8080
 ```
 
-Verify home → project page → archive → stable latest → archive navigation → Doubleword guide. Run the sync a second time and require an empty diff from the second run.
+Open home → project page → archive → stable latest → archive navigation → Doubleword guide and confirm counts and provider table match `python score.py` output.
