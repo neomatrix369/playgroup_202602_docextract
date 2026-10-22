@@ -561,4 +561,27 @@ DOUBLEWORD_MODELS = {
         ),
     },
 
+    # ═══════════════════════════════════════════════════════════
+    #  AUTO-ADDED 2026-10-21 — prices/tier/ctx need review
+    # ═══════════════════════════════════════════════════════════
+
+    "dw-deepseek-v4.1-flash-1017": {
+        "model":      "deepseek-ai/DeepSeek-V4.1-Flash-1017",
+        "multimodal": False,
+        "modalities": ["text"],
+        "tier":       "standard",       # TODO: verify from DW catalog
+        "price_in":   0.00, "price_out": 0.00,  # TODO: fill from DW catalog
+        "ctx":        1_048_576,        # TODO: verify
+        "notes":      "Oct 2026 update of DeepSeek-V4.1-Flash; verify pricing/modalities",
+    },
+    "dw-muse-spark-open": {
+        "model":      "meta/muse-spark-open",
+        "multimodal": False,
+        "modalities": ["text"],
+        "tier":       "standard",       # TODO: verify from DW catalog
+        "price_in":   0.00, "price_out": 0.00,  # TODO: fill from DW catalog
+        "ctx":        262_000,          # TODO: verify
+        "notes":      "Meta Muse Spark Open; verify pricing/tier/ctx",
+    },
+
 }
