@@ -12,8 +12,10 @@ import os
 import sys
 from datetime import datetime
 
+import llm_google
 import llm_openrouter
 from config_models_doubleword import DOUBLEWORD_MODELS
+from config_models_google import GOOGLE_MODELS
 from config_models_openrouter import OPENROUTER_MODELS
 from config_models_v7 import V7_MODELS
 from utils import get_logger, sanitize_error_message
@@ -70,7 +72,7 @@ The raw text from the document follows:
 ADDRESS_FIELDS = {"address__postcode", "address__post_town", "address__street_line"}
 NUMERIC_FIELDS = {"income_annually_in_british_pounds", "spending_annually_in_british_pounds"}
 
-ALL_MODELS = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS, **V7_MODELS}
+ALL_MODELS = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS, **V7_MODELS, **GOOGLE_MODELS}
 
 
 def _mod_tag(multimodal):
@@ -364,6 +366,119 @@ def _run_openrouter(model_short_name):
         raise RuntimeError(f"[OpenRouter] '{model_short_name}' produced no usable rows; preserved temporary output and stopped before scoring")
     if usage_omitted:
         raise RuntimeError(f"[OpenRouter] '{model_short_name}' omitted usage data; preserved temporary output and stopped for review")
+    os.replace(tmp_filename, out_filename)
+    return "completed"
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  Google backend (synchronous, one row at a time — mirrors OpenRouter)
+# ═══════════════════════════════════════════════════════════════════
+
+def _run_google(model_short_name):
+    """Run extraction for one Google Gemini model. Returns status: 'completed', 'skipped', or 'failed'."""
+    model_cfg = GOOGLE_MODELS[model_short_name]
+    model = model_cfg["model"]
+    multimodal = model_cfg["multimodal"]
+    max_ctx_tokens = model_cfg.get("ctx")
+    out_filename = f"data/playgroup_dev_extracted__google__{model_short_name}.tsv"
+    tmp_filename = out_filename + ".tmp"
+
+    if os.path.exists(out_filename):
+        log.warning("[Google] Skipping {} {}: {} already exists",
+                    model_short_name, _mod_tag(multimodal), out_filename)
+        return "skipped"
+
+    log.info("[Google] Model: {} ({}) {}", model_short_name, model, _mod_tag(multimodal))
+    log.info("[Google] Output: {}", out_filename)
+
+    price_in = model_cfg.get("price_in", 0)
+    price_out = model_cfg.get("price_out", 0)
+
+    rows_with_values = 0
+    rows_empty = 0
+    field_counts = {}
+    total_elapsed_secs = 0.0
+    total_prompt_tokens = 0
+    total_completion_tokens = 0
+    total_cost_usd = 0.0
+    call_log_rows = []
+
+    csv.field_size_limit(10 * 1024 * 1024)
+    with open(IN_FILENAME, "r") as infile, open(tmp_filename, "w") as outfile:
+        reader = csv.reader(infile, delimiter="\t", quoting=csv.QUOTE_NONE)
+        for row_num, row in enumerate(reader):
+            assert len(row) == 6, f"Expected 6 cols, got {len(row)} in row {row_num}"
+            pdf_filename, _keys, _text_djvu2hocr, _text_tesseract411, _text_tesseractmarch2020, text_combined = row
+
+            log.info("[Google] Processing row {}: {}", row_num, pdf_filename)
+            call_log_base = {
+                "datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "provider": "Google",
+                "model_short_name": model_short_name,
+                "model_full_name": model,
+                "tier": model_cfg.get("tier", ""),
+                "multimodal": multimodal,
+                "row_num": row_num,
+                "pdf_filename": pdf_filename,
+            }
+            try:
+                result = llm_google.call_llm(model_short_name, PROMPT_TEMPLATE, text_combined,
+                                             max_ctx_tokens=max_ctx_tokens)
+                fields = _parse_llm_response(result["text"])
+            except Exception as e:
+                error_msg = sanitize_error_message(str(e)).replace("\t", " ").replace("\n", " ")
+                line = f"error={error_msg}"
+                outfile.write(line + "\n")
+                rows_empty += 1
+                log.error("[Google] -> ERROR: {}", error_msg[:120])
+                call_log_rows.append({**call_log_base, "status": "error", "elapsed_secs": 0,
+                                      "prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0,
+                                      "fields_extracted": 0, "error": error_msg[:500]})
+                continue
+
+            row_cost = (result["prompt_tokens"] * price_in + result["completion_tokens"] * price_out) / 1_000_000
+            total_elapsed_secs += result["elapsed_secs"]
+            total_prompt_tokens += result["prompt_tokens"]
+            total_completion_tokens += result["completion_tokens"]
+            total_cost_usd += row_cost
+
+            line = _row_to_tsv_line(fields)
+            outfile.write(line + "\n")
+
+            if fields:
+                rows_with_values += 1
+                log.info("  [Google] -> {}  [{}s, ${:.6f}]", line[:100], result['elapsed_secs'], row_cost)
+                for key in fields:
+                    field_counts[key] = field_counts.get(key, 0) + 1
+            else:
+                rows_empty += 1
+                log.warning("  [Google] -> (no values extracted)  [{}s]", result['elapsed_secs'])
+
+            call_log_rows.append({**call_log_base, "status": "ok" if fields else "empty",
+                                  "elapsed_secs": result["elapsed_secs"],
+                                  "prompt_tokens": result["prompt_tokens"],
+                                  "completion_tokens": result["completion_tokens"],
+                                  "cost_usd": round(row_cost, 6),
+                                  "fields_extracted": len(fields),
+                                  "error": ""})
+        outfile.flush()
+
+    _print_summary("Google", model_short_name, multimodal, rows_with_values, rows_empty, field_counts,
+                   total_elapsed_secs, total_prompt_tokens, total_completion_tokens, total_cost_usd)
+    stats_row = _stats_row("Google", model_short_name, model_cfg, rows_with_values + rows_empty,
+                           rows_with_values, rows_empty, field_counts, total_elapsed_secs, total_prompt_tokens,
+                           total_completion_tokens, total_cost_usd)
+    stats_fields = (["datetime", "provider", "model_short_name", "model_full_name", "tier", "multimodal",
+                     "price_in", "price_out", "ctx", "total", "rows_with_values", "rows_empty",
+                     "total_elapsed_secs", "total_prompt_tokens", "total_completion_tokens", "total_cost_usd",
+                     "avg_secs_per_row", "avg_cost_per_row"] + ALL_FIELDS + ["batch_id"])
+    _atomic_upsert_rows(CALL_LOG_FILENAME, CALL_LOG_FIELDS, "Google", model_short_name, call_log_rows)
+    _atomic_upsert_rows(STATS_FILENAME, stats_fields, "Google", model_short_name, [stats_row])
+    all_errors = all(row["status"] == "error" for row in call_log_rows)
+    with open(tmp_filename) as f:
+        all_error_lines = all(line.startswith("error=") for line in f)
+    if rows_with_values == 0 or all_errors or all_error_lines:
+        raise RuntimeError(f"[Google] '{model_short_name}' produced no usable rows; preserved temporary output and stopped before scoring")
     os.replace(tmp_filename, out_filename)
     return "completed"
 
@@ -1745,12 +1860,14 @@ def _announce_potentially_deprecated(provider, flagged_models):
 
 
 def _resolve_model(model_short_name):
-    """Return backend string ('doubleword', 'v7', or 'openrouter') or exit with error.
+    """Return backend string ('google', 'doubleword', 'v7', or 'openrouter') or exit with error.
 
     potentially_deprecated models are NOT skipped — they still run normally.
     Only a manually set 'deprecated': True flag would retire a model (if that
     logic is ever added in future).
     """
+    if model_short_name in GOOGLE_MODELS:
+        return "google"
     _v7_prefixes = {k.split("/")[0] for k in V7_MODELS if "/" in k}
     if model_short_name in V7_MODELS or model_short_name.split("/")[0] in _v7_prefixes:
         return "v7"
@@ -1763,10 +1880,12 @@ def _resolve_model(model_short_name):
     available_or = ", ".join(f"{k}{_mod_tag(OPENROUTER_MODELS[k]['multimodal'])}" for k in OPENROUTER_MODELS)
     available_dw = ", ".join(f"{k}{_mod_tag(DOUBLEWORD_MODELS[k]['multimodal'])}" for k in DOUBLEWORD_MODELS)
     available_v7 = ", ".join(f"{k}{_mod_tag(V7_MODELS[k]['multimodal'])}" for k in V7_MODELS)
+    available_goog = ", ".join(f"{k}{_mod_tag(GOOGLE_MODELS[k]['multimodal'])}" for k in GOOGLE_MODELS)
     log.error("Unknown model '{}'.", model_short_name)
     log.error("  OpenRouter models: {}", available_or)
     log.error("  Doubleword models: {}", available_dw)
     log.error("  V7 Go models: {}", available_v7)
+    log.error("  Google models: {}", available_goog)
     sys.exit(1)
 
 
@@ -1776,7 +1895,7 @@ async def main():
     import sys as _sys
     _argv = _sys.argv[1:]
     _explicitly_non_dw = (
-        ("--all-openrouter" in _argv or "--all-v7" in _argv)
+        ("--all-openrouter" in _argv or "--all-v7" in _argv or "--all-google" in _argv)
         and "--all-doubleword" not in _argv
         and not any(a.startswith("dw-") for a in _argv)
     )
@@ -1788,7 +1907,7 @@ async def main():
             import config_models_doubleword as _cfg_dw
             importlib.reload(_cfg_dw)
             DOUBLEWORD_MODELS = _cfg_dw.DOUBLEWORD_MODELS
-            ALL_MODELS = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS, **V7_MODELS}
+            ALL_MODELS = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS, **V7_MODELS, **GOOGLE_MODELS}
 
     # Full pricing sync from docs (disabled by default — docs IDs historically mismatched)
     if not os.getenv("SKIP_DOUBLEWORD_SYNC"):
@@ -1797,7 +1916,7 @@ async def main():
         import config_models_doubleword as _cfg_dw
         importlib.reload(_cfg_dw)
         DOUBLEWORD_MODELS = _cfg_dw.DOUBLEWORD_MODELS
-        ALL_MODELS = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS, **V7_MODELS}
+        ALL_MODELS = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS, **V7_MODELS, **GOOGLE_MODELS}
 
     parser = argparse.ArgumentParser(
         description="Extract charity data via OpenRouter, Doubleword Batch API, or V7 Go agents. "
@@ -1817,6 +1936,8 @@ async def main():
     group.add_argument("--all-v7", action="store_true",
                        help="Run only V7 Go models; refresh agent_template_json from the API before submit, "
                             "then use preflight + auto-ensure for missing properties per Go Agent v2 run")
+    group.add_argument("--all-google", action="store_true",
+                       help="Run only Google DeepMind Gemini models (direct API, synchronous per-row)")
     parser.add_argument(
         "--v7-agent-template",
         metavar="PATH",
@@ -1848,6 +1969,8 @@ async def main():
         models_to_run = list(OPENROUTER_MODELS)
     elif args.all_v7:
         models_to_run = list(V7_MODELS)
+    elif args.all_google:
+        models_to_run = list(GOOGLE_MODELS)
     else:
         models_to_run = list(ALL_MODELS)           # includes potentially_deprecated
 
@@ -1855,19 +1978,22 @@ async def main():
     dw_models = []
     v7_models = []
     or_models = []
+    google_models = []
     for model_short_name in models_to_run:
         backend = _resolve_model(model_short_name)
         if backend == "doubleword":
             dw_models.append(model_short_name)
         elif backend == "v7":
             v7_models.append(model_short_name)
+        elif backend == "google":
+            google_models.append(model_short_name)
         else:
             or_models.append(model_short_name)
 
     # Print run plan
     log.info("=" * 60)
-    log.info("Extraction run: {} OpenRouter + {} Doubleword + {} V7 models",
-             len(or_models), len(dw_models), len(v7_models))
+    log.info("Extraction run: {} OpenRouter + {} Doubleword + {} V7 + {} Google models",
+             len(or_models), len(dw_models), len(v7_models), len(google_models))
     log.info("=" * 60)
 
     if or_models:
@@ -1882,6 +2008,8 @@ async def main():
             log.info("[V7] Using --v7-agent-template: {}", args.v7_agent_template)
     elif args.v7_agent_template:
         log.warning("--v7-agent-template ignored: no V7 models in this run")
+    if google_models:
+        _print_provider_plan("google", google_models)
 
     all_statuses = {}  # (provider, model) -> status
 
@@ -1893,6 +2021,15 @@ async def main():
         for model_short_name in or_models:
             status = _run_openrouter(model_short_name)
             all_statuses[("openrouter", model_short_name)] = status or "failed"
+
+    # Run Google models sequentially (sync, one row at a time — mirrors OpenRouter)
+    if google_models:
+        log.info("-" * 60)
+        log.info("Starting Google ({} models)", len(google_models))
+        log.info("-" * 60)
+        for model_short_name in google_models:
+            status = _run_google(model_short_name)
+            all_statuses[("google", model_short_name)] = status or "failed"
 
     # Run Doubleword models — either full run or retry-failed-rows only
     if dw_models:
