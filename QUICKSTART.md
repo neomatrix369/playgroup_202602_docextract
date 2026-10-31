@@ -41,6 +41,10 @@ DOUBLEWORD_API_KEY=your-doubleword-api-key-here   # optional, for Doubleword bat
 # Disable auto-sync to preserve manual model identifier corrections (recommended)
 SKIP_DOUBLEWORD_SYNC=1
 
+# Optional — Google DeepMind (only if you run models from config_models_google.py, e.g. google-gemini-4-argon)
+# Get key at: https://aistudio.google.com/app/apikey
+GEMINI_API_KEY=your-google-ai-studio-key
+
 # Optional — V7 Go (only if you run models from config_models_v7.py, e.g. v7-go-agent-v2/claude-sonnet)
 V7_GO_API_KEY=your-v7-go-api-key
 V7_GO_WORKSPACE_ID=your-workspace-uuid
@@ -55,7 +59,7 @@ V7_GO_PDF_DIR=data
 # V7_GO_AUTO_ENSURE_PROPERTIES=1  # auto-create missing properties on the V7 agent
 ```
 
-The OpenRouter key is required for OpenRouter models. The Doubleword key is only needed for `DOUBLEWORD_MODELS` entries (e.g. `dw-qwen3.5-9b`). The V7 variables are only needed for `V7_MODELS` entries. **Registry sizes (for mental model):** 39 OpenRouter models, 35 Doubleword extraction models (auto-sync **disabled** via `SKIP_DOUBLEWORD_SYNC=1` — model identifiers are manually corrected), 32 optional V7 keys — see [README — Key Findings](README.md#key-findings) and [Auto-Sync Pricing](README.md#auto-sync-pricing). For V7 setup detail, read [README.md](README.md) — **V7 Go (optional backend)** — especially **File property for Go Agent v2** and **V7_GO_PARENT_ENTITY_ID** if you use `agent_template_json` or child projects. A compact V7-only checklist is in [docs/v7-go.md](docs/v7-go.md).
+The OpenRouter key is required for OpenRouter models. The Doubleword key is only needed for `DOUBLEWORD_MODELS` entries (e.g. `dw-qwen3.5-9b`). The V7 variables are only needed for `V7_MODELS` entries. `GEMINI_API_KEY` is only needed for `GOOGLE_MODELS` entries (e.g. `google-gemini-4-argon`). **Registry sizes (for mental model):** 39 OpenRouter models, 35 Doubleword extraction models (auto-sync **disabled** via `SKIP_DOUBLEWORD_SYNC=1` — model identifiers are manually corrected), 32 optional V7 keys, 4 Google DeepMind keys — see [README — Key Findings](README.md#key-findings) and [Auto-Sync Pricing](README.md#auto-sync-pricing). For V7 setup detail, read [README.md](README.md) — **V7 Go (optional backend)** — especially **File property for Go Agent v2** and **V7_GO_PARENT_ENTITY_ID** if you use `agent_template_json` or child projects. A compact V7-only checklist is in [docs/v7-go.md](docs/v7-go.md).
 
 ---
 
