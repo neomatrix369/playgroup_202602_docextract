@@ -223,6 +223,12 @@ python extractor.py gemini-3.8-flash dw-qwen3-14b v7-go-agent-v2/claude-sonnet
 # All Doubleword models with 24h window (cheapest)
 python extractor.py --all-doubleword --completion-window 24h
 
+# One Google DeepMind model (registry key google-*)
+python extractor.py google-gemini-4-argon
+
+# All Google DeepMind models
+python extractor.py --all-google
+
 # Re-submit only rows that failed in the previous run (merges back into existing output files)
 python extractor.py --retry-failed
 
@@ -331,7 +337,9 @@ python score.py data/playgroup_dev_extracted__v7__v7-go-agent-v2__claude-sonnet.
 | `llm_doubleword.py` | LLM client for Doubleword Batch API (async, direct batch management with checkpoint/resume). OCR models receive PDF pages as base64-encoded images via PyMuPDF; reasoning-model `<think>` blocks are stripped before JSON extraction. |
 | `llm_v7.py` | LLM client for [V7 Go](https://docs.go.v7labs.com/) (async HTTP: create entity per row, poll until output field ready; Go Agent v2: empty entity body, PDF upload, multi-field merge). Resolves file field and parent entity with guardrails; logs diagnostics for unavailable-model skips. Same orchestration hooks as `llm_doubleword.py` (`submit_batch`, `poll_batch`, `download_results`, checkpoints). |
 | `extraction_and_prompt_example.py` | Simple single-model extraction loop, good for prompt experiments. |
-| `extractor.py` | Unified extraction runner. Auto-detects backend from registries (`DOUBLEWORD_MODELS`, `V7_MODELS`, `OPENROUTER_MODELS`). At startup (for DW runs) auto-adds new DW API models as stubs; full docs pricing sync still disabled (`SKIP_DOUBLEWORD_SYNC=1`). Doubleword and V7 use async polling with checkpoint/resume; OpenRouter is sync per row. Graceful Ctrl-C preserves checkpoints. Truncates OCR text to model context window (conservative 3 chars/token estimate). Doubleword: downloads DW error files for pre-processing rejections. Flags: `--completion-window`, `--all-doubleword`, `--all-openrouter`, `--all-v7`, `--v7-agent-template`, `--retry-failed`. |
+| `extractor.py` | Unified extraction runner. Auto-detects backend from registries (`DOUBLEWORD_MODELS`, `V7_MODELS`, `OPENROUTER_MODELS`, `GOOGLE_MODELS`). At startup (for DW runs) auto-adds new DW API models as stubs; full docs pricing sync still disabled (`SKIP_DOUBLEWORD_SYNC=1`). Doubleword and V7 use async polling with checkpoint/resume; OpenRouter and Google are sync per row. Graceful Ctrl-C preserves checkpoints. Truncates OCR text to model context window (conservative 3 chars/token estimate). Doubleword: downloads DW error files for pre-processing rejections. Flags: `--completion-window`, `--all-doubleword`, `--all-openrouter`, `--all-v7`, `--v7-agent-template`, `--all-google`, `--retry-failed`. |
+| `llm_google.py` | LLM client for Google DeepMind Gemini API (synchronous, via `google-genai` SDK). Requires `GEMINI_API_KEY`. Handles retries, usage tracking, and `<think>` block stripping for reasoning models. |
+| `config_models_google.py` | Google DeepMind model registry — 4 models (`google-gemini-4-argon`, `google-gemini-2.5-pro`, `google-gemini-2.5-flash` [deprecated], `google-gemini-3.8-flash`). Prices are USD/M from [ai.google.dev/gemini-api/docs/pricing](https://ai.google.dev/gemini-api/docs/pricing). |
 | `sync_doubleword_models.py` | Syncs Doubleword model data. **New-model auto-add**: called by `extractor.py` at startup with `write=True` — appends stubs for API models not yet in config. **Full docs pricing sync**: disabled by default (`SKIP_DOUBLEWORD_SYNC=1`) because docs identifiers don't match batch API. Run standalone to reset to docs version. Run with `--diff` for dry-run new/gone report (no file writes); `--probe-api` to dump raw API model list. |
 | `sync_v7_go_agent_template.py` | Fetches the current V7 Go project + property list from the API and refreshes `v7_go_agent_v2_template.json` when the normalized JSON differs (stable ordering, tool placeholders for non-manual fields). Uses the same env vars as `llm_v7.py`. |
 | `score.py` | Scorer with F1/Precision/Recall. No args → ranked leaderboard; pass a filename → verbose field-by-field diff. Leaderboard **Model** column uses the same short display rule as the playground when shared `agent__` prefixes apply (see [Results](#results)). |
@@ -339,6 +347,7 @@ python score.py data/playgroup_dev_extracted__v7__v7-go-agent-v2__claude-sonnet.
 | `config_models_openrouter.py` | OpenRouter model registry — 39 models organised by tier. |
 | `config_models_doubleword.py` | Doubleword model registry — 38 extraction models (manually maintained; auto-sync disabled via `SKIP_DOUBLEWORD_SYNC=1`). |
 | `config_models_v7.py` | V7 Go model registry — short names (e.g. `v7-go-agent-v2/claude-sonnet`) mapped to display metadata; agent IDs and field slugs usually come from env (see “V7 Go” above). |
+| `config_models_google.py` | Google DeepMind model registry — 4 models prefixed `google-*`. Requires `GEMINI_API_KEY`. |
 | `playground.py` | Generates `which-models-extracted-playground.html` from extraction results. Chart/table **labels** use short model names when safe (shared `agent__` prefix); embedded JSON keys stay full ids. Rankings use F1; heatmaps/errors use exact-match. Tables and charts share one row builder per tab — after regenerate, verify integrity (see `/docextract-workflow`). |
 
 ### Model Tiers
@@ -382,6 +391,17 @@ Registry keys start with `v7-`. Many use a **`v7-go-agent-v2/<variant>`** patter
 Each entry includes `model` (long label), `display` (short label), `tier: v7`, `ctx`, `price_in` / `price_out` (often `0` until you set pricing manually), `agent_template_json`, `input_field_slug`, `output_field_slug`, and optional `notes`. Workspace and agent UUIDs usually come from **environment variables**, not from the dict — see **V7 Go (optional backend)** above.
 
 To list keys from the shell: `python -c "from config_models_v7 import V7_MODELS; print('\n'.join(sorted(V7_MODELS)))"`.
+
+#### Google DeepMind (`config_models_google.py`)
+
+Prefixed with `google-`. **4** models accessed directly via the Gemini API (Google AI Studio). Requires `GEMINI_API_KEY` in `.env`. Runs are synchronous (one request per row), same as OpenRouter. Prices are USD/M from the [Gemini API pricing page](https://ai.google.dev/gemini-api/docs/pricing).
+
+| Tier | Key | Notes |
+|------|-----|-------|
+| `flagship` | `google-gemini-4-argon` | Frontier reasoning model, 1M ctx; launch price until 2026-11-30 |
+| `pro` | `google-gemini-2.5-pro` | Pro thinking model, 1M ctx |
+| `flash` | `google-gemini-3.8-flash` | High-speed flash model, 1M ctx |
+| `flash` | `google-gemini-2.5-flash` | ⚠️ Deprecated (404) — use `google-gemini-3.8-flash` |
 
 ### Frontend (Doc Risk Auditor prototype)
 

@@ -46,6 +46,7 @@ python extractor.py
 python extractor.py --all-openrouter
 python extractor.py --all-doubleword
 python extractor.py --all-v7
+python extractor.py --all-google
 
 # Retry failed rows from previous run
 python extractor.py --retry-failed
@@ -107,15 +108,17 @@ python sync_v7_go_agent_template.py
 
 ### Backend Auto-Detection
 
-`extractor.py` merges three model registries and auto-detects the backend:
+`extractor.py` merges four model registries and auto-detects the backend:
 - `dw-*` keys → Doubleword Batch API (`llm_doubleword.py`)
 - `v7-*` keys → V7 Go entity API (`llm_v7.py`)
+- `google-*` keys → Google DeepMind Gemini API (`llm_google.py`)
 - Everything else → OpenRouter (`llm_openrouter.py`)
 
 All backends share a common interface in `extractor.py` but have different execution patterns:
 - **OpenRouter**: Synchronous per-row requests
 - **Doubleword**: Async batch submission → poll completion → download results
 - **V7 Go**: Async entity creation per row (or Go Agent v2 flow: empty entity + PDF upload) → poll output fields
+- **Google**: Synchronous per-row requests via `google-genai` SDK; requires `GEMINI_API_KEY`
 
 ### Model Registries
 
@@ -124,6 +127,7 @@ All backends share a common interface in `extractor.py` but have different execu
 | `config_models_openrouter.py` | OpenRouter | ❌ Manual | 39 |
 | `config_models_doubleword.py` | Doubleword | ⚠️ **Partial** (new-model stubs auto-added; pricing manual) | 35 |
 | `config_models_v7.py` | V7 Go | ❌ Manual | 32 |
+| `config_models_google.py` | Google DeepMind | ❌ Manual | 4 |
 
 **Doubleword sync — two independent mechanisms:**
 - **New-model detection** (always on for DW runs): `extractor.py` queries the DW Batch API `/v1/models` at startup. Any model not yet in `config_models_doubleword.py` is auto-appended as a stub (`auto_added: True`, price `0.00`, tier `standard`). Review price/tier/ctx after the run.
@@ -228,6 +232,8 @@ Per-document F1 is computed from field-level TP/FP/FN, then averaged across all 
 | `llm_openrouter.py` | OpenRouter HTTP client (sync per-row) |
 | `llm_doubleword.py` | Doubleword Batch API client (async batch: submit → poll → download) |
 | `llm_v7.py` | V7 Go entity API client (async: create entity per row or Go Agent v2 flow with PDF upload) |
+| `llm_google.py` | Google DeepMind Gemini API client (sync per-row via `google-genai` SDK; requires `GEMINI_API_KEY`) |
+| `config_models_google.py` | Google DeepMind model registry — 4 models prefixed `google-*` |
 | `score.py` | F1/Precision/Recall scorer with field-level similarity. No args → leaderboard; pass filename → verbose diff |
 | `playground.py` | Generates `which-models-extracted-playground.html` from `data/`. Paired table/chart views per tab; F1 + exact-match dual scoring. After regenerate, agents must run `/docextract-workflow` Playground Data Integrity Gate. |
 | `.claude/skills/docextract-workflow/` | Project workflow skill (`/docextract-workflow`): stage detection, cadence, and playground integrity checklist (`playground-integrity.md`). |
@@ -243,6 +249,11 @@ Per-document F1 is computed from field-level TP/FP/FN, then averaged across all 
 ### Required for OpenRouter
 ```bash
 OPENROUTER_API_KEY=sk-or-v1-...
+```
+
+### Required for Google DeepMind
+```bash
+GEMINI_API_KEY=your-google-ai-studio-key  # https://aistudio.google.com/app/apikey
 ```
 
 ### Required for Doubleword
