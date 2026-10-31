@@ -82,10 +82,28 @@ def call_llm(
         {"role": "user", "content": prompt},
     ]
 
+    config = GOOGLE_MODELS.get(model_name, {})
+    thinking_level = config.get("thinking_level")
+    extra_body: dict[str, Any] = {}
+    if thinking_level:
+        extra_body = {
+            "google": {
+                "thinking_config": {
+                    "thinking_level": thinking_level,
+                    "include_thoughts": config.get("include_thoughts", False),
+                }
+            }
+        }
+        logger.info("[Google] thinking_level={} for {}", thinking_level, model_name)
+
     client = _get_client()
     t0 = time.time()
     response = utils.call_with_backoff(
-        lambda: client.chat.completions.create(model=api_model, messages=messages),
+        lambda: client.chat.completions.create(
+            model=api_model,
+            messages=messages,
+            **({"extra_body": extra_body} if extra_body else {}),
+        ),
         label="Google",
         model_name=api_model,
         retry_markers=RETRY_MARKERS,
