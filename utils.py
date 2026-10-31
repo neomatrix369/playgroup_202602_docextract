@@ -1,6 +1,8 @@
+import json
 import os
 import re
 import sys
+import time
 from datetime import datetime, timezone
 
 from loguru import logger
@@ -41,6 +43,57 @@ def sanitize_error_message(msg):
     msg = re.sub(r"(?i)(api[_-]?key|authorization|x-api-key)(['\"\s:=]+)[^'\"\s,}]+", r"\1\2<redacted>", msg)
     msg = re.sub(r"(/keys/)[A-Fa-f0-9]{32,}", r"\1<redacted>", msg)
     return msg
+
+
+# ── Shared helpers for sync chat-completion clients (OpenRouter, Google) ──
+
+def truncate_to_ctx(text: str, prompt_template: str, max_ctx_tokens: int | None,
+                    model_name: str, log=logger) -> str:
+    """Cut text so template + text + ~2000-token reply fit in max_ctx_tokens (≈4 chars/token)."""
+    if not max_ctx_tokens:
+        return text
+    max_text_chars = (max_ctx_tokens - 2000) * 4 - len(prompt_template)
+    if len(text) > max_text_chars:
+        log.warning("Truncating text from {} to {} chars for {} (ctx={})",
+                    len(text), max_text_chars, model_name, max_ctx_tokens)
+        return text[:max_text_chars]
+    return text
+
+
+def call_with_backoff(call, label: str, model_name: str,
+                      retry_markers: tuple[str, ...] = ("429",),
+                      max_retries: int = 5, log=logger):
+    """Run call() and retry on rate limits with 10s, 20s, 40s, 80s, 160s waits.
+
+    An exception is retried when its lower-cased text contains any of retry_markers.
+    A JSONDecodeError (garbled body) is retried at once without waiting.
+    Any other error is re-raised. Raises RuntimeError if every attempt fails.
+    """
+    for attempt in range(max_retries + 1):
+        try:
+            return call()
+        except json.JSONDecodeError:
+            log.warning("[{}] JSONDecodeError after calling {}", label, model_name)
+        except Exception as e:
+            error_str = str(e).lower()
+            if any(m in error_str for m in retry_markers) and attempt < max_retries:
+                wait = 2 ** attempt * 10
+                log.warning("[{}] Rate limited for {}, waiting {}s before retry {}/{}: {}",
+                            label, model_name, wait, attempt + 1, max_retries, e)
+                time.sleep(wait)
+            else:
+                log.error("[{}] Error calling {}: {}", label, model_name, e)
+                raise
+    raise RuntimeError(f"No valid response from {model_name} after {max_retries + 1} attempts")
+
+
+def read_usage(response) -> tuple[int, int, bool]:
+    """Return (prompt_tokens, completion_tokens, usage_available) from a chat-completion response."""
+    usage = getattr(response, "usage", None)
+    prompt = getattr(usage, "prompt_tokens", None)
+    completion = getattr(usage, "completion_tokens", None)
+    available = usage is not None and prompt is not None and completion is not None
+    return prompt or 0, completion or 0, available
 
 def extract_from_triple_backticks(text):
     """Extract content enclosed in triple backticks from multiline text.

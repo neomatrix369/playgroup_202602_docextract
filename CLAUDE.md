@@ -234,7 +234,7 @@ Per-document F1 is computed from field-level TP/FP/FN, then averaged across all 
 | `config_models_*.py` | Model registries (OpenRouter manual, Doubleword manually corrected, V7 manual) |
 | `sync_doubleword_models.py` | Sync Doubleword pricing from docs endpoint (disabled by default via `SKIP_DOUBLEWORD_SYNC=1`; the old `model-pricing.md` URL 404s — live catalog is `/inference-api/models`). At extractor startup, `sync_from_api(write=True)` auto-appends stubs for new API models. Run with `--diff` for a dry-run report; `--probe-api` to dump the raw API model list. |
 | `sync_v7_go_agent_template.py` | Refresh `v7_go_agent_v2_template.json` from V7 API after UI property changes |
-| `utils.py` | Shared helpers: `get_logger`, `extract_from_triple_backticks` (strips `<think>` blocks from reasoning models), `sanitize_error_message` |
+| `utils.py` | Shared helpers: `get_logger`, `extract_from_triple_backticks` (strips `<think>` blocks from reasoning models), `sanitize_error_message`; sync-client primitives `truncate_to_ctx`, `call_with_backoff`, `read_usage` (shared by `llm_openrouter.py` and `llm_google.py`) |
 | `v7_go_ensure.py` | V7 Go configuration validation utilities |
 | `utility/render_log_scroll.py` | Render fixed-viewport `tail -f` style log scroll MP4s; drop logs in `media/log-scrolls/inputs/` → outputs in `media/log-scrolls/outputs/` |
 

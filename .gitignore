@@ -35,4 +35,4 @@ media/log-scrolls/inputs/*
 .mcp.json
 .omc/
 .vscode/
-data/.dw_*
+data/.dw*
