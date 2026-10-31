@@ -51,6 +51,9 @@ GOOGLE_MODELS = {
         "price_out": 2.50,
         "ctx": 1_048_576,
         "notes": "Google DeepMind high-efficiency fast workhorse model, 1M ctx",
+        "potentially_deprecated": True,
+        "deprecation_reason": "API returns 404: 'no longer available to new users'; use google-gemini-3.8-flash",
+        "successor": "google-gemini-3.8-flash",
     },
     "google-gemini-3.8-flash": {
         "model": "gemini-3.8-flash",

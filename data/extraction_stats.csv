@@ -137,3 +137,6 @@ datetime,provider,model_short_name,model_full_name,tier,multimodal,price_in,pric
 2026-09-18 07:45:52,Doubleword,dw-deepseek-v4.1-flash,deepseek-ai/DeepSeek-V4.1-Flash,standard,True,0.12,0.48,1048576,11,11,0,620,160121,26356,0.031865,56.36,0.002897,11,11,11,9,9,10,11,11,72271e50-6a8e-4ccc-89d2-e410fc22cd2f
 2026-10-21 00:22:13,Doubleword,dw-muse-spark-open,meta/muse-spark-open,standard,False,0.0,0.0,262000,11,11,0,41,159138,23500,0.0,3.73,0.0,11,11,11,9,9,10,11,11,07026798-d3dc-44e1-94f1-a06e795119f8
 2026-10-21 00:22:23,Doubleword,dw-deepseek-v4.1-flash-1017,deepseek-ai/DeepSeek-V4.1-Flash-1017,standard,False,0.0,0.0,1048576,11,11,0,52,160121,8541,0.0,4.73,0.0,11,11,11,9,9,10,11,11,f44e36be-a58f-4c81-9e41-ec1c2083826e
+2026-10-31 15:05:12,Google,google-gemini-2.5-flash,gemini-2.5-flash,flash,False,0.3,2.5,1048576,11,0,11,0.0,0,0,0.0,0.0,0.0,0,0,0,0,0,0,0,0,
+2026-10-31 15:07:37,Google,google-gemini-3.8-flash,gemini-3.8-flash,flash,False,0.75,3.75,1048576,11,11,0,125.2,187325,1619,0.146565,11.38,0.013324,11,11,11,9,9,10,11,11,
+2026-10-31 15:10:00,Google,google-gemini-4-argon,gemini-4-argon,flagship,False,2.0,10.0,1048576,11,11,0,108.88,186327,1624,0.388894,9.9,0.035354,11,11,11,9,9,10,11,11,

@@ -75,10 +75,11 @@ def load_model_meta() -> dict:
     try:
         from config_models_openrouter import OPENROUTER_MODELS
         from config_models_doubleword import DOUBLEWORD_MODELS
+        from config_models_google import GOOGLE_MODELS
         from config_models_v7 import V7_MODELS
     except ImportError:
         return {}
-    all_models = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS, **V7_MODELS}
+    all_models = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS, **V7_MODELS, **GOOGLE_MODELS}
     meta = {}
     for short_name, cfg in all_models.items():
         if not isinstance(cfg, dict):
@@ -227,8 +228,9 @@ def load_extraction_stats() -> dict:
         try:
             from config_models_openrouter import OPENROUTER_MODELS
             from config_models_doubleword import DOUBLEWORD_MODELS
+            from config_models_google import GOOGLE_MODELS
             from config_models_v7 import V7_MODELS
-            all_models = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS, **V7_MODELS}
+            all_models = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS, **V7_MODELS, **GOOGLE_MODELS}
         except ImportError:
             all_models = {}
         for model_name, cfg in all_models.items():
@@ -399,6 +401,8 @@ def main():
                 model_providers[name] = "doubleword"
             elif name.startswith("v7-"):
                 model_providers[name] = "v7"
+            elif name.startswith("google-"):
+                model_providers[name] = "google"
             else:
                 model_providers[name] = "openrouter"
 
@@ -854,15 +858,19 @@ function costTierBadge(m){
 }
 function providerLabel(m){
   const p = RAW.model_providers?.[m] || 'unknown'
-  return p === 'v7' ? 'V7 Go' : (p.charAt(0).toUpperCase() + p.slice(1))
+  if(p==='v7') return 'V7 Go'
+  if(p==='google') return 'Google DeepMind'
+  return p.charAt(0).toUpperCase() + p.slice(1)
 }
 function providerChartLabel(p){
-  return p === 'v7' ? 'V7 Go' : (p.charAt(0).toUpperCase() + p.slice(1))
+  if(p==='v7') return 'V7 Go'
+  if(p==='google') return 'Google DeepMind'
+  return p.charAt(0).toUpperCase() + p.slice(1)
 }
 function providerBadge(m){
   const p = RAW.model_providers?.[m] || 'unknown'
-  const cls = {'openrouter':'badge-blue','doubleword':'badge-yellow','v7':'badge-v7'}[p]||'badge-gray'
-  const label = p === 'v7' ? 'V7 Go' : (p.charAt(0).toUpperCase() + p.slice(1))
+  const cls = {'openrouter':'badge-blue','doubleword':'badge-yellow','v7':'badge-v7','google':'badge-green'}[p]||'badge-gray'
+  const label = providerLabel(m)
   return `<span class="badge ${cls}">${label}</span>`
 }
 function allProviders(){

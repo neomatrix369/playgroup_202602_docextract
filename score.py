@@ -4,13 +4,14 @@ import sys
 from difflib import SequenceMatcher
 
 from config_models_doubleword import DOUBLEWORD_MODELS
+from config_models_google import GOOGLE_MODELS
 from config_models_openrouter import OPENROUTER_MODELS
 from config_models_v7 import V7_MODELS
 from utils import get_logger
 
 log = get_logger("score")
 
-ALL_MODELS = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS, **V7_MODELS}
+ALL_MODELS = {**OPENROUTER_MODELS, **DOUBLEWORD_MODELS, **V7_MODELS, **GOOGLE_MODELS}
 
 # Fields where exact match is required (no fuzzy scoring)
 EXACT_FIELDS = {"charity_number", "report_date"}
