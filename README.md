@@ -27,7 +27,7 @@ Browse results **without cloning** — mirrors of this repo’s playground on [n
 
 ## Key Findings
 
-> **Provider aggregates below** match `python score.py` over every `data/*_dev_extracted__*.tsv` file present on **2026-10-22** (**124** scored runs: **46** counted as OpenRouter — 39 under `playgroup_dev_extracted__openrouter__*.tsv` plus **7** legacy paths without a provider segment, which `score.py` treats as OpenRouter — plus **45** Doubleword and **33** V7). **Registries:** 39 OpenRouter keys, 38 Doubleword models (Async-catalog prices filled 2026-09-11; 2 new stubs added 2026-10-21), 32 V7 keys — see `config_models_*.py`. Refresh numbers and [which-models-extracted-playground.html](which-models-extracted-playground.html) after new extractions: `python score.py` (check the printed **Provider summary**), then `python playground.py`.
+> **Provider aggregates below** match `python score.py` over every `data/*_dev_extracted__*.tsv` file present on **2026-10-31** (**127** scored runs: **46** counted as OpenRouter — 39 under `playgroup_dev_extracted__openrouter__*.tsv` plus **7** legacy paths without a provider segment, which `score.py` treats as OpenRouter — plus **45** Doubleword, **33** V7, and **3** Google). **Registries:** 39 OpenRouter keys, 38 Doubleword models (Async-catalog prices filled 2026-09-11; 2 new stubs added 2026-10-21), 32 V7 keys, 5 Google keys (3 active, 2 deprecated) — see `config_models_*.py`. Refresh numbers and [which-models-extracted-playground.html](which-models-extracted-playground.html) after new extractions: `python score.py` (check the printed **Provider summary**), then `python playground.py`.
 
 **V7 Go** is a third extraction backend (optional). Completed runs write `data/playgroup_dev_extracted__v7__*.tsv`; `python score.py` and the playground score them like OpenRouter and Doubleword.
 
@@ -38,10 +38,11 @@ Browse results **without cloning** — mirrors of this repo’s playground on [n
 | Doubleword | 45 | 43 | 2 | 0.832 | 0.948 | dw-muse-spark-open | 65.7/85 (77%) | 703.3 | 0.0669 |
 | OpenRouter | 46 | 33 | 13 | 0.788 | 0.946 | gemini-3-pro | 59.9/85 (71%) | 1,037.9 | 0.1584 |
 | V7 Go | 33 | 33 | 0 | 0.833 | 0.852 | gpt4-1† | 62.8/85 (74%) | 123.8 | 0.0000 |
+| Google | 3 | 3 | 0 | 0.942 | 0.944 | google-gemini-3.8-flash | 77.4/85 (91%) | 127.4 | 0.2620 |
 
 † Same short label as `score.py` / the playground; TSV filenames and `extraction_stats.csv` use the full id `v7-go-agent-v2__gpt4-1`. **V7 cost** stays **0** in these aggregates until you set `price_in` / `price_out` in `config_models_v7.py`; **`batch_id`** in CSV is synthetic — see [V7 Go — Timing and cost](#v7-go--timing-and-cost).
 
-Doubleword’s snapshot **average** F1 among active models (0.832) edges OpenRouter’s (0.788), and Doubleword now holds the highest **single-model** F1 (`dw-muse-spark-open`, 0.948 — new global #1 as of 2026-10-22). `dw-deepseek-v4-pro-0813` drops to 2nd (0.947); OpenRouter’s `gemini-3-pro` is 3rd (0.946); `kimi-k3` and `kimi-k2.6` rank 4th/5th (0.944). The new `dw-deepseek-v4.1-flash-1017` scores F1=0.943, entering at rank 8. **V7** in this dataset averages **0.833** F1 with **no** failed (F1=0) runs among the 33 scored files. OpenRouter’s average is still reduced by free-tier failures; Doubleword’s average cost per active model (~$0.067) is lower than OpenRouter’s (~$0.158). V7 dollar totals stay at zero until pricing is mirrored into config (see [Auto-Sync Pricing](#auto-sync-pricing)).
+Doubleword’s snapshot **average** F1 among active models (0.832) edges OpenRouter’s (0.788), and Doubleword now holds the highest **single-model** F1 (`dw-muse-spark-open`, 0.948 — global #1). `dw-deepseek-v4-pro-0813` is 2nd (0.947); OpenRouter’s `gemini-3-pro` is 3rd (0.946); `kimi-k3` and `kimi-k2.6` rank 4th/5th (0.944). **Google (direct)** enters as the 4th backend with **3 active models** averaging F1 **0.942** (no failures); `google-gemini-3.8-flash` ties at rank 6 (F1=0.944), `google-gemini-4-argon` and `google-gemini-3.1-pro` are 15th/16th (0.941/0.940). **V7** averages **0.833** F1 with **no** failed runs among the 33 scored files. OpenRouter’s average is still reduced by free-tier failures; Doubleword’s average cost per active model (~$0.067) is lower than OpenRouter’s (~$0.158). V7 dollar totals stay at zero until pricing is mirrored into config (see [Auto-Sync Pricing](#auto-sync-pricing)).
 
 Historical `gemini-2.0-flash`, `gemini-2.5-flash`, `gemini-3-flash`, and `gemini-3-pro` rows predate per-call usage capture, so their displayed time/cost values are estimates rather than measured spend.
 
@@ -55,11 +56,11 @@ Historical `gemini-2.0-flash`, `gemini-2.5-flash`, `gemini-3-flash`, and `gemini
 | 4 | kimi-k3 | OpenRouter | 0.944 | 0.975 | 0.916 | 77.8/85 (92%) |
 | 5 | kimi-k2.6 | OpenRouter | 0.944 | 0.975 | 0.915 | 77.8/85 (92%) |
 
-*(No V7 model in the global top five on 2026-10-22; best V7 run is **gpt4-1** at F1 **0.852**, ranked just below the OpenRouter / Doubleword leaders — run `python score.py` for the full sort.)*
+*(No V7 or Google direct model in the global top five on 2026-10-31; best Google run is **google-gemini-3.8-flash** at F1 **0.944** (rank 6, tied with kimi-k2.6 and glm-5.3-flash); best V7 run is **gpt4-1** at F1 **0.852** — run `python score.py` for the full sort.)*
 
 **Takeaways:**
 
-- **Doubleword now holds 6 of the global top 10.** `dw-muse-spark-open` (F1=0.948) is new global #1; `dw-deepseek-v4.1-flash-1017` (F1=0.943) enters at rank 8, giving Doubleword ranks 1, 2, 7, 8, 9, and 10. `dw-deepseek-v4-pro-0813` is 2nd (0.947); OpenRouter's `gemini-3-pro` is 3rd (0.946); `kimi-k3` and `kimi-k2.6` are 4th/5th (0.944); `glm-5.3-flash` is 6th (0.944); `dw-qwen3.8-27b` is 7th (0.943); `dw-deepseek-v4.1-flash-1017` is 8th (0.943); `dw-qwen3-5-397b-a17b-dottxt` and `dw-kimi-k3` are 9th/10th (0.942). OpenRouter holds 4 of the top 10.
+- **Doubleword holds 5 of the global top 10** (ranks 1, 2, 7, 8, 9). `dw-muse-spark-open` (F1=0.948) is global #1; `dw-deepseek-v4-pro-0813` is 2nd (0.947); OpenRouter's `gemini-3-pro` is 3rd (0.946); `kimi-k3` and `kimi-k2.6` are 4th/5th (0.944); **Google direct's `google-gemini-3.8-flash`** ties at 6th (F1=0.944) alongside `glm-5.3-flash`; `dw-qwen3.8-27b` is 7th (0.943); `dw-deepseek-v4.1-flash-1017` is 8th (0.943); `dw-qwen3-5-397b-a17b-dottxt` and `dw-kimi-k3` are 9th/10th (0.942). OpenRouter holds 4 of the top 10; Google direct enters the top 10 for the first time.
 - **43 of 45 Doubleword models produced usable results.** Standard text LLMs score F1 0.824–0.948. Three OCR-specialist models were benchmarked: `dw-olmocr-2-7b-1025` (F1=0.090), `dw-lightonocr-2-1b-bbox-soup` (F1=0.000), and `dw-deepseek-ocr-2` (F1=0.335 via the **two-step OCR→extract** pipeline — step 1: OCR images → markdown via DeepSeek-OCR-2; step 2: markdown → JSON via `dw-qwen3-5-4b`; configured via `two_step_ocr` + `ocr_extract_model` in `config_models_doubleword.py`). Two models returned empty/zero-F1 results on the 2026-10-22 snapshot: `dw-qwen3.5-397b` and `dw-lightonocr-2-1b-bbox-soup`.
 - **Free-tier models universally failed** on this task — the 15 zero-score runs are either free-tier or had context/format issues. This includes `llama-3.3-70b-free`, `gemma-3-27b-free`, `gemma-3n-free`, and others.
 - **Precision is consistently high across scoring models** (0.96–0.97), meaning when models extract a field, they're usually correct. The differentiator is recall — whether they find all fields.
@@ -339,7 +340,7 @@ python score.py data/playgroup_dev_extracted__v7__v7-go-agent-v2__claude-sonnet.
 | `extraction_and_prompt_example.py` | Simple single-model extraction loop, good for prompt experiments. |
 | `extractor.py` | Unified extraction runner. Auto-detects backend from registries (`DOUBLEWORD_MODELS`, `V7_MODELS`, `OPENROUTER_MODELS`, `GOOGLE_MODELS`). At startup (for DW runs) auto-adds new DW API models as stubs; full docs pricing sync still disabled (`SKIP_DOUBLEWORD_SYNC=1`). Doubleword and V7 use async polling with checkpoint/resume; OpenRouter and Google are sync per row. Graceful Ctrl-C preserves checkpoints. Truncates OCR text to model context window (conservative 3 chars/token estimate). Doubleword: downloads DW error files for pre-processing rejections. Flags: `--completion-window`, `--all-doubleword`, `--all-openrouter`, `--all-v7`, `--v7-agent-template`, `--all-google`, `--retry-failed`. |
 | `llm_google.py` | LLM client for Google DeepMind Gemini API (synchronous, via `google-genai` SDK). Requires `GEMINI_API_KEY`. Handles retries, usage tracking, and `<think>` block stripping for reasoning models. |
-| `config_models_google.py` | Google DeepMind model registry — 4 models (`google-gemini-4-argon`, `google-gemini-2.5-pro`, `google-gemini-2.5-flash` [deprecated], `google-gemini-3.8-flash`). Prices are USD/M from [ai.google.dev/gemini-api/docs/pricing](https://ai.google.dev/gemini-api/docs/pricing). |
+| `config_models_google.py` | Google DeepMind model registry — 5 models, 3 active (`google-gemini-4-argon`, `google-gemini-3.1-pro`, `google-gemini-3.8-flash`) and 2 deprecated (`google-gemini-2.5-pro` → 3.1-pro, `google-gemini-2.5-flash` → 3.8-flash). Prices are USD/M from [ai.google.dev/gemini-api/docs/pricing](https://ai.google.dev/gemini-api/docs/pricing). |
 | `sync_doubleword_models.py` | Syncs Doubleword model data. **New-model auto-add**: called by `extractor.py` at startup with `write=True` — appends stubs for API models not yet in config. **Full docs pricing sync**: disabled by default (`SKIP_DOUBLEWORD_SYNC=1`) because docs identifiers don't match batch API. Run standalone to reset to docs version. Run with `--diff` for dry-run new/gone report (no file writes); `--probe-api` to dump raw API model list. |
 | `sync_v7_go_agent_template.py` | Fetches the current V7 Go project + property list from the API and refreshes `v7_go_agent_v2_template.json` when the normalized JSON differs (stable ordering, tool placeholders for non-manual fields). Uses the same env vars as `llm_v7.py`. |
 | `score.py` | Scorer with F1/Precision/Recall. No args → ranked leaderboard; pass a filename → verbose field-by-field diff. Leaderboard **Model** column uses the same short display rule as the playground when shared `agent__` prefixes apply (see [Results](#results)). |
@@ -347,7 +348,7 @@ python score.py data/playgroup_dev_extracted__v7__v7-go-agent-v2__claude-sonnet.
 | `config_models_openrouter.py` | OpenRouter model registry — 39 models organised by tier. |
 | `config_models_doubleword.py` | Doubleword model registry — 38 extraction models (manually maintained; auto-sync disabled via `SKIP_DOUBLEWORD_SYNC=1`). |
 | `config_models_v7.py` | V7 Go model registry — short names (e.g. `v7-go-agent-v2/claude-sonnet`) mapped to display metadata; agent IDs and field slugs usually come from env (see “V7 Go” above). |
-| `config_models_google.py` | Google DeepMind model registry — 4 models prefixed `google-*`. Requires `GEMINI_API_KEY`. |
+| `config_models_google.py` | Google DeepMind model registry — 5 models prefixed `google-*` (3 active, 2 deprecated). Requires `GEMINI_API_KEY`. |
 | `playground.py` | Generates `which-models-extracted-playground.html` from extraction results. Chart/table **labels** use short model names when safe (shared `agent__` prefix); embedded JSON keys stay full ids. Rankings use F1; heatmaps/errors use exact-match. Tables and charts share one row builder per tab — after regenerate, verify integrity (see `/docextract-workflow`). |
 
 ### Model Tiers
@@ -394,13 +395,14 @@ To list keys from the shell: `python -c "from config_models_v7 import V7_MODELS;
 
 #### Google DeepMind (`config_models_google.py`)
 
-Prefixed with `google-`. **4** models accessed directly via the Gemini API (Google AI Studio). Requires `GEMINI_API_KEY` in `.env`. Runs are synchronous (one request per row), same as OpenRouter. Prices are USD/M from the [Gemini API pricing page](https://ai.google.dev/gemini-api/docs/pricing).
+Prefixed with `google-`. **5** models (3 active, 2 deprecated) accessed directly via the Gemini API (Google AI Studio). Requires `GEMINI_API_KEY` in `.env`. Runs are synchronous (one request per row), same as OpenRouter. Prices are USD/M from the [Gemini API pricing page](https://ai.google.dev/gemini-api/docs/pricing).
 
 | Tier | Key | Notes |
 |------|-----|-------|
 | `flagship` | `google-gemini-4-argon` | Frontier reasoning model, 1M ctx; launch price until 2026-11-30 |
-| `pro` | `google-gemini-2.5-pro` | Pro thinking model, 1M ctx |
+| `pro` | `google-gemini-3.1-pro` | Pro thinking model (`gemini-3.1-pro-preview`), 1M ctx |
 | `flash` | `google-gemini-3.8-flash` | High-speed flash model, 1M ctx |
+| `pro` | `google-gemini-2.5-pro` | ⚠️ Deprecated (404) — use `google-gemini-3.1-pro` |
 | `flash` | `google-gemini-2.5-flash` | ⚠️ Deprecated (404) — use `google-gemini-3.8-flash` |
 
 ### Frontend (Doc Risk Auditor prototype)
