@@ -1,4 +1,3 @@
-import json
 import os
 import time
 
@@ -45,13 +44,8 @@ def _get_providers(model_name):
 def call_llm(model_name, prompt_template, extracted_text, max_ctx_tokens=None):
     """Returns text, timing, token counts, and explicit usage availability."""
     instructions = "Follow the instructions in the prompt template.\n"
-    if max_ctx_tokens:
-        # Rough estimate: 1 token ≈ 4 chars. Reserve space for prompt template + response.
-        max_text_chars = (max_ctx_tokens - 2000) * 4 - len(prompt_template)
-        if len(extracted_text) > max_text_chars:
-            logger.warning("Truncating text from {} to {} chars for {} (ctx={})",
-                           len(extracted_text), max_text_chars, model_name, max_ctx_tokens)
-            extracted_text = extracted_text[:max_text_chars]
+    extracted_text = utils.truncate_to_ctx(extracted_text, prompt_template, max_ctx_tokens,
+                                           model_name, log=logger)
     prompt = prompt_template + extracted_text
 
     logger.info("Prompt:\n{}", prompt)
@@ -65,40 +59,19 @@ def call_llm(model_name, prompt_template, extracted_text, max_ctx_tokens=None):
         {"role": "system", "content": instructions},
         {"role": "user", "content": prompt},
     ]
-    max_retries = 5
     t0 = time.time()
-    response = None
-    for attempt in range(max_retries + 1):
-        try:
-            response = client.chat.completions.create(
-                model=model_name,
-                messages=messages,
-                extra_body=extra_params,
-            )
-            break
-        except json.JSONDecodeError:
-            logger.warning("[OpenRouter] JSONDecodeError after calling {}", model_name)
-        except Exception as e:
-            error_str = str(e)
-            if "429" in error_str and attempt < max_retries:
-                wait = 2 ** attempt * 10  # 10s, 20s, 40s, 80s, 160s
-                logger.warning("[OpenRouter] Rate limited (429) for {}, waiting {}s before retry {}/{}",
-                               model_name, wait, attempt + 1, max_retries)
-                time.sleep(wait)
-            else:
-                raise
-    if response is None:
-        raise RuntimeError(f"No valid JSON response from {model_name} after {max_retries + 1} attempts")
+    response = utils.call_with_backoff(
+        lambda: client.chat.completions.create(
+            model=model_name,
+            messages=messages,
+            extra_body=extra_params,
+        ),
+        label="OpenRouter",
+        model_name=model_name,
+        log=logger,
+    )
     elapsed_secs = round(time.time() - t0, 2)
-
-    usage = getattr(response, "usage", None)
-    prompt_token_value = getattr(usage, "prompt_tokens", None)
-    completion_token_value = getattr(usage, "completion_tokens", None)
-    usage_available = (usage is not None
-                       and prompt_token_value is not None
-                       and completion_token_value is not None)
-    prompt_tokens = prompt_token_value or 0
-    completion_tokens = completion_token_value or 0
+    prompt_tokens, completion_tokens, usage_available = utils.read_usage(response)
 
     raw_text = response.choices[0].message.content or ""
     logger.info("[OpenRouter] Response from {}, len={}", model_name, len(raw_text))
