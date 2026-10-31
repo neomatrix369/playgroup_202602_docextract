@@ -340,7 +340,7 @@ python score.py data/playgroup_dev_extracted__v7__v7-go-agent-v2__claude-sonnet.
 | `extraction_and_prompt_example.py` | Simple single-model extraction loop, good for prompt experiments. |
 | `extractor.py` | Unified extraction runner. Auto-detects backend from registries (`DOUBLEWORD_MODELS`, `V7_MODELS`, `OPENROUTER_MODELS`, `GOOGLE_MODELS`). At startup (for DW runs) auto-adds new DW API models as stubs; full docs pricing sync still disabled (`SKIP_DOUBLEWORD_SYNC=1`). Doubleword and V7 use async polling with checkpoint/resume; OpenRouter and Google are sync per row. Graceful Ctrl-C preserves checkpoints. Truncates OCR text to model context window (conservative 3 chars/token estimate). Doubleword: downloads DW error files for pre-processing rejections. Flags: `--completion-window`, `--all-doubleword`, `--all-openrouter`, `--all-v7`, `--v7-agent-template`, `--all-google`, `--retry-failed`. |
 | `llm_google.py` | LLM client for Google DeepMind Gemini API (synchronous, via `google-genai` SDK). Requires `GEMINI_API_KEY`. Handles retries, usage tracking, and `<think>` block stripping for reasoning models. |
-| `config_models_google.py` | Google DeepMind model registry — 5 models, 3 active (`google-gemini-4-argon`, `google-gemini-3.1-pro`, `google-gemini-3.8-flash`) and 2 deprecated (`google-gemini-2.5-pro` → 3.1-pro, `google-gemini-2.5-flash` → 3.8-flash). Prices are USD/M from [ai.google.dev/gemini-api/docs/pricing](https://ai.google.dev/gemini-api/docs/pricing). |
+| `config_models_google.py` | Google DeepMind model registry — 14 entries (12 active: 3 baselines + 9 thinking-level sweep variants `*-think-low/medium/high`; 2 deprecated → 3.1-pro / 3.8-flash). `thinking_level` field drives `extra_body` in `llm_google.py`. Prices are USD/M from [ai.google.dev/gemini-api/docs/pricing](https://ai.google.dev/gemini-api/docs/pricing). |
 | `sync_doubleword_models.py` | Syncs Doubleword model data. **New-model auto-add**: called by `extractor.py` at startup with `write=True` — appends stubs for API models not yet in config. **Full docs pricing sync**: disabled by default (`SKIP_DOUBLEWORD_SYNC=1`) because docs identifiers don't match batch API. Run standalone to reset to docs version. Run with `--diff` for dry-run new/gone report (no file writes); `--probe-api` to dump raw API model list. |
 | `sync_v7_go_agent_template.py` | Fetches the current V7 Go project + property list from the API and refreshes `v7_go_agent_v2_template.json` when the normalized JSON differs (stable ordering, tool placeholders for non-manual fields). Uses the same env vars as `llm_v7.py`. |
 | `score.py` | Scorer with F1/Precision/Recall. No args → ranked leaderboard; pass a filename → verbose field-by-field diff. Leaderboard **Model** column uses the same short display rule as the playground when shared `agent__` prefixes apply (see [Results](#results)). |
@@ -348,7 +348,7 @@ python score.py data/playgroup_dev_extracted__v7__v7-go-agent-v2__claude-sonnet.
 | `config_models_openrouter.py` | OpenRouter model registry — 39 models organised by tier. |
 | `config_models_doubleword.py` | Doubleword model registry — 38 extraction models (manually maintained; auto-sync disabled via `SKIP_DOUBLEWORD_SYNC=1`). |
 | `config_models_v7.py` | V7 Go model registry — short names (e.g. `v7-go-agent-v2/claude-sonnet`) mapped to display metadata; agent IDs and field slugs usually come from env (see “V7 Go” above). |
-| `config_models_google.py` | Google DeepMind model registry — 5 models prefixed `google-*` (3 active, 2 deprecated). Requires `GEMINI_API_KEY`. |
+| `config_models_google.py` | Google DeepMind model registry — 14 entries prefixed `google-*` (12 active: 3 baselines + 9 thinking-level sweep variants; 2 deprecated). Requires `GEMINI_API_KEY`. |
 | `playground.py` | Generates `which-models-extracted-playground.html` from extraction results. Chart/table **labels** use short model names when safe (shared `agent__` prefix); embedded JSON keys stay full ids. Rankings use F1; heatmaps/errors use exact-match. Tables and charts share one row builder per tab — after regenerate, verify integrity (see `/docextract-workflow`). |
 
 ### Model Tiers
@@ -395,13 +395,18 @@ To list keys from the shell: `python -c "from config_models_v7 import V7_MODELS;
 
 #### Google DeepMind (`config_models_google.py`)
 
-Prefixed with `google-`. **5** models (3 active, 2 deprecated) accessed directly via the Gemini API (Google AI Studio). Requires `GEMINI_API_KEY` in `.env`. Runs are synchronous (one request per row), same as OpenRouter. Prices are USD/M from the [Gemini API pricing page](https://ai.google.dev/gemini-api/docs/pricing).
+Prefixed with `google-`. **14** entries (12 active, 2 deprecated) accessed directly via the Gemini API (Google AI Studio). Requires `GEMINI_API_KEY` in `.env`. Runs are synchronous (one request per row), same as OpenRouter. Prices are USD/M from the [Gemini API pricing page](https://ai.google.dev/gemini-api/docs/pricing).
+
+Each active model has a **baseline** entry (no thinking config) plus **three thinking-level sweep variants** (`-think-low`, `-think-medium`, `-think-high`). The `thinking_level` field is passed as `extra_body={"google": {"thinking_config": {"thinking_level": "..."}}}` via the OpenAI-compat endpoint; `None` = no thinking config (API default).
 
 | Tier | Key | Notes |
 |------|-----|-------|
 | `flagship` | `google-gemini-4-argon` | Frontier reasoning model, 1M ctx; launch price until 2026-11-30 |
+| `flagship` | `google-gemini-4-argon-think-{low,medium,high}` | Thinking-level sweep variants |
 | `pro` | `google-gemini-3.1-pro` | Pro thinking model (`gemini-3.1-pro-preview`), 1M ctx |
+| `pro` | `google-gemini-3.1-pro-think-{low,medium,high}` | Thinking-level sweep variants |
 | `flash` | `google-gemini-3.8-flash` | High-speed flash model, 1M ctx |
+| `flash` | `google-gemini-3.8-flash-think-{low,medium,high}` | Thinking-level sweep variants |
 | `pro` | `google-gemini-2.5-pro` | ⚠️ Deprecated (404) — use `google-gemini-3.1-pro` |
 | `flash` | `google-gemini-2.5-flash` | ⚠️ Deprecated (404) — use `google-gemini-3.8-flash` |
 
