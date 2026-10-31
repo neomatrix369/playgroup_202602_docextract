@@ -36,3 +36,4 @@ media/log-scrolls/inputs/*
 .omc/
 .vscode/
 data/.dw*
+*.tmp
