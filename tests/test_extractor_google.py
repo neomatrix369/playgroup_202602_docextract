@@ -83,6 +83,35 @@ class TestExtractorGoogleBackendDetectionShould:
                 f"Expected '{key}' in extractor.ALL_MODELS"
             )
 
+    def test_given_thinking_sweep_models_when_resolved_then_all_route_to_google_backend(self) -> None:
+        """
+        Scenario: Thinking-level sweep models route to Google backend
+        Slice: slice-2-extractor-google-backend-integration
+        Given the 9 new sweep model keys
+        When _resolve_model is called for each
+        Then they all return 'google' as the backend
+        """
+        ### Given
+        import extractor
+
+        ### When
+        sweep_keys = [
+            "google-gemini-4-argon-think-low",
+            "google-gemini-4-argon-think-medium",
+            "google-gemini-4-argon-think-high",
+            "google-gemini-3.1-pro-think-low",
+            "google-gemini-3.1-pro-think-medium",
+            "google-gemini-3.1-pro-think-high",
+            "google-gemini-3.8-flash-think-low",
+            "google-gemini-3.8-flash-think-medium",
+            "google-gemini-3.8-flash-think-high",
+        ]
+
+        ### Then
+        for key in sweep_keys:
+            backend = extractor._resolve_model(key)
+            assert backend == "google", f"Expected 'google' for '{key}', got '{backend}'"
+
 
 class TestExtractorGoogleOutputPathShould:
     """Verifies output file naming convention for Google models."""
