@@ -27,6 +27,18 @@ GOOGLE_MODELS = {
     # ═══════════════════════════════════════════════════════════
     #  PRO & THINKING MODELS
     # ═══════════════════════════════════════════════════════════
+    "google-gemini-3.1-pro": {
+        "model": "gemini-3.1-pro-preview",
+        "multimodal": False,
+        "modalities": ["text"],
+        "tier": "pro",
+        # Pricing TBD — verify at https://ai.google.dev/gemini-api/docs/pricing
+        # Using gemini-2.5-pro pricing as placeholder; update after confirmation.
+        "price_in": 1.25,
+        "price_out": 10.00,
+        "ctx": 1_048_576,
+        "notes": "Google DeepMind pro thinking model (successor to 2.5-pro), 1M ctx",
+    },
     "google-gemini-2.5-pro": {
         "model": "gemini-2.5-pro",
         "multimodal": False,
@@ -37,6 +49,9 @@ GOOGLE_MODELS = {
         "price_out": 10.00,
         "ctx": 1_048_576,
         "notes": "Google DeepMind thinking and reasoning model, 1M ctx",
+        "potentially_deprecated": True,
+        "deprecation_reason": "API returns 404: 'no longer available to new users'; use google-gemini-3.1-pro (gemini-3.1-pro-preview)",
+        "successor": "google-gemini-3.1-pro",
     },
 
     # ═══════════════════════════════════════════════════════════
