@@ -1,6 +1,6 @@
 # UK Charity Document Extraction — Multi-Model Benchmark
 
-Extract structured fields from UK charity financial PDFs using LLMs via [OpenRouter](https://openrouter.ai/), the [Doubleword Batch API](https://docs.doubleword.ai/batches/getting-started-with-batched-api), or [V7 Go](https://docs.go.v7labs.com/) (agent/entity API), then score and rank the results across every extracted run in `data/` (dozens of models across OpenRouter, Doubleword, and optional V7). V7 is an optional third backend for product-style runs (e.g. Doc Risk Auditor).
+Extract structured fields from UK charity financial PDFs using LLMs via [OpenRouter](https://openrouter.ai/), the [Doubleword Batch API](https://docs.doubleword.ai/batches/getting-started-with-batched-api), [V7 Go](https://docs.go.v7labs.com/) (agent/entity API), or the [Google DeepMind Gemini API](https://ai.google.dev/) (direct), then score and rank the results across every extracted run in `data/` (dozens of models across OpenRouter, Doubleword, V7, and Google). V7 is an optional third backend for product-style runs (e.g. Doc Risk Auditor).
 
 **Jump to:** [Hosted demos](#hosted-demos) | [Key Findings](#key-findings) | [Setup](#setup) | [Workflow](#end-to-end-workflow) | [V7 Go](#v7-go-optional-backend) | [Results](#results) | [Repo Reference](#whats-in-this-repo) | [Dataset](#dataset) | [V7 doc (short)](docs/v7-go.md)
 
@@ -127,7 +127,7 @@ The key result files:
 
 | File | What it shows |
 |---|---|
-| `data/extraction_stats.csv` | One row per model run: `provider` is `openrouter`, `doubleword`, or `v7`; tier, row counts, per-field hit rates, wall-clock time, cost. Doubleword rows include real `batch_id`; V7 rows use a **synthetic** `batch_id` (checkpoint map), not a Doubleword batch. |
+| `data/extraction_stats.csv` | One row per model run: `provider` is `openrouter`, `doubleword`, `v7`, or `google`; tier, row counts, per-field hit rates, wall-clock time, cost. Doubleword rows include real `batch_id`; V7 rows use a **synthetic** `batch_id` (checkpoint map), not a Doubleword batch. |
 | [which-models-extracted-playground.html](which-models-extracted-playground.html) | Interactive playground — open in browser for charts, heatmaps, and recommendations |
 
 The leaderboard printed by `score.py` is ranked by F1 and includes precision, recall, field counts, time, and cost. For readability, the printed **Model** column (and the playground’s tables and chart labels) **shortens** ids when every model name that contains `__` shares the same `agent__` prefix — for example **`gpt4-1`** instead of **`v7-go-agent-v2__gpt4-1`**. Names without `__`, or mixed `__` prefixes, stay full-length so rows stay distinct. **Canonical ids** (for filenames, `extraction_stats.csv`, and lookups) are always the full string.
@@ -187,7 +187,7 @@ Reads `data/playgroup_dev_in.tsv`, sends each row to `claude-3.5-haiku`, and pri
 
 ### 3. Run extraction across one or more models
 
-Pass one or more model names as arguments, or omit to run all registered models. The backend is **auto-detected from the model registries** in `config_models_*.py`: keys in `DOUBLEWORD_MODELS` use the Doubleword Batch API (async), keys in `V7_MODELS` use the V7 Go entity API (async), and keys in `OPENROUTER_MODELS` use OpenRouter (sync). Runs are idempotent — if the output file already exists for a model, that model is skipped.
+Pass one or more model names as arguments, or omit to run all registered models. The backend is **auto-detected from the model registries** in `config_models_*.py`: keys in `DOUBLEWORD_MODELS` use the Doubleword Batch API (async), keys in `V7_MODELS` use the V7 Go entity API (async), keys in `GOOGLE_MODELS` (prefix `google-*`) use the Google Gemini API direct (sync), and keys in `OPENROUTER_MODELS` use OpenRouter (sync). Runs are idempotent — if the output file already exists for a model, that model is skipped.
 
 ```bash
 # One OpenRouter model
@@ -201,6 +201,9 @@ python extractor.py
 
 # All OpenRouter models only
 python extractor.py --all-openrouter
+
+# All Google DeepMind Gemini models only (sync, direct API)
+python extractor.py --all-google
 
 # All V7 Go models only (see config_models_v7.py and llm_v7.py)
 python extractor.py --all-v7
@@ -244,7 +247,8 @@ Each run prints a per-provider plan (which models will run, skip, or resume) and
 | `data/playgroup_dev_extracted__openrouter__<model>.tsv` | OpenRouter extraction output |
 | `data/playgroup_dev_extracted__doubleword__<model>.tsv` | Doubleword batch output |
 | `data/playgroup_dev_extracted__v7__<model>.tsv` | V7 Go entity-run output |
-| `data/extraction_stats.csv` | Cumulative run stats: `provider` ∈ {`openrouter`, `doubleword`, `v7`}, row counts, fields, time, cost; `batch_id` is the Doubleword batch id or a **V7 synthetic** id (see [V7 Go — Timing and cost](#v7-go--timing-and-cost)) |
+| `data/playgroup_dev_extracted__google__<model>.tsv` | Google DeepMind Gemini extraction output |
+| `data/extraction_stats.csv` | Cumulative run stats: `provider` ∈ {`openrouter`, `doubleword`, `v7`, `google`}, row counts, fields, time, cost; `batch_id` is the Doubleword batch id or a **V7 synthetic** id (see [V7 Go — Timing and cost](#v7-go--timing-and-cost)) |
 | `data/extraction_call_log.csv` | Per-row call log |
 | `data/.doubleword_checkpoints.json` | Doubleword batch resume state |
 | `data/.doubleword_failed_rows.json` | Failed row indices for `--retry-failed` (Doubleword) |
@@ -330,8 +334,9 @@ python score.py data/playgroup_dev_extracted__v7__v7-go-agent-v2__claude-sonnet.
 | `llm_openrouter.py` | LLM client for OpenRouter (synchronous). Run directly for a smoke test. |
 | `llm_doubleword.py` | LLM client for Doubleword Batch API (async, direct batch management with checkpoint/resume). OCR models receive PDF pages as base64-encoded images via PyMuPDF; reasoning-model `<think>` blocks are stripped before JSON extraction. |
 | `llm_v7.py` | LLM client for [V7 Go](https://docs.go.v7labs.com/) (async HTTP: create entity per row, poll until output field ready; Go Agent v2: empty entity body, PDF upload, multi-field merge). Resolves file field and parent entity with guardrails; logs diagnostics for unavailable-model skips. Same orchestration hooks as `llm_doubleword.py` (`submit_batch`, `poll_batch`, `download_results`, checkpoints). |
+| `llm_google.py` | LLM client for Google DeepMind Gemini API (synchronous per-row, OpenAI-compatible endpoint). Exponential backoff on 429/503; context truncation; triple-backtick JSON extraction. Requires `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) in `.env`. |
 | `extraction_and_prompt_example.py` | Simple single-model extraction loop, good for prompt experiments. |
-| `extractor.py` | Unified extraction runner. Auto-detects backend from registries (`DOUBLEWORD_MODELS`, `V7_MODELS`, `OPENROUTER_MODELS`). At startup (for DW runs) auto-adds new DW API models as stubs; full docs pricing sync still disabled (`SKIP_DOUBLEWORD_SYNC=1`). Doubleword and V7 use async polling with checkpoint/resume; OpenRouter is sync per row. Graceful Ctrl-C preserves checkpoints. Truncates OCR text to model context window (conservative 3 chars/token estimate). Doubleword: downloads DW error files for pre-processing rejections. Flags: `--completion-window`, `--all-doubleword`, `--all-openrouter`, `--all-v7`, `--v7-agent-template`, `--retry-failed`. |
+| `extractor.py` | Unified extraction runner. Auto-detects backend from registries (`DOUBLEWORD_MODELS`, `V7_MODELS`, `GOOGLE_MODELS`, `OPENROUTER_MODELS`). At startup (for DW runs) auto-adds new DW API models as stubs; full docs pricing sync still disabled (`SKIP_DOUBLEWORD_SYNC=1`). Doubleword and V7 use async polling with checkpoint/resume; OpenRouter and Google are sync per row. Graceful Ctrl-C preserves checkpoints. Truncates OCR text to model context window (conservative 3 chars/token estimate). Doubleword: downloads DW error files for pre-processing rejections. Flags: `--completion-window`, `--all-doubleword`, `--all-openrouter`, `--all-v7`, `--all-google`, `--v7-agent-template`, `--retry-failed`. |
 | `sync_doubleword_models.py` | Syncs Doubleword model data. **New-model auto-add**: called by `extractor.py` at startup with `write=True` — appends stubs for API models not yet in config. **Full docs pricing sync**: disabled by default (`SKIP_DOUBLEWORD_SYNC=1`) because docs identifiers don't match batch API. Run standalone to reset to docs version. Run with `--diff` for dry-run new/gone report (no file writes); `--probe-api` to dump raw API model list. |
 | `sync_v7_go_agent_template.py` | Fetches the current V7 Go project + property list from the API and refreshes `v7_go_agent_v2_template.json` when the normalized JSON differs (stable ordering, tool placeholders for non-manual fields). Uses the same env vars as `llm_v7.py`. |
 | `score.py` | Scorer with F1/Precision/Recall. No args → ranked leaderboard; pass a filename → verbose field-by-field diff. Leaderboard **Model** column uses the same short display rule as the playground when shared `agent__` prefixes apply (see [Results](#results)). |
@@ -339,6 +344,7 @@ python score.py data/playgroup_dev_extracted__v7__v7-go-agent-v2__claude-sonnet.
 | `config_models_openrouter.py` | OpenRouter model registry — 39 models organised by tier. |
 | `config_models_doubleword.py` | Doubleword model registry — 38 extraction models (manually maintained; auto-sync disabled via `SKIP_DOUBLEWORD_SYNC=1`). |
 | `config_models_v7.py` | V7 Go model registry — short names (e.g. `v7-go-agent-v2/claude-sonnet`) mapped to display metadata; agent IDs and field slugs usually come from env (see “V7 Go” above). |
+| `config_models_google.py` | Google DeepMind model registry — 4 Gemini models (`google-gemini-4-argon`, `google-gemini-2.5-pro`, `google-gemini-2.5-flash`, `google-gemini-3.8-flash`) with tier, ctx, pricing, and modality metadata. |
 | `playground.py` | Generates `which-models-extracted-playground.html` from extraction results. Chart/table **labels** use short model names when safe (shared `agent__` prefix); embedded JSON keys stay full ids. Rankings use F1; heatmaps/errors use exact-match. Tables and charts share one row builder per tab — after regenerate, verify integrity (see `/docextract-workflow`). |
 
 ### Model Tiers
@@ -365,6 +371,17 @@ Prefixed with `dw-`. **35** extraction models, maintained manually (auto-sync di
 | `premium` (13) | `dw-deepseek-v4-flash`, `dw-deepseek-v4-pro`, `dw-deepseek-v4-pro-0813`, `dw-glm-5-1`, `dw-glm-5-2`, `dw-glm-5.3`, `dw-inkling`, `dw-kimi-k2-6`, `dw-kimi-k3`, `dw-nemotron-3-ultra-550b-a55b`, `dw-qwen3-5-397b-a17b`, `dw-qwen3-5-397b-a17b-dottxt`, `dw-qwen3.8-27b` |
 
 Each model entry includes: model ID (manually corrected from API), `multimodal` flag, supported modalities, context length, `intelligence` score, `quantization` (FP8/FP4/INT4/NVFP4), API modes (`batch`/`async`/`realtime`), `params_total`/`params_active`, `thinking_default` (reasoning on by default?), `dottxt` flag (structured generation variant), `ocr` flag with OCR-specific config (`ocr_prompt`, `ocr_max_image_dim`), optional `two_step_ocr` + `ocr_extract_model` (OCR batch then text JSON extraction for pure-OCR models), `description`, and `usage_notes`.
+
+#### Google DeepMind (`config_models_google.py`)
+
+Registry keys start with `google-`. Four Gemini models (sync direct API, `GEMINI_API_KEY` or `GOOGLE_API_KEY` required):
+
+| Key | Model | Tier | Ctx |
+|-----|-------|------|-----|
+| `google-gemini-4-argon` | `gemini-4-argon` | `ultra_cheap` | 1,048,576 |
+| `google-gemini-2.5-pro` | `gemini-2.5-pro` | `premium` | 1,048,576 |
+| `google-gemini-2.5-flash` | `gemini-2.5-flash` | `great_value` | 1,048,576 |
+| `google-gemini-3.8-flash` | `gemini-3.8-flash` | `ultra_cheap` | 1,048,576 |
 
 <a id="v7-registry"></a>
 
@@ -397,8 +414,8 @@ To list keys from the shell: `python -c "from config_models_v7 import V7_MODELS;
 | `playgroup_dev_in.tsv` | Input: 11 PDFs × 6 columns (filename, keys, 3 OCR text variants, combined text) |
 | `playgroup_dev_expected.tsv` | Ground truth field values |
 | `pdf_names.txt` | PDF filenames in row order |
-| `playgroup_dev_extracted__<provider>__<model>.tsv` | Per-model extraction output: `openrouter`, `doubleword`, or `v7` (`v7` filenames use `__` instead of `/` in the model segment) |
-| `extraction_stats.csv` | Cumulative run stats: `provider` ∈ {`openrouter`, `doubleword`, `v7`}, model id, row counts, per-field hit rates, wall-clock time, cost; `batch_id` = Doubleword batch id or **V7 synthetic** id |
+| `playgroup_dev_extracted__<provider>__<model>.tsv` | Per-model extraction output: `openrouter`, `doubleword`, `v7`, or `google` (`v7` filenames use `__` instead of `/` in the model segment) |
+| `extraction_stats.csv` | Cumulative run stats: `provider` ∈ {`openrouter`, `doubleword`, `v7`, `google`}, model id, row counts, per-field hit rates, wall-clock time, cost; `batch_id` = Doubleword batch id or **V7 synthetic** id |
 | `extraction_call_log.csv` | Per-row call log: provider, model, row, status, elapsed time, tokens, cost (token/cost columns depend on backend; V7 often has no token counts from the API) |
 | `.doubleword_checkpoints.json` | Doubleword batch checkpoint: maps model → batch_id for resume on cancel/re-run |
 | `.doubleword_failed_rows.json` | Failed-row index (Doubleword); consumed by `--retry-failed` |

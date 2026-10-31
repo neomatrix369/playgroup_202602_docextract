@@ -39,4 +39,5 @@ Do not edit manually — skills append rows automatically.
 | 2026-10-31 | feat/slice-1-gemini-api-client-and-registry | create-pr | 1 | DONE | PR #32 opened against neomatrix369:main |
 | 2026-10-31 | slice/2-extractor-google-backend-integration | tdd+implement | 2 | DONE | 6 new unit tests (6/6 pass); _run_google, --all-google, google backend auto-detect; 15/15 total tests pass |
 | 2026-10-31 | slice/2-extractor-google-backend-integration | create-pr | 2 | DONE | PR #33 opened against neomatrix369:main |
+| 2026-10-31 | slice/2-extractor-google-backend-integration | sync-docs | 2 | DONE | README.md + CLAUDE.md updated: Google backend, --all-google, provider enum, llm_google.py, config_models_google.py, tier table, env var |
 
