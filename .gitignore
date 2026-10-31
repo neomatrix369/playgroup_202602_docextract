@@ -32,3 +32,7 @@ media/log-scrolls/inputs/*
 .cursor/
 .gemini/
 .pi/
+.mcp.json
+.omc/
+.vscode/
+data/.dw*
