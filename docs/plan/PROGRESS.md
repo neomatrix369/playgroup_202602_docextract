@@ -38,4 +38,5 @@ Do not edit manually — skills append rows automatically.
 | 2026-10-31 | feat/slice-1-gemini-api-client-and-registry | pricing fix | 1 | DONE | All 4 prices corrected from ai.google.dev pricing; 2.5-pro ctx 2M→1M. Argon price doubles 2026-12-01, 3.8 Flash 2027-01-01 |
 | 2026-10-31 | feat/slice-1-gemini-api-client-and-registry | create-pr | 1 | DONE | PR #32 opened against neomatrix369:main |
 | 2026-10-31 | slice/2-extractor-google-backend-integration | tdd+implement | 2 | DONE | 6 new unit tests (6/6 pass); _run_google, --all-google, google backend auto-detect; 15/15 total tests pass |
+| 2026-10-31 | slice/2-extractor-google-backend-integration | create-pr | 2 | DONE | PR #33 opened against neomatrix369:main |
 
