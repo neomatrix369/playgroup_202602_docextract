@@ -233,7 +233,7 @@ Per-document F1 is computed from field-level TP/FP/FN, then averaged across all 
 | `llm_doubleword.py` | Doubleword Batch API client (async batch: submit → poll → download) |
 | `llm_v7.py` | V7 Go entity API client (async: create entity per row or Go Agent v2 flow with PDF upload) |
 | `llm_google.py` | Google DeepMind Gemini API client (sync per-row via `google-genai` SDK; requires `GEMINI_API_KEY`) |
-| `config_models_google.py` | Google DeepMind model registry — 14 entries prefixed `google-*` (12 active: 3 baselines + 9 thinking-level sweep variants `*-think-low/medium/high`; 2 deprecated: 2.5-pro → 3.1-pro, 2.5-flash → 3.8-flash). `thinking_level` field drives `extra_body` in `llm_google.py`; `None` = no thinking config passed. |
+| `config_models_google.py` | Google DeepMind model registry — 14 entries prefixed `google-*` (12 active: 3 baselines + 9 thinking-level sweep variants `*-think-low/medium/high`; 2 deprecated: 2.5-pro → 3.1-pro, 2.5-flash → 3.8-flash). `thinking_level` field is passed as `reasoning_effort` kwarg to `chat.completions.create` in `llm_google.py`; `None` = no thinking config passed. |
 | `score.py` | F1/Precision/Recall scorer with field-level similarity. No args → leaderboard; pass filename → verbose diff |
 | `playground.py` | Generates `which-models-extracted-playground.html` from `data/`. Paired table/chart views per tab; F1 + exact-match dual scoring. After regenerate, agents must run `/docextract-workflow` Playground Data Integrity Gate. |
 | `.claude/skills/docextract-workflow/` | Project workflow skill (`/docextract-workflow`): stage detection, cadence, and playground integrity checklist (`playground-integrity.md`). |
