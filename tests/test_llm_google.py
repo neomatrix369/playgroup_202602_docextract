@@ -34,6 +34,62 @@ class TestConfigModelsGoogleShould:
         for model_key in expected_models:
             assert model_key in GOOGLE_MODELS, f"Expected {model_key} in GOOGLE_MODELS"
 
+    def test_given_thinking_level_sweep_when_inspected_then_nine_variants_present(self) -> None:
+        """
+        Scenario: Thinking-level sweep registry coverage
+        Slice: slice-1-gemini-api-client-and-registry
+        Given the Google models configuration module
+        When GOOGLE_MODELS is inspected for sweep entries
+        Then all 9 thinking-level variants (3 models × 3 levels) are present with correct thinking_level values
+        """
+        ### Given
+        from config_models_google import GOOGLE_MODELS
+
+        ### When
+        sweep_keys = [
+            ("google-gemini-4-argon-think-low", "low"),
+            ("google-gemini-4-argon-think-medium", "medium"),
+            ("google-gemini-4-argon-think-high", "high"),
+            ("google-gemini-3.1-pro-think-low", "low"),
+            ("google-gemini-3.1-pro-think-medium", "medium"),
+            ("google-gemini-3.1-pro-think-high", "high"),
+            ("google-gemini-3.8-flash-think-low", "low"),
+            ("google-gemini-3.8-flash-think-medium", "medium"),
+            ("google-gemini-3.8-flash-think-high", "high"),
+        ]
+
+        ### Then
+        for key, expected_level in sweep_keys:
+            assert key in GOOGLE_MODELS, f"Expected sweep key {key} in GOOGLE_MODELS"
+            assert GOOGLE_MODELS[key]["thinking_level"] == expected_level, (
+                f"{key}: expected thinking_level={expected_level!r}, "
+                f"got {GOOGLE_MODELS[key]['thinking_level']!r}"
+            )
+
+    def test_given_baseline_entries_when_inspected_then_thinking_level_is_none(self) -> None:
+        """
+        Scenario: Baseline entries have no thinking config
+        Slice: slice-1-gemini-api-client-and-registry
+        Given the three active baseline entries (no sweep suffix)
+        When thinking_level is read
+        Then it is None for all of them (API default)
+        """
+        ### Given
+        from config_models_google import GOOGLE_MODELS
+
+        ### When
+        baseline_keys = [
+            "google-gemini-4-argon",
+            "google-gemini-3.1-pro",
+            "google-gemini-3.8-flash",
+        ]
+
+        ### Then
+        for key in baseline_keys:
+            assert GOOGLE_MODELS[key]["thinking_level"] is None, (
+                f"{key}: expected thinking_level=None, got {GOOGLE_MODELS[key]['thinking_level']!r}"
+            )
+
     def test_given_model_entries_when_validated_then_each_has_required_metadata_keys(self) -> None:
         """
         Scenario: Model metadata validation
@@ -250,3 +306,77 @@ class TestLlmGoogleShould:
 
             with pytest.raises(RuntimeError, match="Fatal API crash"):
                 llm_google.call_llm("google-gemini-4-argon", "template", "text")
+
+    def test_given_thinking_level_sweep_model_when_called_then_reasoning_effort_is_passed(self) -> None:
+        """
+        Scenario: thinking_level forwarded as reasoning_effort
+        Slice: slice-1-gemini-api-client-and-registry
+        Given a sweep entry with thinking_level='low'
+        When call_llm is called
+        Then reasoning_effort='low' is passed directly to chat.completions.create
+        """
+        ### Given
+        import llm_google
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = '{"charity_number": "123"}'
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_response.usage.prompt_tokens = 50
+        mock_response.usage.completion_tokens = 10
+
+        ### When
+        with patch.object(llm_google, "_get_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_client.chat.completions.create.return_value = mock_response
+            mock_get_client.return_value = mock_client
+
+            llm_google.call_llm(
+                model_name="google-gemini-3.8-flash-think-low",
+                prompt_template="Extract: ",
+                extracted_text="Some text",
+            )
+
+            call_kwargs = mock_client.chat.completions.create.call_args.kwargs
+
+        ### Then
+        assert "reasoning_effort" in call_kwargs, "reasoning_effort must be passed for thinking-level models"
+        assert call_kwargs["reasoning_effort"] == "low"
+        assert "extra_body" not in call_kwargs, "extra_body must NOT be used for reasoning_effort models"
+
+    def test_given_baseline_model_when_called_then_extra_body_is_absent(self) -> None:
+        """
+        Scenario: No extra_body for baseline (thinking_level=None)
+        Slice: slice-1-gemini-api-client-and-registry
+        Given a baseline entry with thinking_level=None
+        When call_llm is called
+        Then extra_body is NOT passed to chat.completions.create
+        """
+        ### Given
+        import llm_google
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = '{"charity_number": "456"}'
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_response.usage.prompt_tokens = 50
+        mock_response.usage.completion_tokens = 10
+
+        ### When
+        with patch.object(llm_google, "_get_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_client.chat.completions.create.return_value = mock_response
+            mock_get_client.return_value = mock_client
+
+            llm_google.call_llm(
+                model_name="google-gemini-3.8-flash",
+                prompt_template="Extract: ",
+                extracted_text="Some text",
+            )
+
+            call_kwargs = mock_client.chat.completions.create.call_args.kwargs
+
+        ### Then
+        assert "extra_body" not in call_kwargs, (
+            "extra_body must NOT be passed for baseline models with thinking_level=None"
+        )
