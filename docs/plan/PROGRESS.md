@@ -36,4 +36,5 @@ Do not edit manually — skills append rows automatically.
 | 2026-10-31 | feat/slice-1-gemini-api-client-and-registry | verify (oracles) | 1 | PASS | 9/9 unit tests; registry oracle OK; live smoke gemini-4-argon OK (4.2s); all 4 model ids exist on live API |
 | 2026-10-31 | feat/slice-1-gemini-api-client-and-registry | refactor | 1 | DONE | Extracted truncate_to_ctx / call_with_backoff / read_usage into utils.py; OpenRouter re-verified live |
 | 2026-10-31 | feat/slice-1-gemini-api-client-and-registry | pricing fix | 1 | DONE | All 4 prices corrected from ai.google.dev pricing; 2.5-pro ctx 2M→1M. Argon price doubles 2026-12-01, 3.8 Flash 2027-01-01 |
+| 2026-10-31 | feat/slice-1-gemini-api-client-and-registry | create-pr | 1 | DONE | PR #32 opened against neomatrix369:main |
 
