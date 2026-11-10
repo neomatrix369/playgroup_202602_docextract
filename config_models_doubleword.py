@@ -612,8 +612,8 @@ DOUBLEWORD_MODELS = {
         "model":      "moonshotai/Kimi-K3.1-Pro",
         "multimodal": False,
         "modalities": ["text"],
-        "tier":       "premium",        # TODO: verify from DW catalog
-        "price_in":   0.00, "price_out": 0.00,  # TODO: fill from DW catalog
+        "tier":       "premium",
+        "price_in":   1.40, "price_out": 7.00,  # Async $/M from DW catalog 2026-11-10
         "ctx":        262_000,          # TODO: verify
         "notes":      "Kimi K3.1 Pro; verify pricing/tier/ctx/modalities",
     },
