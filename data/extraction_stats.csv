@@ -151,3 +151,4 @@ datetime,provider,model_short_name,model_full_name,tier,multimodal,price_in,pric
 2026-10-31 18:54:52,Google,google-gemini-2.5-pro,gemini-2.5-pro,pro,False,1.25,10.0,1048576,11,0,11,0.0,0,0,0.0,0.0,0.0,0,0,0,0,0,0,0,0,
 2026-10-31 18:58:16,Google,google-gemini-3.8-flash-think-medium,gemini-3.8-flash,flash,False,0.75,3.75,1048576,11,11,0,166.52,187325,1631,0.14661,15.14,0.013328,11,11,11,9,9,10,11,11,
 2026-10-31 19:09:47,Google,google-gemini-3.8-flash-think-high,gemini-3.8-flash,flash,False,0.75,3.75,1048576,11,11,0,690.79,187325,1622,0.146576,62.8,0.013325,11,11,11,9,9,10,11,11,
+2026-11-09 23:52:49,Doubleword,dw-kimi-k3.1-pro,moonshotai/Kimi-K3.1-Pro,premium,False,0.0,0.0,262000,11,11,0,35,160521,13052,0.0,3.18,0.0,11,11,11,9,9,10,11,11,7f1288af-0823-4697-bae7-60b05b6d9e32

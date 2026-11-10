@@ -16,6 +16,7 @@ DOUBLEWORD_MODELS = {
 
 
     "dw-deepseek-v4-pro": {
+        "potentially_deprecated": True,
         "model":      "deepseek-ai/DeepSeek-V4-Pro",
         "multimodal": False,
         "modalities": ["text"],
@@ -31,6 +32,7 @@ DOUBLEWORD_MODELS = {
         "description": "DeepSeek V4-Pro is DeepSeek's flagship open MoE model for advanced reasoning, coding, and agentic work. With 1.6T total parameters, 49B active parameters, and a 1M-token context window.",
     },
     "dw-deepseek-v4-flash": {
+        "potentially_deprecated": True,
         "model":      "deepseek-ai/DeepSeek-V4-Flash",
         "multimodal": False,
         "modalities": ["text"],
@@ -46,6 +48,7 @@ DOUBLEWORD_MODELS = {
         "description": "DeepSeek V4-Flash is a general-purpose open MoE model built for reasoning, tool use, and long-context work. With 284B total parameters, 13B active parameters, and a 1M-token context window.",
     },
     "dw-glm-5-1": {
+        "potentially_deprecated": True,
         "model":      "zai-org/GLM-5.1-FP8",
         "multimodal": False,
         "modalities": ["text"],
@@ -77,6 +80,7 @@ DOUBLEWORD_MODELS = {
         "usage_notes": "Same calling convention as GLM-5.1: Thinking Mode enabled by default. To disable: chat_template_kwargs: {enable_thinking: false}. Temp=1.0, TopP=0.95.",
     },
     "dw-nemotron-3-super-120b-a12b": {
+        "potentially_deprecated": True,
         "model":      "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4",
         "multimodal": False,
         "modalities": ["text"],
@@ -110,6 +114,7 @@ DOUBLEWORD_MODELS = {
         "usage_notes": "Same calling convention as Nemotron-Super: Temp=1.0, TopP=0.95. Thinking opt-in: extra_body={chat_template_kwargs: {enable_thinking: true}}. For low-effort mode add low_effort: true.",
     },
     "dw-gpt-oss-20b": {
+        "potentially_deprecated": True,
         "model":      "openai/gpt-oss-20b",
         "multimodal": False,
         "modalities": ["text"],
@@ -124,6 +129,7 @@ DOUBLEWORD_MODELS = {
         "description": "OpenAI gpt-oss-20b — for lower latency, and local or specialized use cases (21B parameters with 3.6B active parameters).",
     },
     "dw-gpt-oss-120b": {
+        "potentially_deprecated": True,
         "model":      "openai/gpt-oss-120b",
         "multimodal": False,
         "modalities": ["text"],
@@ -137,6 +143,7 @@ DOUBLEWORD_MODELS = {
         "usage_notes": "No special params required — same standard calling convention as gpt-oss-20b.",
     },
     "dw-qwen3-14b": {
+        "potentially_deprecated": True,
         "model":      "Qwen/Qwen3-14B-FP8",
         "multimodal": False,
         "modalities": ["text"],
@@ -177,6 +184,7 @@ DOUBLEWORD_MODELS = {
         "usage_notes": "Thinking Mode: enabled by default. To disable: chat_template_kwargs: {enable_thinking: false}. No graduated thinking levels.",
     },
     "dw-kimi-k2-6": {
+        "potentially_deprecated": True,
         "model":      "moonshotai/Kimi-K2.6",
         "multimodal": True,
         "modalities": ["text","image"],
@@ -206,6 +214,7 @@ DOUBLEWORD_MODELS = {
         "usage_notes": "To enable reasoning: chat_template_kwargs: {enable_thinking: true}. Supports image and video input via image_url and video_url content types.",
     },
     "dw-inkling": {
+        "potentially_deprecated": True,
         "model":      "thinkingmachines/Inkling-NVFP4",
         "multimodal": True,
         "modalities": ["text", "image"],   # also supports audio — not used in this benchmark
@@ -218,6 +227,7 @@ DOUBLEWORD_MODELS = {
         "usage_notes": "Has reasoning capability via <|content_thinking|> token — verify if on by default. Audio input supported but not used in this benchmark. Verify API call format before running evals.",
     },
     "dw-qwen3-5-9b": {
+        "potentially_deprecated": True,
         "model":      "Qwen/Qwen3.5-9B",
         "multimodal": True,
         "modalities": ["text","image"],
@@ -232,6 +242,7 @@ DOUBLEWORD_MODELS = {
         "usage_notes": "Thinking Mode: enabled by default. To disable: chat_template_kwargs: {enable_thinking: false}. No graduated thinking levels.",
     },
     "dw-qwen3-5-4b": {
+        "potentially_deprecated": True,
         "model":      "Qwen/Qwen3.5-4B",
         "multimodal": True,
         "modalities": ["text","image"],
@@ -246,6 +257,7 @@ DOUBLEWORD_MODELS = {
         "usage_notes": "Thinking Mode: enabled by default. To disable: chat_template_kwargs: {enable_thinking: false}. No graduated thinking levels.",
     },
     "dw-qwen3-5-9b-dottxt": {
+        "potentially_deprecated": True,
         "model":      "Qwen/Qwen3.5-9B-dottxt",
         "multimodal": True,
         "modalities": ["text","image"],
@@ -293,6 +305,7 @@ DOUBLEWORD_MODELS = {
         "usage_notes": "Thinking Mode: enabled by default. To disable: chat_template_kwargs: {enable_thinking: false}. dottxt structured generation enabled.",
     },
     "dw-qwen3-5-397b-a17b-dottxt": {
+        "potentially_deprecated": True,
         "model":      "Qwen/Qwen3.5-397B-A17B-FP8-dottxt",
         "multimodal": True,
         "modalities": ["text","image"],
@@ -311,6 +324,7 @@ DOUBLEWORD_MODELS = {
         "usage_notes": "Max New Tokens: 16384. Temp=0.7, TopP=0.8, TopK=20, MinP=0. presence_penalty=1.5. Thinking Mode: enabled by default. No graduated thinking. dottxt structured generation.",
     },
     "dw-qwen3-5-397b-a17b": {
+        "potentially_deprecated": True,
         "model":      "Qwen/Qwen3.5-397B-A17B-FP8",
         "multimodal": True,
         "modalities": ["text","image"],
@@ -328,6 +342,7 @@ DOUBLEWORD_MODELS = {
         "usage_notes": "Max New Tokens: 16384. Temp=0.7, TopP=0.8, TopK=20, MinP=0. presence_penalty=1.5. Thinking Mode: enabled by default. No graduated thinking.",
     },
     "dw-qwen3-vl-30b-a3b-instruct": {
+        "potentially_deprecated": True,
         "model":      "Qwen/Qwen3-VL-30B-A3B-Instruct-FP8",
         "multimodal": True,
         "modalities": ["text","image"],
@@ -368,6 +383,7 @@ DOUBLEWORD_MODELS = {
 
 
     "dw-deepseek-ocr-2": {
+        "potentially_deprecated": True,
         "model":      "deepseek-ai/DeepSeek-OCR-2",
         "multimodal": True,
         "modalities": ["image","text"],
@@ -408,6 +424,7 @@ DOUBLEWORD_MODELS = {
         "usage_notes": "Do not include system or user prompt (model repeats it). Send image directly in content. Render PDFs to PNG/JPEG at longest dimension 1540px.",
     },
     "dw-olmocr-2-7b-1025": {
+        "potentially_deprecated": True,
         "model":      "allenai/olmOCR-2-7B-1025-FP8",
         "multimodal": True,
         "modalities": ["image","text"],
@@ -431,6 +448,7 @@ DOUBLEWORD_MODELS = {
     # ═══════════════════════════════════════════════════════════
 
     "dw-gemma-4-26b-a4b-it": {
+        "potentially_deprecated": True,
         "model":      "google/gemma-4-26B-A4B-it",
         "multimodal": False,
         "modalities": ["text"],
@@ -463,6 +481,7 @@ DOUBLEWORD_MODELS = {
         "notes":      "",
     },
     "dw-hy3-fp8": {
+        "potentially_deprecated": True,
         "model":      "tencent/Hy3-FP8",
         "multimodal": False,
         "modalities": ["text"],
@@ -500,6 +519,7 @@ DOUBLEWORD_MODELS = {
     # ═══════════════════════════════════════════════════════════
 
     "dw-mimo-v2.5-pro": {
+        "potentially_deprecated": True,
         "model":      "XiaomiMiMo/MiMo-V2.5-Pro",
         "multimodal": False,
         "modalities": ["text"],
@@ -582,6 +602,20 @@ DOUBLEWORD_MODELS = {
         "price_in":   0.00, "price_out": 0.00,  # TODO: fill from DW catalog
         "ctx":        262_000,          # TODO: verify
         "notes":      "Meta Muse Spark Open; verify pricing/tier/ctx",
+    },
+
+    # ═══════════════════════════════════════════════════════════
+    #  AUTO-ADDED 2026-11-09 — prices/tier/ctx need review
+    # ═══════════════════════════════════════════════════════════
+
+    "dw-kimi-k3.1-pro": {
+        "model":      "moonshotai/Kimi-K3.1-Pro",
+        "multimodal": False,
+        "modalities": ["text"],
+        "tier":       "premium",
+        "price_in":   1.40, "price_out": 7.00,  # Async $/M from DW catalog 2026-11-10
+        "ctx":        262_000,          # TODO: verify
+        "notes":      "Kimi K3.1 Pro; verify pricing/tier/ctx/modalities",
     },
 
 }
